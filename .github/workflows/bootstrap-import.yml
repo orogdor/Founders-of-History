@@ -19,7 +19,6 @@ jobs:
           git -C "$RUNNER_TEMP/source" archive HEAD | tar -xf - -C "$GITHUB_WORKSPACE"
           cp -a .bootstrap-overlay/. .
           rm -rf .bootstrap-overlay
-          rm .github/workflows/bootstrap-import.yml
           git add -A
-          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -m "Import latest Founders of History game"
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "Import latest Founders of History game"
           git push origin HEAD:main
