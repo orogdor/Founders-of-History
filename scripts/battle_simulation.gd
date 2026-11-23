@@ -17,6 +17,7 @@ const Assault=preload("res://scripts/siege_assault.gd")
 const WallWalk=preload("res://scripts/wall_walk.gd")
 const TowerGuards=preload("res://scripts/tower_garrison.gd")
 const Support=preload("res://scripts/siege_support.gd")
+const Targeting=preload("res://scripts/battle_targeting.gd")
 const DATA=preload("res://data/economy.json")
 const SWORDS=["archer","bronze_archer","iron_archer","crossbowman","chariot","stone_guard"]
 const ARROWS=["slinger","archer","bronze_archer","iron_archer","crossbowman","chariot","javelinman"]
@@ -25,6 +26,7 @@ const STRAIGHT_FIRE=["musketeer","arquebusier","line_infantry","rifleman","machi
 var game_state: Variant=null
 var crowd=Crowd.new()
 var arrivals=Arrivals.new()
+var targeting=Targeting.new()
 
 static func alive(unit: Dictionary) -> bool:
  return float(unit.hp)>0 and not unit.get("retreated",false) and not unit.get("reserve",false)
@@ -105,8 +107,10 @@ func step(battle: Dictionary,delta: float,technology: Variant=0,nav: Variant=nul
  for unit in squads:move_anchor(unit,squads,battle,arrival_goals,dt,nav)
  var open: Callable=Callable(nav,"is_open") if nav!=null else func(_x,_z):return true
  var radius_of=func(p):return float(p.get("radius",0.34))
- for actor in agents:
-  move_fighter(actor,agents,squads,battle,bins,dt,technology,open,radius_of,nav)
+ targeting.rebuild(agents)
+ for index in agents.size():
+  move_fighter(agents[index],agents,squads,battle,bins,dt,technology,open,radius_of,nav)
+  targeting.update_agent(index)
  if not battle.has("ballistaShots"):battle.ballistaShots=[]
  Resolution.finish_tick(battle,squads,dt)
 
@@ -174,14 +178,9 @@ func move_fighter(actor: Dictionary,agents: Array,squads: Array,battle: Dictiona
   if float(man.get("cool",0))>0:man.cool=float(man.cool)*3
   man.catapultReloadVersion=104
  man.cool=maxf(0,float(man.get("cool",0))-dt);man.wasMoving=bool(man.get("moving",false));man.moving=false
- var enemy: Variant=null;var best:=INF;var threat: Variant=null;var threat_distance:=INF
- for p in agents:
-  if p.u.team==unit.team or float(p.m.hp)<=0 or p.m.get("escaped",false) or p.u.get("retreated",false):continue
-  if unit.get("attackTargetSource")!=null and p.u.source!=unit.attackTargetSource:continue
-  if unit.get("combatMode","auto")=="manual" and unit.get("attackTargetSource")==null:continue
-  var d:=Doctrine.distance(man,p.m);var score: float=d+(-1.2 if man.get("targetId")==p.m.id else 0)+absf(float(p.m.z)-float(man.z))*0.15
-  if not p.u.get("routing",false) and not p.m.get("routing",false) and d<threat_distance:threat=p.m;threat_distance=d
-  if score<best:best=score;enemy=p
+ var selected:=targeting.query(actor)
+ var enemy: Variant=selected.enemy;var best:=float(selected.best)
+ var threat: Variant=selected.threat;var threat_distance:=float(selected.threat_distance)
  man.targetId=enemy.m.id if enemy!=null else null
  if unit.kind=="dragoon" and not unit.get("routing",false) and not man.get("routing",false):man.dismounted=enemy!=null and not unit.get("manualOrder",false) and best<float(stats.range)*1.15 and threat_distance>5
  elif unit.kind=="dragoon":man.dismounted=false
