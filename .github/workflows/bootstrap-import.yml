@@ -1,0 +1,25 @@
+name: Import latest game snapshot
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  import:
+    if: github.event.head_commit.message == 'Prepare game import'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import tested Kuningriigid snapshot and rename
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch godot-port-lahtekood --no-checkout https://github.com/orogdor/Kuningriigid.git "$RUNNER_TEMP/source"
+          test "$(git -C "$RUNNER_TEMP/source" rev-parse HEAD)" = bf024414d7887453af0259330523e95bbc07db6c
+          git -C "$RUNNER_TEMP/source" archive HEAD | tar -xf - -C "$GITHUB_WORKSPACE"
+          cp -a .bootstrap-overlay/. .
+          rm -rf .bootstrap-overlay
+          rm .github/workflows/bootstrap-import.yml
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -m "Import latest Founders of History game"
+          git push origin HEAD:main
