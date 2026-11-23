@@ -9,6 +9,7 @@ const View=preload("res://scripts/battle_view.gd")
 const Marker=preload("res://scripts/world_marker_models.gd")
 const Motion=preload("res://scripts/human_motion.gd")
 const Human=preload("res://assets/people/human_far.glb")
+const Humans=preload("res://scripts/human_factory.gd")
 const Dog=preload("res://scripts/scout_dog.gd")
 var host: Node
 var center:=Vector2i.ZERO
@@ -49,7 +50,13 @@ func make_person(kind: String,team: int,phase: float) -> Node3D:
   var motion:=Motion.new();motion.phase=phase;person.set_meta("traveller_motion",motion)
  return person
 
+func team_era(team: int) -> int:
+ if host==null or not "game" in host or not host.game is Dictionary:return 0
+ var ages: Array=host.game.get("ages",[])
+ return int(ages[team]) if team>=0 and team<ages.size() else 0
+
 func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dictionary:
+ var era:=team_era(team)
  var root:=Node3D.new();root.name="Traveller";root.set_meta("traveller_key",key);add_child(root)
  var people: Array=[]
  if kind=="army":
@@ -58,12 +65,12 @@ func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dic
    var person:=make_person(str(unit.kind),team,float(i)*0.17);person.position=Vector3((i%4-1.5)*0.7,0,floori(float(i)/4)*0.8);root.add_child(person);people.append(person)
  elif kind=="settler":
   for i in 3:
-   var person:=Human.instantiate();person.scale=Vector3.ONE*1.66;person.position=Vector3((i-1)*0.9,0,-i*0.5);root.add_child(person)
+   var person:=Humans.create(["man","woman","boy" if Humans.stable_hash(key)%2==0 else "girl"][i],era,"settler",Humans.stable_hash(key+str(i)));person.scale=Vector3.ONE*(1.66*Humans.size_factor(person));person.position=Vector3((i-1)*0.9,0,-i*0.5);root.add_child(person)
    var motion:=Motion.new();motion.phase=i*0.7;person.set_meta("traveller_motion",motion);people.append(person)
  elif kind=="boat":
   Marker.add_ship(root,"transport",team,0);root.scale=Vector3.ONE*5.0
  else:
-  var person:=Human.instantiate();person.scale=Vector3.ONE*1.66;person.position=Vector3(0.8,0,0.8);root.add_child(person)
+  var person:=Humans.create(Humans.pick_body(key,"merchant"),era,"merchant",Humans.stable_hash(key));person.scale=Vector3.ONE*1.66;person.position=Vector3(0.8,0,0.8);root.add_child(person)
   var motion:=Motion.new();person.set_meta("traveller_motion",motion);people.append(person)
   var cart:=MeshInstance3D.new();var mesh:=BoxMesh.new();mesh.size=Vector3(1.4,0.7,2.0);cart.mesh=mesh;cart.position=Vector3(0,0.8,-0.4)
   var material:=StandardMaterial3D.new();material.albedo_color=Color("8b6a44");cart.material_override=material;root.add_child(cart)

@@ -7,15 +7,20 @@ const WORK:={"lumber":"stone_lumber","forester":"stone_forester","quarry":"stone
 
 static func attach(model: Node,bone: String,kind: String,offset:=Vector3.ZERO) -> Node3D:
 	var skeleton:=Motion.find_skeleton(model)
-	if skeleton==null or skeleton.find_bone(bone)<0:return null
+	if skeleton==null:return null
+	var rig: Variant=skeleton.get_meta("human_rig") if skeleton.has_meta("human_rig") else null
+	var bone_name: String=rig.bone_name(bone) if rig!=null else bone
+	if skeleton.find_bone(bone_name)<0:return null
 	var path: String="res://assets/people/equipment/"+kind+".glb"
 	if not ResourceLoader.exists(path):return null
 	if not scenes.has(kind):scenes[kind]=load(path)
-	var attachment:=BoneAttachment3D.new();attachment.bone_name=bone;skeleton.add_child(attachment)
+	var attachment:=BoneAttachment3D.new();attachment.bone_name=bone_name;skeleton.add_child(attachment)
+	var holder: Node3D=attachment
+	if rig!=null:holder=rig.prop_frame(bone);attachment.add_child(holder)
 	var prop: Node3D=scenes[kind].instantiate();prop.position=offset
 	if FLIP.has(kind):prop.rotation.z=PI;prop.position.y+=float(FLIP[kind])
 	if kind=="stone_herder":prop.rotation.x=1.4
-	attachment.add_child(prop);return prop
+	holder.add_child(prop);return prop
 
 static func job(model: Node,kind: String) -> Node3D:
 	var tool: String=WORK.get(kind,"stone_worker")

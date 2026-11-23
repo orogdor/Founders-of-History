@@ -7,6 +7,7 @@ const Equipment=preload("res://scripts/human_equipment.gd")
 const MarkerModels=preload("res://scripts/world_marker_models.gd")
 const HUMAN=preload("res://assets/people/human_far.glb")
 const GUARD=preload("res://assets/people/spearman_v262.glb")
+const Humans=preload("res://scripts/human_factory.gd")
 const HOMES:=[Vector2(-15,-15),Vector2(14,-16),Vector2(0,16),Vector2(-17,13),Vector2(17,12),Vector2(-9,18),Vector2(19,-3),Vector2(-21,0),Vector2(9,-17),Vector2(5,19)]
 const ACTIONS:={"chat":"talk","work":"build","carry":"carry","sit":"sit","rest":"sit","eat":"eat","play":"play","celebrate":"play","guard":"guard"}
 var host: Node
@@ -20,11 +21,17 @@ var cursor:=0
 
 func setup(owner: Node,id: String,tile: Vector2i,tile_heights: Array,owner_team: int,nearby:=false,visual:=PackedVector4Array()) -> void:
 	host=owner;site_id=id;site_tile=tile;heights=tile_heights;visual_heights=visual;team=owner_team
+	var era:=0
+	if team>=0 and host!=null and "game" in host and host.game is Dictionary and host.game.has("ages") and team<host.game.ages.size():era=int(host.game.ages[team])
 	for i in (2 if nearby else 6):
 		var root:=Node3D.new();add_child(root)
-		var figure: Node3D=(GUARD if i==0 else HUMAN).instantiate()
-		if i==0:MarkerModels.apply_colors(figure)
-		figure.scale=Vector3.ONE*(1.66*(1.03 if i==0 else 0.69 if i==3 else 0.94));root.add_child(figure)
+		var figure: Node3D
+		if i==0:figure=GUARD.instantiate();MarkerModels.apply_colors(figure)
+		else:
+			var key:="%s:%d" % [id,i]
+			figure=Humans.create(Humans.pick_body(key,"",i==3),era,"",Humans.stable_hash(key))
+		var size:=1.03 if i==0 else (0.69 if i==3 and not Humans.is_real(figure) else 0.94)
+		figure.scale=Vector3.ONE*(1.66*size);root.add_child(figure)
 		var basket:=Equipment.attach(figure,"hand_L","load_basket",Vector3(0,-0.04,0.04))
 		if basket!=null:basket.visible=false
 		var p: Vector2=HOMES[i%HOMES.size()];root.position=Vector3(p.x,Terrain.visual_rendered_height(heights,visual_heights,p.x,p.y),p.y)
