@@ -6,7 +6,7 @@ Proovirõivad: MakeHumani abivõrkudest (helper-tights, helper-skirt, helper-hai
 
 Käivitus: python3 mpfb_bodies.py <mpfb_data> <makehuman_data> <projekt> [--clothes]
 """
-import gzip, json, math, os, struct, sys
+import gzip, json, math, os, struct, sys, zlib
 import numpy as np
 
 MPFB, MHDATA, PROJECT = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -420,7 +420,7 @@ import textures as TX
 TEXDIR = f"{PROJECT}/assets/people/textures"
 FABRIC_SIZE = 1024
 FABRICS = ("linen", "straw", "wool", "denim", "jersey", "leather", "hide", "oilcloth", "fur", "hair", "braid", "metal",
-           "herringbone", "plaid", "stripe", "brocade", "knit", "twill", "felt", "quilted", "mail", "plate", "camo")
+           "herringbone", "plaid", "stripe", "brocade", "knit", "twill", "felt", "quilted", "mail", "plate", "camo", "hairlock")
 
 def write_fabrics():
     os.makedirs(TEXDIR, exist_ok=True)
@@ -442,7 +442,7 @@ def uv_meters(V, group):
 
 TILE_M = {"linen": 0.22, "straw": 0.3, "wool": 0.28, "denim": 0.22, "jersey": 0.16, "leather": 0.35, "hide": 0.45,
           "oilcloth": 0.35, "fur": 0.3, "hair": 0.18, "braid": 0.25, "metal": 0.08, "herringbone": 0.3, "plaid": 0.35, "stripe": 0.45,
-          "brocade": 0.3, "knit": 0.2, "twill": 0.22, "felt": 0.3, "quilted": 0.6, "mail": 0.55, "plate": 0.5, "camo": 0.9}
+          "brocade": 0.16, "knit": 0.2, "twill": 0.22, "felt": 0.3, "quilted": 0.6, "mail": 0.55, "plate": 0.5, "camo": 0.9}
 
 def raster_vertex(size, tris_uv, tri_vals, img=None):
     """Kolmnurgad UV-s, väärtused tippudes; interpoleerib (max olemasolevaga)."""
@@ -515,7 +515,7 @@ def bake_skin(V, name, tone):
         return np.array(_I.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(blur)), float) / 255
     masks = {k: f"{MPFB}/textures/mpfb_{k}.jpg" for k in ("lips", "eyelids", "ears", "fingernails", "toenails")}
     pre = {"red": field("red", 6), "brow": field("brow", 1.2), "beard": field("beard", 4), "scalp": field("scalp", 6)}
-    albedo, normal, rough = TX.skin_baked(S, faces_uv, pre, masks, tone, seed=hash(name) % 97, beard=(name == "man"))
+    albedo, normal, rough = TX.skin_baked(S, faces_uv, pre, masks, tone, seed=zlib.crc32(name.encode()) % 97, beard=(name == "man"))
     os.makedirs(TEXDIR, exist_ok=True)
     albedo.save(f"{TEXDIR}/skin_{name}_albedo.png"); normal.save(f"{TEXDIR}/skin_{name}_normal.png"); rough.save(f"{TEXDIR}/skin_{name}_orm.png")
 
@@ -609,8 +609,8 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
     neck = joint_y(V, "joint-neck"); head = joint_y(V, "joint-head"); head2 = joint_y(V, "joint-head-2")
     chest = joint_y(V, "joint-spine-1")
     skirt_mid_z = V[group_vertices("helper-skirt"), 2].mean()
-    layer = {"underwear": 0.002, "socks": 0.002, "shirt": 0.004, "legs": 0.005, "torso": 0.008, "armor": 0.012, "armarm": 0.012,
-             "cuirass": 0.02, "feet": 0.006, "apron": 0.03, "belt": 0.028, "outer": 0.016, "head": 0.01, "jewelry": 0.006}.get(slot, 0.005)
+    layer = {"underwear": 0.001, "socks": 0.0015, "shirt": 0.0055, "legs": 0.003, "torso": 0.008, "armor": 0.012, "armarm": 0.012,
+             "cuirass": 0.02, "feet": 0.006, "apron": 0.03, "belt": 0.042, "outer": 0.016, "head": 0.01, "jewelry": 0.006}.get(slot, 0.005)
     parts = []
     skirty = any(k in item_id for k in SKIRTY)
     if slot in ("hair", "beard"):
@@ -638,7 +638,26 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
         parts.append((select_faces("body", V, zones={"neck", "torso"}, ymin=neck - 0.45, ymax=neck - 0.15), N_body, 0.006, "body"))
         return parts
     if slot == "belt":
-        parts.append((select_faces("helper-tights", V, ymin=pelvis + 0.35, ymax=pelvis + 0.75), N_tights, layer, "helper-tights"))
+        if "crossbelts" in item_id:
+            # kaks diagonaalrihma õlalt vastasküljele (üle mundri)
+            sh = joint_y(V, "joint-l-shoulder"); xs = abs(V[group_vertices("joint-l-shoulder"), 0].mean())
+            fs = select_faces("helper-tights", V, zones={"torso"}, ymin=pelvis + 0.2)
+            c = V[FACE_PAD[fs]].mean(1)
+            k = (sh - (pelvis + 0.4)) / (2 * xs * 0.85)
+            ym = (sh + pelvis + 0.4) / 2
+            keep = [f for f, (x, y, z) in zip(fs, c) if min(abs((y - ym) - k * x), abs((y - ym) + k * x)) < 0.22 * np.sqrt(1 + k * k)]
+            parts.append((keep, N_tights, 0.03, "helper-tights"))
+            return parts
+        if "disc" in item_id:
+            parts.append((select_faces("helper-tights", V, ymin=pelvis + 0.5, ymax=pelvis + 0.62), N_tights, layer, "helper-tights"))
+            Pd = DRAPED["helper-tights"][0] if "helper-tights" in DRAPED else V
+            ids = group_vertices("helper-tights"); Q = Pd[ids]
+            band = Q[(np.abs(Q[:, 1] - (pelvis + 0.56)) < 0.12) & (np.abs(Q[:, 0]) < 0.25)]
+            cen = np.array([0.0, pelvis + 0.56, band[:, 2].max() + layer * 10 + 0.04])
+            parts.append(("gen", HAIR.disc(HEADS[CURRENT_BODY], cen, 0.42, 0.07)))
+            return parts
+        k = pelvis / 9.7   # lastel kitsam vöö
+        parts.append((select_faces("helper-tights", V, ymin=pelvis + 0.4 * k, ymax=pelvis + 0.72 * k), N_tights, layer, "helper-tights"))
         return parts
     if slot == "apron":
         parts.append((select_faces("helper-skirt", V, ymin=knee + 0.2, front=skirt_mid_z), N_skirt, layer, "helper-skirt"))
@@ -655,7 +674,8 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
     skirt_top = V[group_vertices("helper-skirt"), 1].max()
     if upper:
         ymin = skirt_top - 0.5 if skirty and lower else pelvis - 0.1
-        parts.append((select_faces("helper-tights", V, zones=upper, ymin=ymin), N_tights, layer + (0.004 if skirty and lower else 0), "helper-tights"))
+        fs = select_faces("helper-tights", V, zones=upper, ymin=ymin)
+        parts.append((fs, N_tights, layer + (0.004 if skirty and lower else 0), "helper-tights"))
     if skirty and lower:
         hem = ankle + 0.4 if "shins" in hides else knee - 0.4 if "thighs" in hides else knee + 1.2
         parts.append((select_faces("helper-skirt", V, ymin=hem), N_skirt, layer + 0.018, "helper-skirt"))
@@ -705,6 +725,42 @@ def taubin(P, fids, iterations=24, lam=0.5, mu=-0.53):
     out = P.copy(); out[used] = Q
     return out
 
+def drape(P0, N, fids, iterations=48, cap=0.22, lam=0.5, interior=True, normal_only=False):
+    """Riide langemine: Laplace'i silumine, mis ei lase riidel kehale läheneda (nõgusad kohad täituvad
+    kuni `cap` dm, kumerad jäävad alles). Servaahelaid silutakse ainult piki serva, nii kaovad sakid."""
+    used = np.unique(FACE_PAD[fids].ravel())
+    if len(used) < 4:
+        return P0
+    remap = -np.ones(len(P0), int); remap[used] = np.arange(len(used))
+    count = {}
+    for fi in fids:
+        f = BASE_F[fi]
+        for k in range(len(f)):
+            a, b = remap[f[k]], remap[f[(k + 1) % len(f)]]
+            if a == b: continue
+            e = (a, b) if a < b else (b, a); count[e] = count.get(e, 0) + 1
+    edges = np.array(list(count.keys())); border = np.array([count[tuple(e)] == 1 for e in edges])
+    n = len(used)
+    on_border = np.zeros(n, bool); on_border[edges[border].ravel()] = True
+    def rownorm(E):
+        r = np.r_[E[:, 0], E[:, 1]]; c = np.r_[E[:, 1], E[:, 0]]
+        A = sparse.coo_matrix((np.ones(len(r)), (r, c)), shape=(n, n)).tocsr(); A.data[:] = 1.0
+        d = np.asarray(A.sum(1)).ravel(); d[d == 0] = 1
+        return sparse.diags(1 / d) @ A
+    Mi = rownorm(edges); Mb = rownorm(edges[border])
+    sel = sparse.diags(on_border.astype(float))
+    M = sel @ Mb + sparse.diags((~on_border).astype(float)) @ (Mi if interior else sparse.identity(n, format="csr"))
+    base = P0[used]; Nu = N[used]; Q = base.copy()
+    for _ in range(iterations):
+        step = lam * (M @ Q - Q)
+        if normal_only:   # ainult piki normaali: riie ei libise (varrukad ei lühene)
+            step = np.sum(step * Nu, 1)[:, None] * Nu
+        Q = Q + step
+        d = np.sum((Q - base) * Nu, 1)
+        Q = Q + (np.clip(d, 0.0, cap) - d)[:, None] * Nu
+    out = P0.copy(); out[used] = Q
+    return out
+
 TEX_CACHE = {}
 OLD_ERAS = ("stone_", "bronze_", "iron_", "med_")
 
@@ -712,11 +768,11 @@ def garment_shade(V, P, item_id, fids):
     """Tipuvärv (lineaarne halltoon): voldilaadne müra, kaenla-/jalgevahe varjud, vanadel ajastutel äärte mustus."""
     used = np.unique(FACE_PAD[fids].ravel())
     c = np.ones(len(P))
-    rng = np.random.default_rng(abs(hash(item_id)) % 9973)
+    rng = np.random.default_rng(zlib.crc32(item_id.encode()) % 9973)
     # voldid: mõned siinuslained piki keha, eri suundades
-    for _ in range(5):
-        d = rng.normal(size=3); d[1] *= 0.35; d /= np.linalg.norm(d)
-        c -= 0.035 * (0.5 + 0.5 * np.sin(P @ d * rng.uniform(5, 11) + rng.uniform(0, 6.3)))
+    for _ in range(3):   # pikad püstised voldid (heledatel kangastel ei tohi laike jääda)
+        d = rng.normal(size=3); d[1] *= 0.12; d /= np.linalg.norm(d)
+        c -= 0.022 * (0.5 + 0.5 * np.sin(P @ d * rng.uniform(7, 12) + rng.uniform(0, 6.3)))
     def near(cube, s):
         q = V[group_vertices(cube)].mean(0)
         return np.exp(-np.sum((P - q) ** 2, 1) / (2 * s * s))
@@ -747,17 +803,21 @@ def build_garment(body, item_id, item, V, globals_, normals):
             nm = f"{item_id}_{k}"; g.mesh(nm, md, mat); names.append(nm)
             continue
         fids, N, off, grp = prt
-        P = V + N * off * 10
-        if grp == "helper-skirt":
-            P = taubin(P, fids, 6, 0.5, 0.0)   # kerge silumine, kõhu kuju kaob
+        if grp in DRAPED:
+            # kõik kihid samal langenud pinnal (nõgusad kohad täidetud), siis kihi nihe ja siledad servad
+            Pd, Nd = DRAPED[grp]
+            extra = np.full(len(V), 0.012 if grp != "helper-skirt" else 0.0)
+            if item["slot"] == "legs" and grp == "helper-tights" and not any(k in item_id for k in ("hose", "leggings", "stockings")):
+                # püksisääred lahedamad, värvel jääb särgi alla
+                crotch = joint_y(V, "joint-l-upper-leg"); ankle = joint_y(V, "joint-l-ankle")
+                top = np.clip((crotch + 0.3 - V[:, 1]) / 1.2, 0, 1)
+                low = np.clip((V[:, 1] - (ankle + 2.0)) / 1.0, 0, 1)      # saabaste säärte all kitsam
+                extra += 0.1 * top * (0.2 + 0.8 * low)
+            P = Pd + Nd * (off * 10 + extra)[:, None]
+            P = drape(P, Nd, fids, 30, 0.0, interior=False)
             Nn = vertex_normals(P, fids)
-        elif grp in ("helper-tights", "body") and kind not in ("metal",):
-            # lahtisem riie: tugev silumine kehal, nõrgem pea ümber; siis väike nihe välja tagasi
-            P = taubin(P, fids, 30 if grp == "helper-tights" else 8)
-            P = P + N * 0.03
-            Nn = vertex_normals(P, fids)
-        if grp not in ("helper-skirt", "helper-tights", "body") or kind == "metal":
-            Nn = N
+        else:
+            P = V + N * off * 10; Nn = N
         C = garment_shade(V, P, item_id, fids) if kind not in ("hair", "metal") else None
         md = mesh_from_tris(triangulate(fids), P * SCALE, Nn, JOINTS, WTS, BASE_VT, UV_M[grp] / TILE_M[kind], C)
         nm = f"{item_id}_{k}"; g.mesh(nm, md, mat); names.append(nm)
@@ -779,7 +839,7 @@ def write_hair_part(item_id, body, parts, globals_):
     names = []
     for k, (kind, part) in enumerate(parts):
         mat = g.material(item_id + "_" + kind, (1, 1, 1), 1.0, 0.0, t(kind, "albedo"), double=True,
-                         normal=t(kind, "normal"), orm=t(kind, "orm"), normal_scale=0.8)
+                         normal=t(kind, "normal"), orm=t(kind, "orm"), normal_scale=0.8, alpha=0.5 if kind == "hairlock" else None)
         g.mesh(f"{item_id}_{k}", HAIR.to_md(part), mat); names.append(f"{item_id}_{k}")
     g.write(f"{PROJECT}/assets/people/clothes/{item_id}/{body}.glb", globals_, names,
             {"generated": "tools/hair.py", "note": "Parameetriline soeng/habe MPFB2 kehale."})
@@ -798,10 +858,14 @@ def build_hair(body, V, N_body, globals_):
 
 UV_M = {}
 HEADS = {}
+DRAPED = {}
 CURRENT_BODY = None
 if __name__ == "__main__":
-    write_fabrics()
+    ONLY_BODIES = [b for b in os.environ.get("ONLY_BODIES", "").split(",") if b]
+    ONLY_ITEMS = os.environ.get("ONLY_ITEMS", "")
+    if not os.environ.get("SKIP_FABRICS"): write_fabrics()
     for name in BODIES:
+        if ONLY_BODIES and name not in ONLY_BODIES: continue
         print("keha", name)
         V, N_body, globals_ = build_body(name)
         for grp in ("body", "helper-tights", "helper-skirt", "helper-hair"):
@@ -810,6 +874,11 @@ if __name__ == "__main__":
         if MAKE_CLOTHES:
             normals = (N_body, vertex_normals(V, faces_of("helper-tights")), vertex_normals(V, faces_of("helper-skirt")),
                        vertex_normals(V, faces_of("helper-hair")))
-            made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items() if it["slot"] not in ("hair", "beard"))
-            made += build_hair(name, V, N_body, globals_)
+            DRAPED.clear()
+            for grp, Ng, it_, cap_ in (("helper-tights", normals[1], 600, 0.25), ("helper-skirt", normals[2], 300, 0.35), ("body", N_body, 40, 0.08)):
+                fall = faces_of(grp); Pd = drape(V.copy(), Ng, fall, it_, cap_, lam=0.9, normal_only=True)
+                DRAPED[grp] = (Pd, vertex_normals(Pd, fall))
+            made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items()
+                       if it["slot"] not in ("hair", "beard") and (not ONLY_ITEMS or any(iid.startswith(k) for k in ONLY_ITEMS.split(","))))
+            if not ONLY_ITEMS or "hair" in ONLY_ITEMS: made += build_hair(name, V, N_body, globals_)
             print("  proovirõivaid", made)

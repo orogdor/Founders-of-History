@@ -66,9 +66,13 @@ Pildid ja testid:
 
 Ilma graafikata (`--headless`) testid kontrollivad sama, kuid pilte ei salvesta.
 
+## Riiete langemine
+
+Rõivad ei kleepu kehale: `tools/mpfb_bodies.py` (`drape`) täidab abivõrgu nõgusad kohad (rinna vahe, selja nõgusus, kõhulihaste vaod, jalgevahe) kuni 2,5 cm ulatuses ja kõik kihid tehakse sellelt samalt pinnalt, nii et kihid (särk, kuub, vöö, põll) ei lõika üksteisest läbi. Riiete servad (kaelus, varrukaotsad, alläär) silutakse piki serva, et need ei oleks sakilised. Püksisääred on lahedamad kui säärised ja sukad, saapasäärte all kitsamad. Heledatel kangastel pole suuri laike. Inimestel on veidi erinev nahatoon (`HumanFactory.tint_skin`).
+
 ## Soengud ja habemed
 
-Soengud tehakse skriptiga `tools/hair.py` pea kuju järgi: peanahk kindla juustejoonega (laup, oimud, kukal), juuksekardinad, patsid ja hobusesabad torudena, nutsud ning pärjapats. Lokkis soengutel on pinnal lokid. Habemed (lühike, täis-, pikk, vuntsid, kitsehabe) tehakse näo piirkondadest ja huuled jäetakse vabaks. Juuste värv on inimesel ühine (soeng + habe), värvid on JSON-i `hair_colors` all.
+Soengud tehakse skriptiga `tools/hair.py` pea kuju järgi: peanahk kindla juustejoonega (laup, oimud, kukal), pikad juuksed paksusega kihina, mille otsad on salkudena läbipaistvad (`hairlock` tekstuur alfaga), patsid kolmest keerduvast salgust, hobusesabad, nutsud ning pärjapats. Lokkis soengutel on pinnal lokid; polkpea otsad keeravad sisse. Habemed (lühike, täis-, pikk, vuntsid, kitsehabe) tehakse näo piirkondadest ja huuled jäetakse vabaks. Juuste värv on inimesel ühine (soeng + habe), värvid on JSON-i `hair_colors` all.
 
 ## Sõdurid
 

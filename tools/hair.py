@@ -231,6 +231,9 @@ def curtain(h, s, cap_P, bverts, seed):
         return None
     order = np.argsort(np.where(th < 0, th + 2 * np.pi, th))
     pts = pts[order]
+    # serv on sakiline (tipud vahelduvad): silu nurga järjekorras
+    k = 7; pad = np.vstack([pts[:1].repeat(k // 2, 0), pts, pts[-1:].repeat(k // 2, 0)])
+    pts = np.stack([np.convolve(pad[:, j], np.ones(k) / k, mode="valid") for j in range(3)], 1)
     # ühtlane jaotus kaare pikkuse järgi
     seg = np.r_[0, np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))]
     n = max(16, int(seg[-1] / 0.12))
@@ -242,32 +245,57 @@ def curtain(h, s, cap_P, bverts, seed):
     st = st + np.array([0, 0.3, 0])
     th0 = h.theta(st)
     r_prev = h.body_r(st[:, 1], th0) + 0.01
+    R_in = np.zeros((rows, n))
+    clear = s.get("clear", 0.18)
     for r in range(rows):
         f = r / (rows - 1)
         y = st[:, 1] + (y_end + jitter - st[:, 1]) * f
         # õlgadest allpool lähevad juuksed selja taha
         back = np.sign(th0) * np.maximum(np.abs(th0), s.get("behind", 2.05))
         tt = th0 + (back - th0) * smoothstep(h.shoulder_y + 0.6, h.shoulder_y - 0.4, y)
-        rb = h.body_r(y, tt) + s.get("clear", 0.18)
+        body = h.body_r(y, tt)
+        rb = body + clear
         rad = np.maximum(rb, r_prev * 0.985) if r else r_prev
+        rad = r_prev + (rad - r_prev) * min(1.0, 0.35 + f * 2.5) if r else rad      # tuleb mütsi alt sujuvalt välja
+        if r and f > 0.35:   # õlgadel ei hakka juuksed külgedele turritama: otsad jäävad õlale
+            rad = np.minimum(rad, r_prev + 0.025)
+        if s.get("tuck"):   # polkpea ots keerab sisse
+            rad = rad - s["tuck"] * smoothstep(0.7, 1.0, f)
         rad = rad + s.get("wave", 0.0) * np.sin(y * 6 + np.arange(n) * 0.7)
         P[r, :, 0] = h.c[0] + np.sin(tt) * rad
         P[r, :, 2] = h.c[2] + np.cos(tt) * rad
         P[r, :, 1] = y
+        R_in[r] = np.maximum(body + 0.025, rad - (0.035 + 0.09 * (1 - f)))   # sisemine kiht: juuste paksus
         r_prev = rad
-    P = P.reshape(-1, 3)
+    # sisemine kiht samade nurkade ja kõrgustega
+    Pi = P.copy()
+    th_all = np.arctan2(P[:, :, 0] - h.c[0], P[:, :, 2] - h.c[2])
+    Pi[:, :, 0] = h.c[0] + np.sin(th_all) * R_in; Pi[:, :, 2] = h.c[2] + np.cos(th_all) * R_in
+    P = P.reshape(-1, 3); Pi = Pi.reshape(-1, 3)
     T = grid_mesh(P, rows, n)
-    u = np.tile(np.arange(n) * 0.12 * 0.9, rows); v = np.repeat(np.arange(rows), n) / (rows - 1)
-    UV = np.stack([u, (v * (P[:, 1].max() - y_end + 0.01) * 0.9) + 1.4], 1)
-    J, W = h.weights(P)
-    C = 0.85 + 0.15 * np.repeat(np.arange(rows) / (rows - 1), n)
-    return Part(P, T, UV, J, W, C)
+    Ti = grid_mesh(Pi, rows, n)[:, ::-1] + len(P)
+    # külgservad: välimine ja sisemine kiht kokku (paksus näha)
+    side = []
+    for c in (0, n - 1):
+        for r in range(rows - 1):
+            a, b = r * n + c, (r + 1) * n + c
+            q = (a, b, b + len(P), a + len(P))
+            side += [(q[0], q[1], q[2]), (q[0], q[2], q[3])] if c == 0 else [(q[0], q[2], q[1]), (q[0], q[3], q[2])]
+    # UV: u = kaare pikkus (salgud ~1,5 cm), v = 0 juur ... 0.97 ots
+    arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(st, axis=0), axis=1))]
+    u = np.tile(arc / 2.0, rows); v = np.repeat(np.arange(rows), n) / (rows - 1) * 0.97
+    UV = np.stack([u, v], 1)
+    Pall = np.vstack([P, Pi]); UVall = np.vstack([UV, UV + [0.37, 0]])
+    J, W = h.weights(Pall)
+    C = 0.82 + 0.18 * np.repeat(np.arange(rows) / (rows - 1), n)
+    Call = np.r_[C, C * 0.8]
+    return Part(Pall, np.vstack([T, Ti, np.array(side)]), UVall, J, W, Call)
 
-def tube(h, path, radius, sides=10, uv_scale=0.9, head_until=None):
+def tube(h, path, radius, sides=10, uv_scale=0.9, head_until=None, dense_in=False):
     path = np.asarray(path, float)
     # sile tee (Catmull-Rom tihendus)
-    dense = []
-    for i in range(len(path) - 1):
+    dense = [] if not dense_in else list(path[:-1])
+    for i in (range(len(path) - 1) if not dense_in else []):
         p0 = path[max(i - 1, 0)]; p1 = path[i]; p2 = path[i + 1]; p3 = path[min(i + 2, len(path) - 1)]
         for t in np.linspace(0, 1, 6, endpoint=False):
             t2, t3 = t * t, t * t * t
@@ -297,6 +325,62 @@ def tube(h, path, radius, sides=10, uv_scale=0.9, head_until=None):
     UV = np.vstack([UV, [0.5, L[-1] * uv_scale]])
     J, W = h.weights(P, head_until)
     return Part(P, T, UV, J, W)
+
+def braid3(h, path, radius, head_until=None, clear=0.05):
+    """Kolmeharuline punutis: kolm salku keerduvad ümber keskjoone (vaheldumisi üle ja alt)."""
+    path = np.asarray(path, float)
+    dense = []
+    for i in range(len(path) - 1):
+        p0 = path[max(i - 1, 0)]; p1 = path[i]; p2 = path[i + 1]; p3 = path[min(i + 2, len(path) - 1)]
+        for t in np.linspace(0, 1, 10, endpoint=False):
+            t2, t3 = t * t, t * t * t
+            dense.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    dense.append(path[-1]); dense = np.array(dense)
+    rr = np.interp(np.linspace(0, 1, len(dense)), np.linspace(0, 1, len(radius)), radius)
+    dense = h.push_out(dense, float(np.max(radius)) + clear)
+    for _ in range(3):   # silu pärast väljalükkamist
+        dense[1:-1] = (dense[:-2] + dense[1:-1] * 2 + dense[2:]) / 4
+    L = np.r_[0, np.cumsum(np.linalg.norm(np.diff(dense, axis=0), axis=1))]
+    # paralleelne raam
+    frames = []; nrm = None
+    for i in range(len(dense)):
+        t = dense[min(i + 1, len(dense) - 1)] - dense[max(i - 1, 0)]; t /= np.linalg.norm(t) + 1e-9
+        if nrm is None:
+            nrm = np.cross(t, [0, 0, 1.0]); nrm = nrm if np.linalg.norm(nrm) > 0.1 else np.cross(t, [1.0, 0, 0])
+        nrm = nrm - t * (nrm @ t); nrm /= np.linalg.norm(nrm) + 1e-9
+        frames.append((nrm.copy(), np.cross(t, nrm)))
+    parts = []
+    period = float(np.mean(radius)) * 3.2
+    for k in range(3):
+        ph = 2 * np.pi * (L / period + k / 3.0)
+        strand = np.array([dense[i] + frames[i][0] * np.sin(ph[i]) * rr[i] * 0.55 + frames[i][1] * np.sin(2 * ph[i]) * rr[i] * 0.28
+                           for i in range(len(dense))])
+        # ots: salgud koonduvad sõlmeks
+        conv = smoothstep(L[-1] - 0.35, L[-1] - 0.1, L)
+        strand = strand + (dense - strand) * conv[:, None]
+        sr = rr * 0.55 * (1 - 0.35 * conv)
+        parts.append(tube(h, strand[::2], sr[::2], 7, uv_scale=0.9, head_until=head_until, dense_in=True))
+    # sõlmest allpool väike tutt
+    end = dense[-1]; dirv = dense[-1] - dense[-4]; dirv /= np.linalg.norm(dirv) + 1e-9
+    tuft = [end - dirv * 0.05, end + dirv * 0.15, end + dirv * 0.35]
+    parts.append(tube(h, tuft, [rr[-1] * 0.7, rr[-1] * 0.9, rr[-1] * 0.25], 8, head_until=head_until))
+    return merge(parts)
+
+def disc(h, center, R, thick, segs=28):
+    """Ümar ehteketas (nt pronksist vööketas): kumer esipind keskmise nupuga, lame tagakülg."""
+    rings = [(0.0, thick * 1.6), (0.12 * R, thick * 1.5), (0.2 * R, thick * 0.9), (0.55 * R, thick * 0.75), (0.85 * R, thick * 0.55),
+             (R, thick * 0.3), (R, 0.0), (0.0, 0.0)]
+    P = []
+    for r, z in rings:
+        for j in range(segs):
+            a = 2 * np.pi * j / segs
+            P.append(center + np.array([np.cos(a) * r, np.sin(a) * r, z]))
+    P = np.array(P)
+    T = grid_mesh(P, len(rings), segs, closed=True)
+    UV = np.stack([P[:, 0] - center[0], P[:, 1] - center[1]], 1) * 1.5 + 0.5
+    J, W = h.weights(P)
+    C = np.ones(len(P)); C[: segs * 2] = 1.0; C[segs * 2: segs * 3] = 0.75   # soon nupu ümber
+    return Part(P, T, UV, J, W, C)
 
 def ellipsoid(h, center, radii, rings=10, segs=14):
     P = []
@@ -333,7 +417,7 @@ STYLES = {
     "hair_m_slicked":   dict(name="Tahapoole kammitud", cap=base(temple=0.1, front=0.6, side=0.38, back=0.4, thick=0.045, vol=0.2, ramp=0.15)),
     "hair_m_bowl":      dict(name="Potisoeng", cap=base(front=0.25, side=0.15, back=0.55, thick=0.11, vol=0.15, ramp=0.06)),
     "hair_m_bob":       dict(name="Lõuani polkpea", cap=base(front=0.3, side=0.45, back=0.35, thick=0.09, vol=0.2, ramp=0.1),
-                             curtain=dict(curtain_from=0.75, length_y=L_CHIN, clear=0.16, jag=0.05, behind=1.0)),
+                             curtain=dict(curtain_from=0.75, length_y=L_CHIN, clear=0.14, jag=0.05, behind=1.0, tuck=0.05)),
     "hair_m_shoulder":  dict(name="Õlgadeni juuksed", cap=base(front=0.55, side=0.45, back=0.3, thick=0.07, vol=0.3),
                              curtain=dict(curtain_from=1.2, length_y=L_SHOULDER, clear=0.17, jag=0.1)),
     "hair_m_wild":      dict(name="Pikk sasitud", cap=base(front=0.5, side=0.45, back=0.3, thick=0.11, vol=0.5, curly=0.05),
@@ -363,7 +447,7 @@ STYLES = {
     "hair_w_crown":     dict(name="Pärjapats", cap=base(front=0.62, side=0.45, back=0.35, thick=0.05, vol=0.1),
                              tail=dict(kind="crown", r=0.2)),
     "hair_w_bob":       dict(name="Polkpea tukaga", cap=base(front=0.28, side=0.45, back=0.3, thick=0.09, vol=0.25, ramp=0.1),
-                             curtain=dict(curtain_from=0.7, length_y=L_CHIN, clear=0.15, jag=0.04, behind=1.0)),
+                             curtain=dict(curtain_from=0.7, length_y=L_CHIN, clear=0.13, jag=0.04, behind=1.0, tuck=0.05)),
     "hair_w_pixie":     dict(name="Lühike poisipea", cap=base(front=0.45, side=0.32, back=0.45, thick=0.07, vol=0.5)),
     "hair_w_curly":     dict(name="Lokkis õlgadeni", cap=base(front=0.55, side=0.45, back=0.3, thick=0.1, vol=0.4, curly=0.08),
                              curtain=dict(curtain_from=0.95, length_y=L_SHOULDER, clear=0.2, jag=0.15, wave=0.06)),
@@ -384,9 +468,10 @@ def build_style(h, sid, seed=7):
     parts = []; braids = []
     c, cap_P, bverts, t = cap(h, s["cap"], seed)
     parts.append(c)
+    locks = []
     if "curtain" in s:
         cur = curtain(h, {**s["cap"], **s["curtain"]}, cap_P, bverts, seed)
-        if cur is not None: parts.append(cur)
+        if cur is not None: locks.append(cur)
     tl = s.get("tail")
     if tl:
         if tl["kind"] in ("ponytail", "braid"):
@@ -400,7 +485,10 @@ def build_style(h, sid, seed=7):
                 path = [p0, p0 + back * 0.25 + [0, -0.4, 0], p0 + back * 0.32 + [0, -1.2, 0], p0 + back * 0.32 + [0, -tl["length"], 0]]
                 rad = [tl["r"] * 1.1, tl["r"], tl["r"] * 0.95, tl["r"] * 0.6]
             path = [h.push_out(np.array([p]), tl["r"] + 0.12)[0] if i else p for i, p in enumerate(path)]
-            (braids if tl["kind"] == "braid" else parts).append(tube(h, path, rad, 10, head_until=y0 - 0.2))
+            if tl["kind"] == "braid":
+                braids.append(braid3(h, path, rad, head_until=y0 - 0.2))
+            else:
+                parts.append(tube(h, path, rad, 10, head_until=y0 - 0.2))
         elif tl["kind"] == "braids2":
             for sgn in (1, -1):
                 p0 = head_point(h, sgn * 1.85, h.eye_y - 0.15, 0.05)
@@ -408,7 +496,7 @@ def build_style(h, sid, seed=7):
                 path = [p0, np.array([sgn * (h.half_w + 0.1), h.neck_y + 0.3, h.c[2] - 0.25]), np.array([sx * 0.9, h.shoulder_y + 0.45, h.c[2] + 0.1]),
                         np.array([sgn * 1.0, h.shoulder_y - 0.3, h.c[2] + 0.9]), np.array([sgn * 0.85, h.shoulder_y - tl["length"] * 0.55, h.c[2] + 1.1])]
                 path = [p if i == 0 else h.push_out(np.array([p]), tl["r"] + 0.15)[0] for i, p in enumerate(path)]
-                braids.append(tube(h, path, [tl["r"] * 1.1, tl["r"], tl["r"], tl["r"] * 0.9, tl["r"] * 0.5], 10, head_until=h.neck_y + 0.2))
+                braids.append(braid3(h, path, [tl["r"] * 1.1, tl["r"], tl["r"], tl["r"] * 0.9, tl["r"] * 0.6], head_until=h.neck_y + 0.2, clear=0.12))
         elif tl["kind"] == "crown":
             ring = []
             for a in np.linspace(0, 2 * np.pi, 24, endpoint=False):
@@ -422,7 +510,8 @@ def build_style(h, sid, seed=7):
         cen = head_point(h, b["th"], h.eye_y + b["y"], s["cap"]["thick"] + b["r"][2] * 0.7)
         parts.append(ellipsoid(h, cen, b["r"]))
     out = [("hair", merge(parts))]
-    if braids: out.append(("braid", merge(braids)))
+    if locks: out.append(("hairlock", merge(locks)))
+    if braids: out.append(("hair", merge(braids)))
     return out
 
 def build_beard(h, bid, seed=3):
@@ -481,6 +570,7 @@ def build_beard(h, bid, seed=3):
     if bid == "beard_moustache":
         P[:, 1] -= 0.12 * smoothstep(0.1, h.mouth_w + 0.1, ax) * moust
     P = M.taubin(P, fids.tolist(), 4, 0.5, -0.53)
+    P = M.drape(P, N, fids.tolist(), 30, 0.0, interior=False)   # sile habemeserv
     remap = -np.ones(len(V), int); remap[used] = np.arange(len(used))
     tris = []
     for fi in fids:

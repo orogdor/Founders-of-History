@@ -375,10 +375,7 @@
   "stone_fur_cape": {
    "name": "Karusnahkne õlakate",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "6e5640",
     "8a7258"
@@ -629,10 +626,7 @@
   "bronze_wool_shawl": {
    "name": "Villane õlarätt",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "d9cdb1",
     "9c3b2e"
@@ -888,10 +882,7 @@
   "iron_soba": {
    "name": "Õlarätt (sõba)",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "3f5a7a",
     "d9cdb1"
@@ -1443,10 +1434,7 @@
   "ren_shawl": {
    "name": "Õlarätt",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "d9cdb1",
     "9c3b2e"
@@ -1699,10 +1687,7 @@
   "ind_wool_shawl": {
    "name": "Villane suurrätt",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "7d7a73",
     "7a5a3a",

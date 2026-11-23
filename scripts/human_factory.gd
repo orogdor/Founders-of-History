@@ -66,6 +66,7 @@ static func create(body: String,era:=0,job:="",seed:=0,team:=-1,unit:="") -> Nod
 		else:
 			root.set_meta("human_real",true)
 			root.set_meta("human_zones",collect_zones(model))
+			tint_skin(model,seed)
 	if root==null:root=FALLBACK.instantiate()
 	root.set_meta("human_body",body);root.set_meta("human_seed",seed)
 	if team>=0:root.set_meta("human_team",team)
@@ -73,6 +74,22 @@ static func create(body: String,era:=0,job:="",seed:=0,team:=-1,unit:="") -> Nod
 	if bool(cfg.get("child",body in ["boy","girl"])):root.set_meta("human_child",true)
 	dress(root,era,job)
 	return root
+
+## Nahatooni väike erinevus inimeste vahel (heledam/tumedam, roosakam/kollakam).
+const SKIN_SHADES:=[Color(1,1,1),Color(0.93,0.9,0.87),Color(1.04,1.01,0.98),Color(0.86,0.8,0.74),Color(0.98,0.95,0.96),Color(0.78,0.7,0.62)]
+static func tint_skin(model: Node,seed: int) -> void:
+	var shade: Color=SKIN_SHADES[stable_hash("%d:skin" % seed)%SKIN_SHADES.size()]
+	if shade==Color(1,1,1):return
+	for node in all_children(model):
+		if not node is MeshInstance3D or node.mesh==null:continue
+		var mesh: MeshInstance3D=node
+		for s in mesh.mesh.get_surface_count():
+			var material: Material=mesh.get_active_material(s)
+			if not material is BaseMaterial3D or not str(material.resource_name).begins_with("skin"):continue
+			var key:="skin:%d:%s" % [material.get_instance_id(),shade.to_html(false)]
+			if not tinted.has(key):
+				var copy: BaseMaterial3D=material.duplicate();copy.albedo_color=copy.albedo_color*shade;tinted[key]=copy
+			mesh.set_surface_override_material(s,tinted[key])
 
 static func collect_zones(model: Node) -> Dictionary:
 	var zones: Dictionary={}
@@ -195,7 +212,7 @@ static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team
 	var tints: Array=item.get("tints",[])
 	var color:=Color(str(tints[stable_hash("%d:%s:tint" % [seed,id])%tints.size()])) if not tints.is_empty() else Color.WHITE
 	if bool(item.get("hair_color",false)):color=hair_color(seed);tints=[color]
-	elif bool(item.get("team",false)):color=team_color(team) if team>=0 else Color("8a7a62");tints=[color]
+	elif bool(item.get("team",false)):color=team_color(team).darkened(0.18) if team>=0 else Color("8a7a62");tints=[color]   # kangas: tumedam kui UI värv
 	for s in mesh.mesh.get_surface_count():
 		var material:=mesh.get_active_material(s)
 		if not material is BaseMaterial3D:continue
