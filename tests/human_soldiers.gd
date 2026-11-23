@@ -36,14 +36,14 @@ func run() -> void:
 		dressed+=1
 		var ap:AnimationPlayer=factory.animation_player(model)
 		var anim:="attack" if ap!=null and ap.has_animation("attack") else ""
-		if ap!=null and info.animated and anim!="":ap.play(anim);ap.seek(0.35,true)
-		elif not info.animated:preload("res://scripts/human_motion.gd").new().apply(model,1.0,false,"train")
+		if ap!=null and info.animated and anim!="":ap.play(anim);ap.seek(0.35,true);model.set_meta("soldier_anim",anim)
+		elif not info.animated:preload("res://scripts/human_motion.gd").new().apply(model,1.0,false,"train");model.set_meta("soldier_anim","attack")
 		await process_frame
 		Humans.follow_soldier(model)
 		await process_frame
 		var src: Skeleton3D=model.get_meta("soldier_source");var rig=model.get_meta("soldier_rig")
 		var hs:=src.find_bone("hand_R")
-		if hs>=0 and rig!=null:
+		if hs>=0 and rig!=null and model.find_child("SoldierGear",true,false)!=null:
 			var a: Vector3=src.global_transform*src.get_bone_global_pose(hs).origin
 			var hsk: Skeleton3D=rig.skeleton;var b: Vector3=hsk.global_transform*hsk.get_bone_global_pose(rig.index["hand_R"]).origin
 			var d:=a.distance_to(b);checked+=1

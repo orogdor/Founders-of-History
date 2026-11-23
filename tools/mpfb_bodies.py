@@ -186,6 +186,22 @@ def weight_matrix():
 
 JOINTS, WTS = weight_matrix()
 
+def soft_skirt_weights(J, W):
+    """Seelikud: osa reie kaalust puusale ja sääre kaalust reiele, et kükitades ja kummardudes
+    ei paisuks seelik jalgade ette kotiks."""
+    n = len(J); dense = np.zeros((n, len(BONES)), np.float32)
+    np.add.at(dense, (np.repeat(np.arange(n), 4), J.ravel()), W.ravel())
+    pel = BONE_INDEX["pelvis"]
+    for side in ("_l", "_r"):
+        th, ca = BONE_INDEX["thigh" + side], BONE_INDEX["calf" + side]
+        m = dense[:, ca] * 0.5; dense[:, ca] -= m; dense[:, th] += m
+        m = dense[:, th] * 0.45; dense[:, th] -= m; dense[:, pel] += m
+    order = np.argsort(-dense, 1)[:, :4]
+    W2 = np.take_along_axis(dense, order, 1); W2 /= np.maximum(W2.sum(1, keepdims=True), 1e-6)
+    return order.astype(np.uint16), W2.astype(np.float32)
+
+JOINTS_SKIRT, WTS_SKIRT = soft_skirt_weights(JOINTS, WTS)
+
 ZONE_OF_BONE = {}
 for b in BONES:
     if b in ("Root", "pelvis"): z = "hips"
@@ -548,7 +564,7 @@ def build_body(name):
     by_zone = {}
     for fi in body_faces:
         zs = [VERTEX_ZONE[v] for v in BASE_F[fi]]
-        z = max(set(zs), key=zs.count); by_zone.setdefault(z, []).append(fi)
+        z = max(sorted(set(zs)), key=zs.count); by_zone.setdefault(z, []).append(fi)
     for z, fids in sorted(by_zone.items()):
         md = mesh_from_tris(triangulate(fids), V * SCALE, N, JOINTS, WTS, BASE_VT)
         g.mesh("body_" + z, md, skin_mat); names.append("body_" + z)
@@ -819,7 +835,8 @@ def build_garment(body, item_id, item, V, globals_, normals):
         else:
             P = V + N * off * 10; Nn = N
         C = garment_shade(V, P, item_id, fids) if kind not in ("hair", "metal") else None
-        md = mesh_from_tris(triangulate(fids), P * SCALE, Nn, JOINTS, WTS, BASE_VT, UV_M[grp] / TILE_M[kind], C)
+        Jg, Wg = (JOINTS_SKIRT, WTS_SKIRT) if grp == "helper-skirt" else (JOINTS, WTS)
+        md = mesh_from_tris(triangulate(fids), P * SCALE, Nn, Jg, Wg, BASE_VT, UV_M[grp] / TILE_M[kind], C)
         nm = f"{item_id}_{k}"; g.mesh(nm, md, mat); names.append(nm)
     g.write(f"{PROJECT}/assets/people/clothes/{item_id}/{body}.glb", globals_, names,
             {"placeholder": True, "note": "Automaatne proovirõivas MakeHumani abivõrkudest; asenda päris MPFB2 riidega."})

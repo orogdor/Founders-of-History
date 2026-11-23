@@ -11,6 +11,7 @@ extends RefCounted
 
 const Rig=preload("res://scripts/human_rig.gd")
 const Equipment=preload("res://scripts/human_equipment.gd")
+const Clips=preload("res://scripts/human_clips.gd")
 const FALLBACK=preload("res://assets/people/human_far.glb")
 const DATA_PATH:="res://data/human_outfits.json"
 ## Mängu kutsujad skaleerivad inimese 1,66-ga (vana mudel on umbes 1 ühik pikk).
@@ -67,6 +68,9 @@ static func create(body: String,era:=0,job:="",seed:=0,team:=-1,unit:="") -> Nod
 			root.set_meta("human_real",true)
 			root.set_meta("human_zones",collect_zones(model))
 			tint_skin(model,seed)
+			if unit=="":
+				var player:=Clips.attach(model,body)
+				if player!=null:root.set_meta("human_player",player)
 	if root==null:root=FALLBACK.instantiate()
 	root.set_meta("human_body",body);root.set_meta("human_seed",seed)
 	if team>=0:root.set_meta("human_team",team)
@@ -300,14 +304,46 @@ static func dress_soldier(model: Node3D,kind: String,team: int,seed: int,model_s
 	model.set_meta("soldier_human",human);model.set_meta("soldier_source",source);model.set_meta("soldier_map",map)
 	model.set_meta("soldier_rig",Rig.of(Rig.find_skeleton(human)));model.set_meta("soldier_old_rig",old_rig)
 	model.set_meta("soldier_hips",source.find_bone("hips" if old_rig else "body"))
+	model.set_meta("soldier_kind",kind)
+	if not kind in MOUNTED:
+		# jalad liigutusteegist (sammud, labajalad); ülakeha ja relvad sõduri enda liigutusest
+		var player:=Clips.attach(human.get_node("Body"),"man")
+		if player!=null:model.set_meta("soldier_player",player);model.set_meta("soldier_motion",load("res://scripts/human_motion.gd").new())
 	follow_soldier(model)
 	return true
 
+const MOUNTED:=["bronze_cavalry","cavalry","knight","heavy_cavalry","cuirassier","dragoon","chariot"]
+const LEG_BONES:=["thigh_L","shin_L","foot_L","thigh_R","shin_R","foot_R"]
+## Luud, mille liigutusteegi poos lähtestatakse, sest sõduri ülakeha arvutus eeldab nende puhkeasendit.
+const SOLDIER_REST_BONES:=["spine_02","clavicle_l","clavicle_r"]
+
+## Sõduri seis (battle_view: idle/walk/run/attack...) -> liigutusteegi klipp jalgadele ja kehale.
+## Jalgade liigutus: ülakeha ja relvad tulevad sõduri enda liigutusest.
+static func soldier_clip(kind: String,state: String,seed: int) -> String:
+	if state in ["walk"]:return "walk"
+	if state in ["run"]:return "jog"
+	return "idle"
+
 ## Kannab sõduri luustiku hetkeasendi inimesele. Kutsu igal kaadril lähedal olevatele sõduritele.
-static func follow_soldier(model: Node3D) -> void:
+## dt: mänguaja samm liigutusteegi klipi jaoks (0 pausi ajal).
+static func follow_soldier(model: Node3D,dt:=0.0) -> void:
 	var source: Skeleton3D=model.get_meta("soldier_source")
 	var rig: Variant=model.get_meta("soldier_rig")
 	if not is_instance_valid(source) or rig==null:return
+	var player: Variant=model.get_meta("soldier_player",null)
+	var gear:=model.find_child("SoldierGear",true,false)!=null
+	if player!=null and is_instance_valid(player):
+		var clip:=soldier_clip(str(model.get_meta("soldier_kind","")),str(model.get_meta("soldier_anim","idle")),stable_hash(str(model.get_instance_id())))
+		if player.current_animation!=clip:
+			var first:=str(player.current_animation)==""
+			player.play(clip,0.0 if first else 0.2)
+			if first:player.seek(fposmod(float(stable_hash(str(model.get_instance_id()))%100)*0.037,player.current_animation_length),true)
+		player.advance(dt)
+		if not gear:return   # relvi pole (nt maakuulaja): kogu keha liigutusteegist
+		var sk: Skeleton3D=rig.skeleton
+		for name in SOLDIER_REST_BONES:
+			var b:=sk.find_bone(name)
+			if b>=0:sk.set_bone_pose_rotation(b,sk.get_bone_rest(b).basis.get_rotation_quaternion())
 	var map: Dictionary=model.get_meta("soldier_map")
 	var delta: Dictionary={}
 	for canon in map:
@@ -316,7 +352,7 @@ static func follow_soldier(model: Node3D) -> void:
 	var hi: int=model.get_meta("soldier_hips")
 	var p:=source.get_bone_global_pose(hi).origin if hi>=0 else Vector3.ZERO
 	var offset:=(p-Vector3(0,Rig.REFERENCE_HIP_HEIGHT,0)) if bool(model.get_meta("soldier_old_rig")) else (p-Vector3(0,SOLDIER_STAND_HEIGHT,0))*(Rig.REFERENCE_HIP_HEIGHT/SOLDIER_STAND_HEIGHT)
-	rig.apply_global(delta,offset)
+	rig.apply_global(delta,offset,LEG_BONES if player!=null and is_instance_valid(player) else [])
 
 ## Kindlate esemetega inimene (proovipildid, kujundaja).
 static func create_with_items(body: String,ids: Array,seed:=0,team:=-1) -> Node3D:

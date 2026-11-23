@@ -3,6 +3,8 @@ extends RefCounted
 const Motion=preload("res://scripts/human_motion.gd")
 static var scenes: Dictionary={}
 const FLIP:={"stone_lumber":-0.18,"stone_forester":-0.18,"stone_worker":-0.18,"stone_miner":-0.18,"stone_builder":-0.15,"stone_fisher":-0.08,"stone_hunter":-0.08,"scout":-0.08}
+## Liigutusteegi haardes: kui palju eset rusikas üles nihutada (hoitakse varre otsast, mitte keskelt).
+const GRIP:={"stone_lumber":0.2,"stone_forester":0.2,"stone_worker":0.2,"stone_miner":0.2,"stone_builder":0.17,"stone_digger":-0.06,"stone_herder":-0.05,"stone_elder":-0.02,"stone_farmer":-0.12,"stone_fisher":0.15,"stone_hunter":0.15,"scout":0.15}
 const WORK:={"lumber":"stone_lumber","forester":"stone_forester","quarry":"stone_miner","mine":"stone_miner","coppermine":"stone_miner","tinmine":"stone_miner","hunter":"stone_hunter","fisher":"stone_fisher","berries":"stone_gatherer","market_woman":"stone_gatherer","well":"stone_watercarrier","farm":"stone_farmer","pasture":"stone_herder","study":"stone_elder","claypit":"stone_digger","mason":"stone_builder","builder":"stone_builder"}
 
 static func attach(model: Node,bone: String,kind: String,offset:=Vector3.ZERO) -> Node3D:
@@ -16,10 +18,19 @@ static func attach(model: Node,bone: String,kind: String,offset:=Vector3.ZERO) -
 	if not scenes.has(kind):scenes[kind]=load(path)
 	var attachment:=BoneAttachment3D.new();attachment.bone_name=bone_name;skeleton.add_child(attachment)
 	var holder: Node3D=attachment
-	if rig!=null:holder=rig.prop_frame(bone);attachment.add_child(holder)
+	var grip:=rig!=null and model.has_meta("human_player")   # liigutusteegi klippidel hoitakse eset rusikas
+	if rig!=null:holder=rig.grip_frame(bone) if grip else rig.prop_frame(bone);attachment.add_child(holder)
 	var prop: Node3D=scenes[kind].instantiate();prop.position=offset
-	if FLIP.has(kind):prop.rotation.z=PI;prop.position.y+=float(FLIP[kind])
-	if kind=="stone_herder":prop.rotation.x=1.4
+	if grip:
+		prop.position.y+=float(GRIP.get(kind,0.0))
+		if kind in ["stone_lumber","stone_forester","stone_worker","stone_miner"]:
+			# kirves ja kirka: pea kaldub sõrmede poole (randme kalle löögil)
+			var pivot:=Transform3D(Basis(Vector3.BACK,-0.5),Vector3.ZERO)
+			prop.transform=pivot*prop.transform
+		prop.scale*=0.82
+	else:
+		if FLIP.has(kind):prop.rotation.z=PI;prop.position.y+=float(FLIP[kind])
+		if kind=="stone_herder":prop.rotation.x=1.4
 	holder.add_child(prop);return prop
 
 static func job(model: Node,kind: String) -> Node3D:

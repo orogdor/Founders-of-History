@@ -105,7 +105,10 @@ func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictio
   if animator!=null:
    var name: String="walk" if pose.moving and animator.has_animation("walk") else "idle"
    if animator.has_animation(name) and animator.current_animation!=name:animator.play(name)
-  if Humans.is_dressed_soldier(person):Humans.follow_soldier(person)
+  if Humans.is_dressed_soldier(person):
+   person.set_meta("soldier_anim","walk" if pose.moving else "idle")
+   var now:=float(host.elapsed);var dt:=clampf(now-float(person.get_meta("follow_time",now)),0.0,0.25);person.set_meta("follow_time",now)
+   Humans.follow_soldier(person,dt)
 
 func sync() -> void:
  if host==null or not host.detail_mode:return

@@ -54,7 +54,34 @@ Tekstuurid on kaustas `assets/people/textures` ja glb-failid viitavad neile (nei
 
 ## Animatsioonid
 
-Liigutused tulevad mängu senisest protseduursest `HumanMotion`-ist; `HumanRig` kannab need 17 luu kaudu MPFB2 luustikule (kontrollitud: luude suunad ühtivad vana mudeliga täpsusega 0,01). Kõik mängus kasutatavad liigutused töötavad: seisab, kõnnib, kannab, raiub, kaevandab, ehitab, korjab, harib, püüab kala, jahib, hiilib, kannab vett, õpib, karjatab, istub, sööb, mängib, valvab, räägib, kaevab.
+Liigutused tulevad Quaternius Universal Animation Library 1 ja 2 teegist (CC0, 49 klippi: seismine, kõnd, jooks, hiilimine, kandmine, istumine, kükitamine, rääkimine, puu raiumine, saagi korjamine, külvamine, kastmine, viskamine, söömine, tantsimine, mõõgavõitlus, kilp, tulirelv, tabamus, surm jne). `tools/retarget_ual.py` kannab need iga keha luustikule üle (`assets/people/animations/<keha>.glb`):
+
+- iga luu maailmapöörde muutus allika puhkeasendi suhtes kantakse MPFB2 luule, mille puhkeasend pööratakse enne allika omaga samaks (luu suund ja teine telg, nt peopesa põiki); sõrmed tulevad kaasa;
+- puusa nihe skaleeritakse puusa kõrguste suhtega;
+- seisuasendites tuuakse jalad lähemale ja pannakse maapinnale (allika „valmis” asend on laiade jalgadega).
+
+Mängus lisab `HumanFactory.create` igale uuele inimesele AnimationPlayeri ja `HumanMotion.apply` valib klipi tegevuse järgi (`scripts/human_clips.gd`, tabel `WORK`), teeb sujuva ülemineku ja liigutab aega mänguaja järgi (paus peatab). Sama tegevusega inimesed ei liigu ühes taktis ja seisjatel on eri seisuasendid. Tööriist on rusikas (`HumanRig.grip_frame`): vars läheb väikese sõrme poolt pöidla poole ja kirve pea kaldub löögi suunas.
+
+| Tegevus | Klipp |
+|---|---|
+| seisab | idle / idle_arms (käed rinnal) / idle_no |
+| kõnnib, kannab | walk, walk_carry; lapsed vahel jog |
+| raiub, sepistab, kaevandab | chop (TreeChopping) |
+| ehitab | fix_kneel / interact |
+| korjab, kaevab | harvest |
+| harib, külvab | plant / harvest |
+| kannab vett | water |
+| püüab kala, karjatab | hold_up (ritv või kepp ees) |
+| jahib | throw |
+| õpib, räägib | talk |
+| istub | crouch (kükitab) |
+| sööb | eat |
+| mängib | dance |
+| valvab | idle_arms |
+| hiilib | sneak / crouch |
+| harjutab (sõdur) | sword_a / sword_b / sword_c / sword_attack |
+
+Sõdurite jalad (sammud, labajalad, seisuasend) tulevad samast teegist, ülakeha ja relvad sõduri enda liigutusest, et relv jääks kätte (test: käsi relvakäest alla 0,22 m). Ratsanikel jääb senine liigutus. Seelikud on reite küljes pehmemalt, et kükitades ei paisuks.
 
 Pildid ja testid:
 - `godot --path . --resolution 1600x900 -s tests/human_showcase.gd -- <kaust>` (üldvaade majaga; lisa `lähivaade` või `nägu`)

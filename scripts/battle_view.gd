@@ -235,12 +235,16 @@ func animate_model(key: String,man: Dictionary,unit: Dictionary) -> void:
   var attacking: bool=float(battle.elapsed)-float(man.get("attackTime",-100))<0.6
   var name: String="attack_sword" if attacking and man.get("weapon")=="sword" and player.has_animation("attack_sword") else "attack" if attacking and player.has_animation("attack") else "walk" if man.get("moving",false) and player.has_animation("walk") else "idle"
   if not player.has_animation(name):return
+  models[key].set_meta("soldier_anim",name)
   if animation_state.get(key)!=name:
    animation_state[key]=name
    var animation:=player.get_animation(name)
    if name in ["walk","idle"]:animation.loop_mode=Animation.LOOP_LINEAR
    player.play(name,0.12)
- else:motions[key].apply(models[key],float(battle.elapsed),man.get("moving",false),"train" if float(battle.elapsed)-float(man.get("attackTime",-100))<0.4 else "")
+ else:
+  var training: bool=float(battle.elapsed)-float(man.get("attackTime",-100))<0.4
+  models[key].set_meta("soldier_anim","attack" if training else "walk" if man.get("moving",false) else "idle")
+  motions[key].apply(models[key],float(battle.elapsed),man.get("moving",false),"train" if training else "")
  var dog=models[key].get_node_or_null("ScoutDog")
  if dog!=null:dog.pose(float(battle.elapsed),man.get("moving",false))
 
@@ -435,19 +439,19 @@ func refresh_ui() -> void:
 func _process(delta: float) -> void:
  if battle.is_empty():return
  if not outer_tiles_pending.is_empty():load_outer_tile()
- animation_clock-=delta;sync_models();sync_siege_models();sync_ballistas();sync_projectiles();follow_soldiers()
+ animation_clock-=delta;sync_models();sync_siege_models();sync_ballistas();sync_projectiles();follow_soldiers(0.0 if host.simulation_paused or host.paused or host.menu_open else delta)
  if animation_clock<=0:animation_clock=0.08
  ui_clock+=delta
  if ui_clock>=0.3:ui_clock=0;refresh_ui()
 
 ## Uued inimesed järgivad lähedal olevate sõdurite animatsioone (kaugemal on vana mudel).
-func follow_soldiers() -> void:
+func follow_soldiers(dt:=0.0) -> void:
  var camera: Camera3D=host.camera if host!=null and "camera" in host else get_viewport().get_camera_3d()
  if camera==null:return
  var eye:=camera.global_position;var limit:=Humans.SOLDIER_DETAIL_DISTANCE+4.0
  for key in models:
   var model: Node3D=models[key]
-  if Humans.is_dressed_soldier(model) and model.visible and model.global_position.distance_to(eye)<limit:Humans.follow_soldier(model)
+  if Humans.is_dressed_soldier(model) and model.visible and model.global_position.distance_to(eye)<limit:Humans.follow_soldier(model,dt)
 
 func handle_click(screen: Vector2,order: bool) -> void:
  if battle.get("result")!=null:return

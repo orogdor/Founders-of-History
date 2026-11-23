@@ -7,10 +7,13 @@
 - `../soldiers/split/*.glb`: mängu olemasolevad sõdurimudelid, mille `tools/split_soldiers.py` on jaganud kehaks ja varustuseks; uut sisu pole lisatud.
 - `textures/`: kangaste ja naha tekstuurid on tehtud protseduuriliselt skriptiga `tools/textures.py`; nahk kasutab MPFB2 CC0 maske (`mpfb_lips`, `mpfb_eyelids`, `mpfb_ears`, `mpfb_fingernails`, `mpfb_toenails`). `eye_brown.png` on MakeHumani CC0 silmatekstuur.
 
+- `animations/*.glb`: Quaternius Universal Animation Library 1 ja 2 (CC0, https://quaternius.com/packs/universalanimationlibrary.html), üle kantud skriptiga `tools/retarget_ual.py`. Litsents: `animations/LICENSE_UAL.txt`.
+
 Uuesti tegemine (vajab numpy, scipy, Pillow):
 
 ```
 python3 tools/outfits.py .
 python3 tools/mpfb_bodies.py <mpfb2>/src/mpfb/data <makehuman>/makehuman/data . --clothes
 python3 tools/split_soldiers.py .
+python3 tools/retarget_ual.py <mpfb2>/src/mpfb/data <makehuman>/makehuman/data . UAL1_Standard.glb UAL2_Standard.glb
 ```
