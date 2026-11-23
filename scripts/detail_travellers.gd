@@ -40,6 +40,7 @@ func eligible(entity: Dictionary) -> bool:
 func make_person(kind: String,team: int,phase: float) -> Node3D:
  var info:Dictionary=factory.soldier_scene(kind,team);var person:Node3D=info.scene.instantiate();person.scale=Vector3.ONE*float(info.scale)
  factory.correct_soldier_materials(person,team)
+ Humans.dress_soldier(person,kind,team,Humans.stable_hash("%s:%d:%f" % [kind,team,phase]),float(info.scale))
  if kind=="scout":
   var dog:=Dog.new();dog.position=Vector3(0.55,0,-0.15)/float(info.scale);dog.scale=Vector3.ONE/float(info.scale);person.add_child(dog)
  var animator:AnimationPlayer=factory.animation_player(person)
@@ -104,6 +105,7 @@ func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictio
   if animator!=null:
    var name: String="walk" if pose.moving and animator.has_animation("walk") else "idle"
    if animator.has_animation(name) and animator.current_animation!=name:animator.play(name)
+  if Humans.is_dressed_soldier(person):Humans.follow_soldier(person)
 
 func sync() -> void:
  if host==null or not host.detail_mode:return

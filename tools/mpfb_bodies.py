@@ -418,12 +418,14 @@ def noise_texture(kind, size=256, seed=1):
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import textures as TX
 TEXDIR = f"{PROJECT}/assets/people/textures"
-FABRICS = ("linen", "straw", "wool", "denim", "jersey", "leather", "hide", "oilcloth", "fur", "hair", "metal")
+FABRIC_SIZE = 1024
+FABRICS = ("linen", "straw", "wool", "denim", "jersey", "leather", "hide", "oilcloth", "fur", "hair", "braid", "metal",
+           "herringbone", "plaid", "stripe", "brocade", "knit", "twill", "felt", "quilted", "mail", "plate", "camo")
 
 def write_fabrics():
     os.makedirs(TEXDIR, exist_ok=True)
     for i, kind in enumerate(FABRICS):
-        a, n, r = TX.fabric(kind, 512, 3 + i)
+        a, n, r = TX.fabric(kind, FABRIC_SIZE, 3 + i)
         a.save(f"{TEXDIR}/{kind}_albedo.png"); n.save(f"{TEXDIR}/{kind}_normal.png"); r.save(f"{TEXDIR}/{kind}_orm.png")
     import shutil
     shutil.copy(f"{MHDATA}/eyes/materials/brown_eye.png", f"{TEXDIR}/eye_brown.png")
@@ -439,7 +441,8 @@ def uv_meters(V, group):
     return L3 / max(L2, 1e-9)
 
 TILE_M = {"linen": 0.22, "straw": 0.3, "wool": 0.28, "denim": 0.22, "jersey": 0.16, "leather": 0.35, "hide": 0.45,
-          "oilcloth": 0.35, "fur": 0.3, "hair": 0.18, "metal": 0.08}
+          "oilcloth": 0.35, "fur": 0.3, "hair": 0.18, "braid": 0.25, "metal": 0.08, "herringbone": 0.3, "plaid": 0.35, "stripe": 0.45,
+          "brocade": 0.3, "knit": 0.2, "twill": 0.22, "felt": 0.3, "quilted": 0.6, "mail": 0.55, "plate": 0.5, "camo": 0.9}
 
 def raster_vertex(size, tris_uv, tri_vals, img=None):
     """Kolmnurgad UV-s, väärtused tippudes; interpoleerib (max olemasolevaga)."""
@@ -575,7 +578,7 @@ def brow_faces(V):
 # ---------------------------------------------------------------- proovirõivad
 OUTFITS = json.load(open(f"{PROJECT}/data/human_outfits.json"))
 ITEMS = OUTFITS["items"]
-SKIRTY = ("skirt", "dress", "kirtle", "gown", "shift", "chemise", "cote", "wrap", "oilskin", "tunic")
+SKIRTY = ("skirt", "dress", "kirtle", "gown", "shift", "chemise", "cote", "wrap", "oilskin", "tunic", "kilt", "robe", "peplos", "coat", "surcoat", "hauberk", "gambeson")
 CLOAKY = ("cloak", "cape", "mantle")
 LEATHERY = ("hide", "leather", "moccasin", "pastlad", "shoes", "turnshoes", "boots", "sneakers", "loincloth")
 FURRY = ("fur",)
@@ -606,23 +609,15 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
     neck = joint_y(V, "joint-neck"); head = joint_y(V, "joint-head"); head2 = joint_y(V, "joint-head-2")
     chest = joint_y(V, "joint-spine-1")
     skirt_mid_z = V[group_vertices("helper-skirt"), 2].mean()
-    layer = {"underwear": 0.002, "socks": 0.002, "shirt": 0.004, "legs": 0.005, "torso": 0.008, "feet": 0.006,
-             "apron": 0.03, "belt": 0.028, "outer": 0.016, "head": 0.01, "jewelry": 0.006}.get(slot, 0.005)
+    layer = {"underwear": 0.002, "socks": 0.002, "shirt": 0.004, "legs": 0.005, "torso": 0.008, "armor": 0.012, "armarm": 0.012,
+             "cuirass": 0.02, "feet": 0.006, "apron": 0.03, "belt": 0.028, "outer": 0.016, "head": 0.01, "jewelry": 0.006}.get(slot, 0.005)
     parts = []
     skirty = any(k in item_id for k in SKIRTY)
-    if slot == "hair":
-        eye = V[group_vertices("helper-l-eye")]; eye_y = eye[:, 1].mean(); eye_z = eye[:, 2].max()
-        head_c = V[group_vertices("joint-head")].mean(0)
-        fids = np.array(faces_of("helper-hair")); pad = FACE_PAD[fids]
-        y = V[pad, 1].mean(1); z = V[pad, 2].mean(1)
-        keep = ~((z > eye_z - 0.75) & (y < eye_y + 0.5))          # tukk näo ees
-        if item_id == "hair_short":
-            keep &= (y > eye_y + 0.15) | ((z < head_c[2] - 0.2) & (y > neck + 0.6))
-        elif item_id == "hair_long_tied":
-            keep &= (y > neck - 0.2) | (z < head_c[2] - 0.3)   # õlgadel ees mitte
-        parts.append((fids[keep].tolist(), N_hair, 0.001, "helper-hair"))
+    if slot in ("hair", "beard"):
         return parts
     if slot == "head":
+        if item_id in HAIR.HATS:
+            return [("gen", HAIR.hat(HEADS[CURRENT_BODY], HAIR.HATS[item_id]))]
         if item.get("hides_hair"):
             face_front = V[group_vertices("helper-l-eye"), 2].max() - 0.35
             fs = [fi for fi in select_faces("body", V, zones={"head", "neck"}, ymin=neck - 0.2)
@@ -634,6 +629,10 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
                 parts.append((select_faces("helper-hair", V, ymin=head2 - 1.0), N_hair, 0.003, "helper-hair"))
         else:
             parts.append((select_faces("body", V, zones={"head"}, ymin=head2 - 0.6), N_body, 0.016 if "straw" in item_id or "hard" in item_id else 0.01, "body"))
+        return parts
+    if slot == "jewelry" and "armband" in item_id:
+        fs = [fi for fi in select_faces("helper-tights", V, zones={"upperarms"}, ymin=chest - 0.9, ymax=chest - 0.35) if V[BASE_F[fi], 0].mean() > 0]
+        parts.append((fs, N_tights, 0.022, "helper-tights"))
         return parts
     if slot == "jewelry":
         parts.append((select_faces("body", V, zones={"neck", "torso"}, ymin=neck - 0.45, ymax=neck - 0.15), N_body, 0.006, "body"))
@@ -650,7 +649,7 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
         return parts
     upper = hides & {"torso", "upperarms", "forearms", "neck"}
     lower = hides & {"hips", "thighs", "shins"}
-    if slot == "outer" and any(k in item_id for k in ("soba", "shawl")):
+    if slot == "outer" and any(k in item_id for k in ("soba", "shawl", "fur_cape")):
         parts.append((select_faces("helper-tights", V, zones={"torso", "upperarms"}, ymin=chest - 1.2), N_tights, layer, "helper-tights"))
         return parts
     skirt_top = V[group_vertices("helper-skirt"), 1].max()
@@ -663,11 +662,12 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
     elif lower:
         parts.append((select_faces("helper-tights", V, zones=lower | ({"hips"} if "thighs" in lower else set()), ymax=pelvis + 0.5 if upper == set() else 1e9),
                       N_tights, layer, "helper-tights"))
-    if slot == "outer" and any(k in item_id for k in CLOAKY):
+    if slot == "outer" and any(k in item_id for k in CLOAKY) and "fur_cape" not in item_id:
         parts.append((select_faces("helper-skirt", V, ymin=knee, back=skirt_mid_z), N_skirt, 0.034, "helper-skirt"))
     return parts
 
 def material_kind(item_id):
+    if "mat" in ITEMS.get(item_id, {}): return ITEMS[item_id]["mat"]
     if any(k in item_id for k in HAIRY): return "hair"
     if any(k in item_id for k in FURRY): return "fur"
     if "amber" in item_id: return "metal"
@@ -732,15 +732,21 @@ def garment_shade(V, P, item_id, fids):
     return np.stack([c, c, c, np.ones_like(c)], 1)
 def build_garment(body, item_id, item, V, globals_, normals):
     N_body, N_tights, N_skirt, N_hair = normals
-    parts = [p for p in garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair) if p[0]]
+    parts = [p for p in garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair) if (p[0] == "gen" or len(p[0]))]
     if not parts:
         return False
     g = Glb(); kind = material_kind(item_id)
     t = lambda m: g.image_uri(f"../../textures/{kind}_{m}.png")
-    mat = g.material(item_id, (1, 1, 1), 1.0, 1.0, t("albedo"), double=True, normal=t("normal"), orm=t("orm"),
-                     normal_scale=1.0 if kind != "hair" else 0.7)
+    mat = g.material(item_id, (1, 1, 1), 1.0, 1.0 if kind in ("metal", "mail", "plate") else 0.0, t("albedo"), double=True,
+                     normal=t("normal"), orm=t("orm"), normal_scale=1.0 if kind != "hair" else 0.7)
     names = []
-    for k, (fids, N, off, grp) in enumerate(parts):
+    for k, prt in enumerate(parts):
+        if prt[0] == "gen":
+            gp = prt[1]
+            md = HAIR.to_md(gp); md["uv"] = (gp.UV * (0.1 / TILE_M[kind]) * 2).astype(np.float32)
+            nm = f"{item_id}_{k}"; g.mesh(nm, md, mat); names.append(nm)
+            continue
+        fids, N, off, grp = prt
         P = V + N * off * 10
         if grp == "helper-skirt":
             P = taubin(P, fids, 6, 0.5, 0.0)   # kerge silumine, kõhu kuju kaob
@@ -759,7 +765,40 @@ def build_garment(body, item_id, item, V, globals_, normals):
             {"placeholder": True, "note": "Automaatne proovirõivas MakeHumani abivõrkudest; asenda päris MPFB2 riidega."})
     return True
 
+import hair as HAIR
+
+def hair_items_for(body):
+    male = body in ("man", "boy")
+    styles = [k for k in HAIR.STYLES if k.startswith("hair_m_" if male else "hair_w_")]
+    beards = list(HAIR.BEARDS) if body == "man" else []
+    return styles, beards
+
+def write_hair_part(item_id, body, parts, globals_):
+    g = Glb()
+    t = lambda kind, m: g.image_uri(f"../../textures/{kind}_{m}.png")
+    names = []
+    for k, (kind, part) in enumerate(parts):
+        mat = g.material(item_id + "_" + kind, (1, 1, 1), 1.0, 0.0, t(kind, "albedo"), double=True,
+                         normal=t(kind, "normal"), orm=t(kind, "orm"), normal_scale=0.8)
+        g.mesh(f"{item_id}_{k}", HAIR.to_md(part), mat); names.append(f"{item_id}_{k}")
+    g.write(f"{PROJECT}/assets/people/clothes/{item_id}/{body}.glb", globals_, names,
+            {"generated": "tools/hair.py", "note": "Parameetriline soeng/habe MPFB2 kehale."})
+
+def build_hair(body, V, N_body, globals_):
+    HAIR.init(sys.modules[__name__])
+    h = HAIR.Head(V, N_body)
+    styles, beards = hair_items_for(body)
+    for sid in styles:
+        write_hair_part(sid, body, HAIR.build_style(h, sid, seed=sum(map(ord, sid)) % 997), globals_)
+    for bid in beards:
+        part = HAIR.build_beard(h, bid)
+        if part is not None:
+            write_hair_part(bid, body, [("hair", part)], globals_)
+    return len(styles) + len(beards)
+
 UV_M = {}
+HEADS = {}
+CURRENT_BODY = None
 if __name__ == "__main__":
     write_fabrics()
     for name in BODIES:
@@ -767,8 +806,10 @@ if __name__ == "__main__":
         V, N_body, globals_ = build_body(name)
         for grp in ("body", "helper-tights", "helper-skirt", "helper-hair"):
             UV_M[grp] = uv_meters(V, grp)
+        HAIR.init(sys.modules[__name__]); HEADS[name] = HAIR.Head(V, N_body); CURRENT_BODY = name
         if MAKE_CLOTHES:
             normals = (N_body, vertex_normals(V, faces_of("helper-tights")), vertex_normals(V, faces_of("helper-skirt")),
                        vertex_normals(V, faces_of("helper-hair")))
-            made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items())
+            made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items() if it["slot"] not in ("hair", "beard"))
+            made += build_hair(name, V, N_body, globals_)
             print("  proovirõivaid", made)

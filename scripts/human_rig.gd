@@ -139,6 +139,13 @@ func apply_pose(result: Dictionary) -> void:
 		var local: Quaternion=Basis.from_euler(poses.get(name,Vector3.ZERO),EULER_ORDER_XYZ).get_rotation_quaternion()
 		var parent: String=PARENT.get(name,"")
 		delta[name]=(delta[parent]*local) if parent!="" else local
+	_apply(delta,Vector3(0,float(result.get("hip_y",REFERENCE_HIP_HEIGHT))-REFERENCE_HIP_HEIGHT,0))
+
+## Rakendab teise luustiku globaalsed luupöörded (nt sõduri animatsioon). offset: puusa nihe vana mudeli ühikutes.
+func apply_global(delta: Dictionary,offset: Vector3) -> void:
+	_apply(delta,offset)
+
+func _apply(delta: Dictionary,hip_offset: Vector3) -> void:
 	var target: Dictionary={}
 	var inv_space:=space.inverse()
 	for name in CANONICAL:
@@ -152,8 +159,7 @@ func apply_pose(result: Dictionary) -> void:
 		parent_global=(Quaternion(target[a])*Quaternion(between[name])) if a!="" else Quaternion(top_parent[name])
 		skeleton.set_bone_pose_rotation(bone,(parent_global.inverse()*Quaternion(target[name])).normalized())
 	var hips: int=index["hips"]
-	var offset:=(float(result.get("hip_y",REFERENCE_HIP_HEIGHT))-REFERENCE_HIP_HEIGHT)*hip_ratio/unit_scale
-	var local_offset:=hip_parent_rest.inverse()*(space*Vector3(0,offset,0))
+	var local_offset:=hip_parent_rest.inverse()*(space*(hip_offset*hip_ratio/unit_scale))
 	skeleton.set_bone_pose_position(hips,skeleton.get_bone_rest(hips).origin+local_offset)
 
 ## Tegelik luunimi vana nime järgi (nt "hand_R" -> "hand_r").

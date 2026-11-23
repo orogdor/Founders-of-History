@@ -51,7 +51,7 @@ static func size_factor(model: Node) -> float:
 	if model!=null and not is_real(model) and model.has_meta("human_child"):return CHILD_FALLBACK_SCALE
 	return 1.0
 
-static func create(body: String,era:=0,job:="",seed:=0) -> Node3D:
+static func create(body: String,era:=0,job:="",seed:=0,team:=-1,unit:="") -> Node3D:
 	var cfg: Dictionary=config().get("bodies",{}).get(body,{})
 	var scene:=packed(str(cfg.get("scene","")))
 	var root: Node3D=null
@@ -68,6 +68,8 @@ static func create(body: String,era:=0,job:="",seed:=0) -> Node3D:
 			root.set_meta("human_zones",collect_zones(model))
 	if root==null:root=FALLBACK.instantiate()
 	root.set_meta("human_body",body);root.set_meta("human_seed",seed)
+	if team>=0:root.set_meta("human_team",team)
+	if unit!="" and is_real(root):root.set_meta("human_unit",unit)
 	if bool(cfg.get("child",body in ["boy","girl"])):root.set_meta("human_child",true)
 	dress(root,era,job)
 	return root
@@ -89,7 +91,8 @@ static func all_children(node: Node) -> Array:
 		out.append(child);out.append_array(all_children(child))
 	return out
 
-## Riidekomplekt: ese iga koha (slot) kohta.
+## Riidekomplekt: ese iga koha (slot) kohta. Ajastul on 5 riietust mehele ja 5 naisele,
+## 5 soengut ja habemete valik; valik tehakse inimese seemne järgi püsivalt.
 static func outfit_items(body: String,era: int,job:="",seed:=0) -> Array:
 	var cfg:=config();var items: Dictionary=cfg.get("items",{})
 	var eras: Array=cfg.get("eras",[])
@@ -97,30 +100,51 @@ static func outfit_items(body: String,era: int,job:="",seed:=0) -> Array:
 	var e: Dictionary=eras[clampi(era,0,eras.size()-1)]
 	var b: Dictionary=cfg.get("bodies",{}).get(body,{})
 	var adult: String=str(b.get("outfit",body))
-	var own: Dictionary=e.get(body,{})
-	var plan: Dictionary=e.get(str(own.get("from",adult)),{}) if own.has("from") or own.is_empty() else own
+	var own: Dictionary=e.get(body,{}) if e.get(body) is Dictionary else {}
 	var slots: Dictionary={}
-	for id in plan.get("base",[]):
-		if items.has(id):slots[str(items[id].slot)]=id
-	var options: Dictionary=plan.get("options",{})
-	var keys: Array=options.keys();keys.sort()
-	for k in keys.size():
-		var choices: Array=options[keys[k]]
-		if choices.is_empty():continue
-		slots.erase(keys[k])
-		for id in choices[stable_hash("%d:%s" % [seed,keys[k]])%choices.size()]:
+	var outfits: Array=e.get(adult,[]) if e.get(adult) is Array else []
+	if not outfits.is_empty():
+		var outfit: Dictionary=outfits[stable_hash("%d:outfit" % seed)%outfits.size()]
+		for id in outfit.get("items",[]):
 			if items.has(id):slots[str(items[id].slot)]=id
 	var jobs: Dictionary=e.get("jobs",{})
 	if jobs.has(job):
 		for id in jobs[job].get("all",[])+jobs[job].get(adult,[]):
 			if items.has(id):slots[str(items[id].slot)]=id
 	for slot in own.get("drop",[]):slots.erase(slot)
-	for key in ["hair","beard"]:
-		var list: Array=b.get(key,[])
-		if not list.is_empty() and not slots.has(key):
-			var id: String=str(list[stable_hash("%d:%s" % [seed,key])%list.size()])
-			if items.has(id):slots[key]=id
+	add_hair(slots,e,adult,body,seed)
 	return slots.values()
+
+static func add_hair(slots: Dictionary,e: Dictionary,adult: String,body: String,seed: int) -> void:
+	var items: Dictionary=config().get("items",{})
+	var hair: Array=e.get("hair",{}).get(adult,[])
+	if not hair.is_empty():
+		var id: String=str(hair[stable_hash("%d:hair" % seed)%hair.size()])
+		if items.has(id):slots["hair"]=id
+	if body=="man":
+		var beards: Array=e.get("beards",[])
+		if not beards.is_empty():
+			var id: String=str(beards[stable_hash("%d:beard" % seed)%beards.size()])
+			if items.has(id):slots["beard"]=id
+
+## Väeliigi varustus (data/human_outfits.json "units") + selle ajastu soeng ja vahel habe.
+static func unit_items(kind: String,seed:=0) -> Array:
+	var cfg:=config();var items: Dictionary=cfg.get("items",{})
+	var unit: Dictionary=cfg.get("units",{}).get(kind,{})
+	var slots: Dictionary={}
+	for id in unit.get("items",[]):
+		if items.has(id):slots[str(items[id].slot)]=id
+	var eras: Array=cfg.get("eras",[])
+	if not eras.is_empty():add_hair(slots,eras[clampi(int(unit.get("era",0)),0,eras.size()-1)],"man","man",seed)
+	return slots.values()
+
+static func hair_color(seed: int) -> Color:
+	var colors: Array=config().get("hair_colors",["5a4030"])
+	return Color(str(colors[stable_hash("%d:haircolor" % seed)%colors.size()]))
+
+static func team_color(team: int) -> Color:
+	var colors: Array=config().get("team_colors",["276bd1","c43d43","9271ce","d2a12e"])
+	return Color(str(colors[clampi(team,0,colors.size()-1)]))
 
 ## Paneb riided selga. Kutsu uuesti ajastu või ameti vahetudes.
 static func dress(root: Node3D,era: int,job:="") -> void:
@@ -133,7 +157,8 @@ static func dress(root: Node3D,era: int,job:="") -> void:
 			node.queue_free()
 	var body: String=str(root.get_meta("human_body"));var seed: int=int(root.get_meta("human_seed",0))
 	var items: Dictionary=config().get("items",{})
-	var ids:=outfit_items(body,era,job,seed)
+	var ids: Array=root.get_meta("human_items") if root.has_meta("human_items") else unit_items(str(root.get_meta("human_unit")),seed) if root.has_meta("human_unit") else outfit_items(body,era,job,seed)
+	var team: int=int(root.get_meta("human_team",-1))
 	var hide_hair:=false
 	for id in ids:
 		if bool(items[id].get("hides_hair",false)):hide_hair=true
@@ -141,7 +166,7 @@ static func dress(root: Node3D,era: int,job:="") -> void:
 	for id in ids:
 		var item: Dictionary=items[id]
 		if hide_hair and str(item.slot)=="hair":continue
-		var meshes:=attach_garment(skeleton,str(id),body,item,seed)
+		var meshes:=attach_garment(skeleton,str(id),body,item,seed,team)
 		if meshes.is_empty():continue
 		garments.append_array(meshes)
 		for zone in item.get("hides",[]):hidden[zone]=true
@@ -151,7 +176,7 @@ static func dress(root: Node3D,era: int,job:="") -> void:
 			if is_instance_valid(mesh):mesh.visible=not hidden.has(zone)
 	root.set_meta("human_garments",garments);root.set_meta("human_outfit",ids)
 
-static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Dictionary,seed: int) -> Array:
+static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Dictionary,seed: int,team:=-1) -> Array:
 	var scene:=packed("res://assets/people/clothes/%s/%s.glb" % [id,body])
 	if scene==null or skeleton==null:return []
 	var instance: Node=scene.instantiate();var meshes: Array=[]
@@ -160,15 +185,17 @@ static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Di
 	for mesh in meshes:
 		mesh.get_parent().remove_child(mesh);mesh.owner=null
 		skeleton.add_child(mesh);mesh.transform=Transform3D.IDENTITY;mesh.skeleton=NodePath("..")
-		tint(mesh,item,seed,id)
+		tint(mesh,item,seed,id,team)
 	instance.free()
 	if meshes.is_empty():push_warning("HumanFactory: '%s' failis pole nahastatud võrku" % id)
 	return meshes
 
-static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String) -> void:
+static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team:=-1) -> void:
 	if mesh.mesh==null:return
 	var tints: Array=item.get("tints",[])
 	var color:=Color(str(tints[stable_hash("%d:%s:tint" % [seed,id])%tints.size()])) if not tints.is_empty() else Color.WHITE
+	if bool(item.get("hair_color",false)):color=hair_color(seed);tints=[color]
+	elif bool(item.get("team",false)):color=team_color(team) if team>=0 else Color("8a7a62");tints=[color]
 	for s in mesh.mesh.get_surface_count():
 		var material:=mesh.get_active_material(s)
 		if not material is BaseMaterial3D:continue
@@ -219,3 +246,66 @@ static func set_era(model: Node3D,era: int) -> void:
 	if int(model.get_meta("human_era",-1))==era:return
 	dress(model,era,str(model.get_meta("human_job","")))
 	if model.has_meta("job_kind"):equip_job(model,str(model.get_meta("job_kind")),era)
+
+# ---------------------------------------------------------------- sõdurid
+## Lähemal kui see kaugus näidatakse uut inimest, kaugemal sõduri vana keha (jõudlus).
+const SOLDIER_DETAIL_DISTANCE:=40.0
+const SOLDIER_BONES:={"hips":"body","spine":"body","chest":"chest","neck":"chest","head":"head","upperArm_L":"upperArm_L","forearm_L":"forearm_L","hand_L":"hand_L",
+	"upperArm_R":"upperArm_R","forearm_R":"forearm_R","hand_R":"hand_R","thigh_L":"thigh_L","shin_L":"shin_L","foot_L":"shin_L","thigh_R":"thigh_R","shin_R":"shin_R","foot_R":"shin_R"}
+const SOLDIER_STAND_HEIGHT:=0.96
+
+## Riietab jagatud sõdurimudeli (assets/soldiers/split): lisab väeliigi riietes inimese, kes järgib
+## sõduri luustikku ja animatsioone. Relvad, kilbid ja hobune jäävad sõdurimudelist.
+static func dress_soldier(model: Node3D,kind: String,team: int,seed: int,model_scale:=1.0) -> bool:
+	if not config().get("units",{}).has(kind):return false
+	var source:=Rig.find_skeleton(model)
+	if source==null:return false
+	var old_bodies: Array=[]
+	var old_body: Node=model.find_child("SoldierBody",true,false)
+	if old_body!=null:old_bodies.append(old_body)
+	elif source.find_bone("hips")>=0:
+		## Vana human_far (nt maakuulaja): kogu mudel on keha, varustust pole.
+		for node in all_children(source):
+			if node is MeshInstance3D:old_bodies.append(node)
+	if old_bodies.is_empty():return false
+	var human:=create("man",0,"",seed,team,kind)
+	if not is_real(human):
+		human.free();return false
+	human.name="SoldierHuman";human.scale=Vector3.ONE*(CALLER_SCALE/maxf(model_scale,0.001))
+	model.add_child(human)
+	for node in all_children(human):
+		if node is GeometryInstance3D:node.visibility_range_end=SOLDIER_DETAIL_DISTANCE;node.visibility_range_end_margin=3.0
+	for body in old_bodies:
+		if body is GeometryInstance3D:body.visibility_range_begin=SOLDIER_DETAIL_DISTANCE;body.visibility_range_begin_margin=3.0
+	var old_rig:=source.find_bone("hips")>=0
+	var map: Dictionary={}
+	for canon in Rig.CANONICAL:map[canon]=source.find_bone(canon if old_rig else str(SOLDIER_BONES[canon]))
+	model.set_meta("soldier_human",human);model.set_meta("soldier_source",source);model.set_meta("soldier_map",map)
+	model.set_meta("soldier_rig",Rig.of(Rig.find_skeleton(human)));model.set_meta("soldier_old_rig",old_rig)
+	model.set_meta("soldier_hips",source.find_bone("hips" if old_rig else "body"))
+	follow_soldier(model)
+	return true
+
+## Kannab sõduri luustiku hetkeasendi inimesele. Kutsu igal kaadril lähedal olevatele sõduritele.
+static func follow_soldier(model: Node3D) -> void:
+	var source: Skeleton3D=model.get_meta("soldier_source")
+	var rig: Variant=model.get_meta("soldier_rig")
+	if not is_instance_valid(source) or rig==null:return
+	var map: Dictionary=model.get_meta("soldier_map")
+	var delta: Dictionary={}
+	for canon in map:
+		var i: int=map[canon]
+		delta[canon]=source.get_bone_global_pose(i).basis.get_rotation_quaternion() if i>=0 else Quaternion.IDENTITY
+	var hi: int=model.get_meta("soldier_hips")
+	var p:=source.get_bone_global_pose(hi).origin if hi>=0 else Vector3.ZERO
+	var offset:=(p-Vector3(0,Rig.REFERENCE_HIP_HEIGHT,0)) if bool(model.get_meta("soldier_old_rig")) else (p-Vector3(0,SOLDIER_STAND_HEIGHT,0))*(Rig.REFERENCE_HIP_HEIGHT/SOLDIER_STAND_HEIGHT)
+	rig.apply_global(delta,offset)
+
+## Kindlate esemetega inimene (proovipildid, kujundaja).
+static func create_with_items(body: String,ids: Array,seed:=0,team:=-1) -> Node3D:
+	var root:=create(body,0,"",seed,team)
+	root.set_meta("human_items",ids);dress(root,0,"")
+	return root
+
+static func is_dressed_soldier(model: Node) -> bool:
+	return model!=null and model.has_meta("soldier_human")
