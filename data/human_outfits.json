@@ -1,0 +1,1662 @@
+{
+ "_info": "Inimeste kehad, riided ja ajastute riidekomplektid. Riidefail: res://assets/people/clothes/<ese>/<keha>.glb. Tööriist: res://assets/people/equipment/<nimi>.glb. Puuduva faili korral jäetakse ese vahele ja kehaosa ei peideta.",
+ "zones": [
+  "head",
+  "neck",
+  "torso",
+  "hips",
+  "upperarms",
+  "forearms",
+  "hands",
+  "thighs",
+  "shins",
+  "feet"
+ ],
+ "slots": [
+  "hair",
+  "beard",
+  "underwear",
+  "shirt",
+  "socks",
+  "legs",
+  "torso",
+  "feet",
+  "apron",
+  "belt",
+  "outer",
+  "head",
+  "jewelry"
+ ],
+ "bodies": {
+  "man": {
+   "scene": "res://assets/people/bodies/man.glb",
+   "outfit": "man",
+   "hair": [
+    "hair_short",
+    "hair_long_tied"
+   ],
+   "beard": [
+    "hair_beard_short",
+    ""
+   ]
+  },
+  "woman": {
+   "scene": "res://assets/people/bodies/woman.glb",
+   "outfit": "woman",
+   "hair": [
+    "hair_braids",
+    "hair_long_tied",
+    "hair_long_loose"
+   ]
+  },
+  "boy": {
+   "scene": "res://assets/people/bodies/boy.glb",
+   "outfit": "man",
+   "child": true,
+   "hair": [
+    "hair_short"
+   ]
+  },
+  "girl": {
+   "scene": "res://assets/people/bodies/girl.glb",
+   "outfit": "woman",
+   "child": true,
+   "hair": [
+    "hair_braids",
+    "hair_long_loose"
+   ]
+  }
+ },
+ "items": {
+  "hair_short": {
+   "name": "Lühikesed juuksed",
+   "slot": "hair",
+   "hides": [],
+   "tints": [
+    "d8b98a",
+    "a07a4e",
+    "6b4a2e",
+    "3b2a1e",
+    "2a211c",
+    "9a5a32"
+   ]
+  },
+  "hair_long_tied": {
+   "name": "Pikad seotud juuksed",
+   "slot": "hair",
+   "hides": [],
+   "tints": [
+    "d8b98a",
+    "a07a4e",
+    "6b4a2e",
+    "3b2a1e",
+    "2a211c",
+    "9a5a32"
+   ]
+  },
+  "hair_braids": {
+   "name": "Palmikud",
+   "slot": "hair",
+   "hides": [],
+   "tints": [
+    "d8b98a",
+    "a07a4e",
+    "6b4a2e",
+    "3b2a1e",
+    "2a211c",
+    "9a5a32"
+   ]
+  },
+  "hair_beard_short": {
+   "name": "Lühike habe",
+   "slot": "beard",
+   "hides": [],
+   "tints": [
+    "d8b98a",
+    "a07a4e",
+    "6b4a2e",
+    "3b2a1e",
+    "2a211c",
+    "9a5a32"
+   ]
+  },
+  "hair_long_loose": {
+   "name": "Pikad lahtised juuksed",
+   "slot": "hair",
+   "hides": [],
+   "tints": [
+    "d8b98a",
+    "a07a4e",
+    "6b4a2e",
+    "3b2a1e",
+    "2a211c",
+    "9a5a32"
+   ]
+  },
+  "stone_hide_loincloth": {
+   "name": "Nahkne niudevöö",
+   "slot": "underwear",
+   "hides": [
+    "hips"
+   ],
+   "tints": [
+    "8f6e4b"
+   ]
+  },
+  "stone_hide_tunic": {
+   "name": "Nahkne kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips"
+   ],
+   "tints": [
+    "8f6e4b",
+    "7a5a3a"
+   ]
+  },
+  "stone_hide_leggings": {
+   "name": "Nahksäärised",
+   "slot": "legs",
+   "hides": [
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "8f6e4b",
+    "7a5a3a"
+   ]
+  },
+  "stone_moccasins": {
+   "name": "Nahkkingad (mokassiinid)",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "stone_fur_cloak": {
+   "name": "Karusnahkne keep",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "6e5640"
+   ]
+  },
+  "stone_fur_hood": {
+   "name": "Karusnahkne kapuuts",
+   "slot": "head",
+   "hides": [
+    "neck"
+   ],
+   "tints": [
+    "6e5640"
+   ],
+   "hides_hair": true
+  },
+  "stone_hide_dress": {
+   "name": "Pikk nahkkleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "8f6e4b",
+    "7a5a3a"
+   ]
+  },
+  "stone_amber_necklace": {
+   "name": "Merevaigust ja hambaripatsitega kaelakee",
+   "slot": "jewelry",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "bronze_wool_wrap": {
+   "name": "Villane mähisrõivas",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e"
+   ]
+  },
+  "bronze_wool_cape": {
+   "name": "Ümar villane keep",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1"
+   ]
+  },
+  "bronze_felt_cap": {
+   "name": "Villane vildikübar",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ],
+   "hides_hair": true
+  },
+  "bronze_leather_shoes": {
+   "name": "Nahkkingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "bronze_wool_blouse": {
+   "name": "Lühikeste varrukatega villane pluus",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1"
+   ]
+  },
+  "bronze_cord_skirt": {
+   "name": "Nööriseelik",
+   "slot": "legs",
+   "hides": [
+    "hips"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a"
+   ]
+  },
+  "bronze_long_skirt": {
+   "name": "Pikk villane seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1"
+   ]
+  },
+  "bronze_belt_disc": {
+   "name": "Pronksist vööketas",
+   "slot": "belt",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "bronze_hairnet": {
+   "name": "Juuksevõrk",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "d9cdb1"
+   ]
+  },
+  "bronze_neck_ring": {
+   "name": "Pronksist kaelavõru",
+   "slot": "jewelry",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "iron_linen_shirt": {
+   "name": "Linane särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "e8e1cf"
+   ]
+  },
+  "iron_wool_trousers": {
+   "name": "Villased püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1",
+    "7d7a73"
+   ]
+  },
+  "iron_wool_tunic": {
+   "name": "Villane kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a",
+    "c8a64a",
+    "4f5f3a",
+    "7d7a73"
+   ]
+  },
+  "iron_cloak_brooch": {
+   "name": "Mantel hoburaudsõlega",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "3f5a7a",
+    "7d7a73"
+   ]
+  },
+  "iron_pastlad": {
+   "name": "Pastlad ja säärepaelad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "iron_belt_knife": {
+   "name": "Vöö ja nuga",
+   "slot": "belt",
+   "hides": [],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "iron_linen_shift": {
+   "name": "Pikk linane särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "e8e1cf"
+   ]
+  },
+  "iron_wool_skirt": {
+   "name": "Villane vaipseelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "3f5a7a",
+    "7a5a3a",
+    "d9cdb1"
+   ]
+  },
+  "iron_soba": {
+   "name": "Õlarätt (sõba)",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "3f5a7a",
+    "d9cdb1"
+   ]
+  },
+  "iron_spiral_headband": {
+   "name": "Pronksspiraalidega peapael",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "iron_breast_ornaments": {
+   "name": "Kaelavõru ja rinnalehed",
+   "slot": "jewelry",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "med_linen_shirt": {
+   "name": "Linane särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "e8e1cf"
+   ]
+  },
+  "med_wool_hose": {
+   "name": "Villased sukkpüksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a",
+    "7d7a73"
+   ]
+  },
+  "med_wool_cote": {
+   "name": "Põlvini villane kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a",
+    "c8a64a",
+    "4f5f3a",
+    "7d7a73"
+   ]
+  },
+  "med_hood": {
+   "name": "Kapuuts õlakattega",
+   "slot": "head",
+   "hides": [
+    "neck"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a",
+    "7a5a3a"
+   ],
+   "hides_hair": true
+  },
+  "med_turnshoes": {
+   "name": "Pöördkingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "med_belt_pouch": {
+   "name": "Vöö ja kukkur",
+   "slot": "belt",
+   "hides": [],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "med_linen_chemise": {
+   "name": "Linane alussärk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "e8e1cf"
+   ]
+  },
+  "med_wool_kirtle": {
+   "name": "Pikk villane kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a",
+    "c8a64a",
+    "4f5f3a",
+    "7d7a73"
+   ]
+  },
+  "med_apron": {
+   "name": "Põll",
+   "slot": "apron",
+   "hides": [],
+   "tints": [
+    "e8e1cf",
+    "d9cdb1"
+   ]
+  },
+  "med_headcloth": {
+   "name": "Linane peakate",
+   "slot": "head",
+   "hides": [
+    "neck"
+   ],
+   "tints": [
+    "e8e1cf"
+   ],
+   "hides_hair": true
+  },
+  "med_wool_mantle": {
+   "name": "Villane mantel",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "3f5a7a",
+    "4f5f3a"
+   ]
+  },
+  "ren_shirt": {
+   "name": "Krae ja kurrutatud kätistega särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "f1efe8",
+    "e8e1cf"
+   ]
+  },
+  "ren_doublet": {
+   "name": "Vamss",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "2e2925",
+    "7a5a3a",
+    "9c3b2e",
+    "4f5f3a"
+   ]
+  },
+  "ren_breeches": {
+   "name": "Pluuderpüksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "2e2925",
+    "7a5a3a",
+    "7d7a73"
+   ]
+  },
+  "ren_stockings": {
+   "name": "Villased sukad",
+   "slot": "socks",
+   "hides": [
+    "shins"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7d7a73",
+    "9c3b2e"
+   ]
+  },
+  "ren_shoes": {
+   "name": "Nahkkingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f",
+    "2e2925"
+   ]
+  },
+  "ren_flat_cap": {
+   "name": "Barett",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ]
+  },
+  "ren_smock": {
+   "name": "Linane särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "f1efe8",
+    "e8e1cf"
+   ]
+  },
+  "ren_bodice_gown": {
+   "name": "Liibuga kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "4f5f3a",
+    "7a5a3a",
+    "3f5a7a"
+   ]
+  },
+  "ren_apron": {
+   "name": "Põll",
+   "slot": "apron",
+   "hides": [],
+   "tints": [
+    "f1efe8",
+    "e8e1cf"
+   ]
+  },
+  "ren_coif": {
+   "name": "Tanu",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "f1efe8"
+   ],
+   "hides_hair": true
+  },
+  "ren_shawl": {
+   "name": "Õlarätt",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "9c3b2e"
+   ]
+  },
+  "ind_cotton_shirt": {
+   "name": "Puuvillane särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "f1efe8",
+    "e8e1cf",
+    "b8c4cc"
+   ]
+  },
+  "ind_trousers_braces": {
+   "name": "Villased püksid traksidega",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7d7a73",
+    "7a5a3a",
+    "2e2925"
+   ]
+  },
+  "ind_waistcoat": {
+   "name": "Vest",
+   "slot": "torso",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "2e2925",
+    "7d7a73",
+    "7a5a3a"
+   ]
+  },
+  "ind_wool_jacket": {
+   "name": "Villane pintsak",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "7d7a73",
+    "7a5a3a",
+    "2c3448"
+   ]
+  },
+  "ind_boots": {
+   "name": "Säärsaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "2e2925",
+    "6b4a2f"
+   ]
+  },
+  "ind_flat_cap": {
+   "name": "Nokamüts",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "7d7a73",
+    "7a5a3a"
+   ]
+  },
+  "ind_blouse": {
+   "name": "Pikkade varrukatega pluus",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "f1efe8",
+    "c9d3dc",
+    "d8c6b0"
+   ]
+  },
+  "ind_long_skirt": {
+   "name": "Pikk seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "2c3448",
+    "7a5a3a",
+    "2e2925",
+    "7d7a73"
+   ]
+  },
+  "ind_apron": {
+   "name": "Põll",
+   "slot": "apron",
+   "hides": [],
+   "tints": [
+    "f1efe8",
+    "c9d3dc"
+   ]
+  },
+  "ind_headscarf": {
+   "name": "Pearätt",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "d9cdb1"
+   ],
+   "hides_hair": true
+  },
+  "ind_wool_shawl": {
+   "name": "Villane suurrätt",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "7d7a73",
+    "7a5a3a",
+    "9c3b2e"
+   ]
+  },
+  "mod_tshirt": {
+   "name": "T-särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "f1efe8",
+    "7d7a73",
+    "2c3448",
+    "4f5f3a",
+    "9c3b2e"
+   ]
+  },
+  "mod_jeans": {
+   "name": "Teksapüksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "3a4c66",
+    "2c3448",
+    "2e2925"
+   ]
+  },
+  "mod_work_jacket": {
+   "name": "Jope",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "8a8160",
+    "2c3448",
+    "2e2925",
+    "4f5f3a"
+   ]
+  },
+  "mod_sneakers": {
+   "name": "Spordijalatsid",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "f1efe8",
+    "7d7a73",
+    "2e2925"
+   ]
+  },
+  "mod_cap": {
+   "name": "Nokkmüts",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2c3448",
+    "2e2925",
+    "9c3b2e"
+   ]
+  },
+  "mod_blouse": {
+   "name": "Pluus",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms"
+   ],
+   "tints": [
+    "f1efe8",
+    "c9d3dc",
+    "9c3b2e",
+    "4f5f3a"
+   ]
+  },
+  "mod_skirt": {
+   "name": "Põlvepikkune seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "2c3448",
+    "2e2925",
+    "7d7a73"
+   ]
+  },
+  "mod_shoes": {
+   "name": "Kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ]
+  },
+  "work_leather_apron": {
+   "name": "Nahkpõll",
+   "slot": "apron",
+   "hides": [],
+   "tints": [
+    "6b4a2f"
+   ]
+  },
+  "work_straw_hat": {
+   "name": "Õlgkübar",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ]
+  },
+  "work_oilskin_coat": {
+   "name": "Õlirõivast vihmamantel",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "c8a64a",
+    "8a8160"
+   ]
+  },
+  "work_overall": {
+   "name": "Tunked",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "2c3448",
+    "8a8160"
+   ]
+  },
+  "work_hard_hat": {
+   "name": "Kiiver",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "e0b030",
+    "f1efe8"
+   ],
+   "hides_hair": true
+  },
+  "work_hi_vis_vest": {
+   "name": "Helkurvest",
+   "slot": "outer",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "d8e030",
+    "e07030"
+   ]
+  }
+ },
+ "eras": [
+  {
+   "id": "stone",
+   "name": "Kiviaeg",
+   "man": {
+    "base": [
+     "stone_hide_loincloth",
+     "stone_hide_tunic",
+     "stone_hide_leggings",
+     "stone_moccasins"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [],
+      [
+       "stone_fur_cloak"
+      ]
+     ],
+     "jewelry": [
+      [],
+      [
+       "stone_amber_necklace"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "stone_hide_dress",
+     "stone_hide_leggings",
+     "stone_moccasins",
+     "stone_amber_necklace"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [],
+      [
+       "stone_fur_cloak"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "hunter": {
+     "all": [
+      "stone_fur_hood",
+      "stone_fur_cloak"
+     ]
+    }
+   },
+   "tools": {},
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "bronze",
+   "name": "Pronksiaeg",
+   "man": {
+    "base": [
+     "bronze_wool_wrap",
+     "bronze_leather_shoes"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [
+       "bronze_wool_cape"
+      ]
+     ],
+     "head": [
+      [],
+      [
+       "bronze_felt_cap"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "bronze_wool_blouse",
+     "bronze_belt_disc",
+     "bronze_leather_shoes"
+    ],
+    "options": {
+     "legs": [
+      [
+       "bronze_cord_skirt"
+      ],
+      [
+       "bronze_long_skirt"
+      ]
+     ],
+     "head": [
+      [],
+      [
+       "bronze_hairnet"
+      ]
+     ],
+     "jewelry": [
+      [],
+      [
+       "bronze_neck_ring"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "bronze_foundry": {
+     "all": [
+      "work_leather_apron"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "bronze_axe",
+    "forester": "bronze_axe",
+    "builder": "bronze_hammer",
+    "mason": "bronze_chisel",
+    "quarry": "bronze_pick",
+    "mine": "bronze_pick",
+    "coppermine": "bronze_pick",
+    "tinmine": "bronze_pick",
+    "farm": "bronze_sickle",
+    "hunter": "bronze_spear",
+    "fisher": "bronze_fishing_spear",
+    "bronze_foundry": "bronze_tongs"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "iron",
+   "name": "Rauaaeg",
+   "man": {
+    "base": [
+     "iron_linen_shirt",
+     "iron_wool_trousers",
+     "iron_wool_tunic",
+     "iron_pastlad",
+     "iron_belt_knife"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [
+       "iron_cloak_brooch"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "iron_linen_shift",
+     "iron_wool_skirt",
+     "iron_pastlad",
+     "iron_breast_ornaments"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [
+       "iron_soba"
+      ]
+     ],
+     "head": [
+      [
+       "iron_spiral_headband"
+      ],
+      []
+     ]
+    }
+   },
+   "jobs": {
+    "smith": {
+     "all": [
+      "work_leather_apron"
+     ]
+    },
+    "smelter": {
+     "all": [
+      "work_leather_apron"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "iron_axe",
+    "forester": "iron_axe",
+    "builder": "iron_hammer",
+    "mason": "iron_chisel",
+    "quarry": "iron_pick",
+    "mine": "iron_pick",
+    "farm": "iron_sickle",
+    "hunter": "iron_spear",
+    "fisher": "iron_fishing_net",
+    "smith": "iron_smith_hammer"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "medieval",
+   "name": "Keskaeg",
+   "man": {
+    "base": [
+     "med_linen_shirt",
+     "med_wool_hose",
+     "med_wool_cote",
+     "med_turnshoes",
+     "med_belt_pouch"
+    ],
+    "options": {
+     "head": [
+      [],
+      [
+       "med_hood"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "med_linen_chemise",
+     "med_wool_kirtle",
+     "med_turnshoes"
+    ],
+    "options": {
+     "head": [
+      [
+       "med_headcloth"
+      ],
+      []
+     ],
+     "apron": [
+      [
+       "med_apron"
+      ],
+      []
+     ],
+     "outer": [
+      [],
+      [
+       "med_wool_mantle"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "farm": {
+     "all": [
+      "work_straw_hat"
+     ]
+    },
+    "smith": {
+     "all": [
+      "work_leather_apron"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "iron_axe",
+    "forester": "iron_axe",
+    "builder": "iron_hammer",
+    "mason": "iron_chisel",
+    "quarry": "iron_pick",
+    "mine": "iron_pick",
+    "farm": "scythe",
+    "fisher": "iron_fishing_net",
+    "smith": "iron_smith_hammer"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "renaissance",
+   "name": "Renessanss",
+   "man": {
+    "base": [
+     "ren_shirt",
+     "ren_doublet",
+     "ren_breeches",
+     "ren_stockings",
+     "ren_shoes"
+    ],
+    "options": {
+     "head": [
+      [],
+      [
+       "ren_flat_cap"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "ren_smock",
+     "ren_bodice_gown",
+     "ren_shoes"
+    ],
+    "options": {
+     "head": [
+      [
+       "ren_coif"
+      ],
+      []
+     ],
+     "apron": [
+      [
+       "ren_apron"
+      ],
+      []
+     ],
+     "outer": [
+      [],
+      [
+       "ren_shawl"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "farm": {
+     "all": [
+      "work_straw_hat"
+     ]
+    },
+    "smith": {
+     "all": [
+      "work_leather_apron"
+     ]
+    },
+    "printer": {
+     "all": [
+      "work_leather_apron"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "steel_axe",
+    "builder": "steel_hammer",
+    "mason": "steel_chisel",
+    "mine": "steel_pick",
+    "farm": "scythe",
+    "smith": "iron_smith_hammer"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "industrial",
+   "name": "Tööstusajastu",
+   "man": {
+    "base": [
+     "ind_cotton_shirt",
+     "ind_trousers_braces",
+     "ind_boots"
+    ],
+    "options": {
+     "torso": [
+      [
+       "ind_waistcoat"
+      ],
+      []
+     ],
+     "outer": [
+      [],
+      [
+       "ind_wool_jacket"
+      ]
+     ],
+     "head": [
+      [
+       "ind_flat_cap"
+      ],
+      []
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "ind_blouse",
+     "ind_long_skirt",
+     "ind_boots"
+    ],
+    "options": {
+     "head": [
+      [
+       "ind_headscarf"
+      ],
+      []
+     ],
+     "apron": [
+      [
+       "ind_apron"
+      ],
+      []
+     ],
+     "outer": [
+      [],
+      [
+       "ind_wool_shawl"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "fisher": {
+     "all": [
+      "work_oilskin_coat"
+     ]
+    },
+    "farm": {
+     "all": [
+      "work_straw_hat"
+     ]
+    },
+    "steelworks": {
+     "all": [
+      "work_leather_apron"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "saw_two_man",
+    "builder": "steel_hammer",
+    "mine": "steel_pick",
+    "farm": "pitchfork",
+    "steelworks": "steel_tongs"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  },
+  {
+   "id": "modern",
+   "name": "Moodne ajastu",
+   "man": {
+    "base": [
+     "mod_tshirt",
+     "mod_jeans",
+     "mod_sneakers"
+    ],
+    "options": {
+     "outer": [
+      [],
+      [
+       "mod_work_jacket"
+      ]
+     ],
+     "head": [
+      [],
+      [
+       "mod_cap"
+      ]
+     ]
+    }
+   },
+   "woman": {
+    "base": [
+     "mod_shoes"
+    ],
+    "options": {
+     "shirt": [
+      [
+       "mod_tshirt"
+      ],
+      [
+       "mod_blouse"
+      ]
+     ],
+     "legs": [
+      [
+       "mod_jeans"
+      ],
+      [
+       "mod_skirt"
+      ]
+     ],
+     "outer": [
+      [],
+      [
+       "mod_work_jacket"
+      ]
+     ]
+    }
+   },
+   "jobs": {
+    "builder": {
+     "all": [
+      "work_hard_hat",
+      "work_hi_vis_vest"
+     ]
+    },
+    "mine": {
+     "all": [
+      "work_hard_hat"
+     ]
+    },
+    "autofactory": {
+     "all": [
+      "work_overall"
+     ]
+    },
+    "refinery": {
+     "all": [
+      "work_overall",
+      "work_hard_hat"
+     ]
+    }
+   },
+   "tools": {
+    "lumber": "chainsaw",
+    "builder": "power_drill"
+   },
+   "boy": {
+    "from": "man",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   },
+   "girl": {
+    "from": "woman",
+    "drop": [
+     "jewelry",
+     "belt",
+     "apron"
+    ]
+   }
+  }
+ ]
+}

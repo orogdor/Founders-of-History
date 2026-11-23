@@ -158,6 +158,8 @@ func apply(model: Node,time: float,moving: bool,action: String="",work_rate:=1.0
 	var skeleton:=find_skeleton(model)
 	if skeleton==null:return
 	var result:=calculate(time,moving,action,work_rate)
+	if skeleton.has_meta("human_rig"):
+		skeleton.get_meta("human_rig").apply_pose(result);return
 	for name in BONES:
 		var i:=skeleton.find_bone(name)
 		if i>=0:skeleton.set_bone_pose_rotation(i,Basis.from_euler(result.poses[name],EULER_ORDER_XYZ).get_rotation_quaternion())

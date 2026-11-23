@@ -9,6 +9,7 @@ const VillageLife = preload("res://scripts/village_life.gd")
 const CityLights = preload("res://scripts/detail_lights.gd")
 const Equipment = preload("res://scripts/human_equipment.gd")
 const Motion = preload("res://scripts/human_motion.gd")
+const Humans = preload("res://scripts/human_factory.gd")
 const Forest = preload("res://scripts/forest_scatter.gd")
 const ForestFill = preload("res://scripts/detail_forest_fill.gd")
 const VisualRiver=preload("res://scripts/visual_river.gd")
@@ -127,7 +128,7 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 	add_child(water)
 	var host:=get_parent()
 	river_segments=host.detail_landscape_for(self,c,r,heights,visual_heights) if host!=null and host.has_method("detail_landscape_for") else Landscape.build(self,cells,c,r,heights,seed,world_heights,river_graph,true,visual_heights)
-	person = HUMAN.instantiate()
+	person = Humans.create("man",0,"settler",1)
 	person.scale = Vector3.ONE * 1.66
 	person.position = Vector3(0,maxf(0,display_height(0,0)),0)
 	add_child(person)
@@ -547,8 +548,9 @@ func clear_area(x: float,z: float,size: Variant) -> void:
 func update_builder(city: Dictionary,time: float,age:=0) -> void:
 	var agents: Array=city.get("builderAgents",[])
 	while builder_people.size()<agents.size():
-		var person: Node3D=HUMAN.instantiate();person.scale=Vector3.ONE*1.66;add_child(person)
-		var tool:=Equipment.job(person,"builder");if tool!=null:person.set_meta("job_tool",tool)
+		var builder_key:="builder:%d" % builder_people.size()
+		var person: Node3D=Humans.create(Humans.pick_body(builder_key,"builder"),age,"builder",Humans.stable_hash(builder_key));person.scale=Vector3.ONE*1.66;add_child(person)
+		Humans.equip_job(person,"builder",age)
 		var pack:=Equipment.load_for(person,"builder");if pack!=null:person.set_meta("job_load",pack)
 		builder_people.append(person);builder_motions.append(Motion.new())
 	if not builder_people.is_empty():builder_person=builder_people[0]
@@ -559,7 +561,8 @@ func update_builder(city: Dictionary,time: float,age:=0) -> void:
 		person.position=Vector3(worker.x,display_height(worker.x,worker.z),worker.z)
 		person.rotation.y=float(worker.get("heading",0))
 		var action: String="carry" if float(worker.get("carried",0))>0 else (str(worker.get("action","")) if worker.get("working",false) else "")
-		if person.has_meta("job_tool"):person.get_meta("job_tool").visible=age==0
+		Humans.set_era(person,age)
+		if person.has_meta("job_tool"):person.get_meta("job_tool").visible=Humans.tool_visible(person,age)
 		if person.has_meta("job_load"):person.get_meta("job_load").visible=action=="carry"
 		builder_motions[i].apply(person,time,worker.get("moving",false),action)
 
@@ -569,13 +572,13 @@ func update_trainer(city: Dictionary,time: float,age:=0) -> void:
 		if trainer_person!=null:trainer_person.visible=false
 		return
 	if trainer_person==null:
-		trainer_person=HUMAN.instantiate()
+		trainer_person=Humans.create("man",age,"worker",7)
 		trainer_person.scale=Vector3.ONE*1.66
 		add_child(trainer_person)
-		var tool:=Equipment.job(trainer_person,"worker")
-		if tool!=null:trainer_person.set_meta("job_tool",tool)
+		Humans.equip_job(trainer_person,"worker",age)
 	trainer_person.visible=true
-	if trainer_person.has_meta("job_tool"):trainer_person.get_meta("job_tool").visible=age==0
+	Humans.set_era(trainer_person,age)
+	if trainer_person.has_meta("job_tool"):trainer_person.get_meta("job_tool").visible=Humans.tool_visible(trainer_person,age)
 	trainer_person.position=Vector3(worker.x,display_height(worker.x,worker.z),worker.z)
 	trainer_person.rotation.y=float(worker.get("heading",0))
 	trainer_motion.apply(trainer_person,time,worker.get("moving",false),str(worker.get("action","")) if worker.get("working",false) else "")
@@ -849,13 +852,12 @@ func update_workers(city: Dictionary,time: float,age:=0) -> void:
 		var worker: Dictionary=workers[key]
 		if worker.get("kind","") not in ["lumber","quarry","hunter","well","fisher","berries","farm","saw","mill","bakery","study","forester","mine","coppermine","tinmine","claypit","gem_mine","oilwell","pottery_kiln","mason","bronze_foundry","cartwright","coal","smelter","smith","scriptorium","library","academy","vegetable_garden","orchard","dairy","spice_garden","coffee_farm","flax_farm","silk_farm","dye_garden","cocoa_farm","rubber_farm","weaver","jeweler","silk_weaver","perfumery","chocolatier","electronics_factory","market_woman","pasture","school","university","monastery","chapel","observatory","public_school","high_school","polytechnic","laboratory","printer","nitrate","powdermill","steelworks","engineworks","refinery","powerplant","autofactory","watermill","windmill","master_workshop","armor_workshop"]:continue
 		if not worker_models.has(key):
-			var model: Node3D=HUMAN.instantiate()
+			var model: Node3D=Humans.create(Humans.pick_body(str(key),str(worker.kind)),age,str(worker.kind),Humans.stable_hash(str(key)))
 			model.scale=Vector3.ONE*1.66
 			add_child(model)
 			worker_models[key]=model
 			worker_motions[key]=Motion.new()
-			var tool:=Equipment.job(model,str(worker.kind))
-			if tool!=null:model.set_meta("job_tool",tool)
+			Humans.equip_job(model,str(worker.kind),age)
 			var pack:=Equipment.load_for(model,str(worker.kind))
 			if pack!=null:model.set_meta("job_load",pack)
 			if worker.kind=="fisher":
@@ -868,7 +870,8 @@ func update_workers(city: Dictionary,time: float,age:=0) -> void:
 		model.rotation.y=float(worker.get("heading",0))
 		model.visible=worker.get("visible",true)
 		var action: String="carry" if float(worker.get("carried",0))>0 else (str(worker.get("action","")) if worker.get("working",false) else "")
-		if model.has_meta("job_tool"):model.get_meta("job_tool").visible=age==0
+		Humans.set_era(model,age)
+		if model.has_meta("job_tool"):model.get_meta("job_tool").visible=Humans.tool_visible(model,age)
 		if model.has_meta("job_load"):model.get_meta("job_load").visible=action=="carry" and worker.kind!="fisher"
 		if model.has_meta("catch"):model.get_meta("catch").visible=action=="carry"
 		if age==0 and worker.kind=="hunter" and worker.get("phase","")=="out" and worker.get("resourceId")!=null:
@@ -880,16 +883,17 @@ func update_workers(city: Dictionary,time: float,age:=0) -> void:
 		var key: String="cargo:"+str(int(cargo.get("portCargoId",city.economy.cargo.find(cargo))))
 		active_cargo[key]=true
 		if not worker_models.has(key):
-			var model: Node3D=HUMAN.instantiate()
+			var model: Node3D=Humans.create(Humans.pick_body(key,"worker"),age,"porter",Humans.stable_hash(key))
 			model.scale=Vector3.ONE*1.66
 			add_child(model)
 			worker_models[key]=model;worker_motions[key]=Motion.new()
-			var tool:=Equipment.job(model,"worker")
-			if tool!=null:model.set_meta("job_tool",tool);tool.visible=false
+			var tool:=Humans.equip_job(model,"worker",age)
+			if tool!=null:tool.visible=false
 			var pack:=Equipment.load_for(model,"worker")
 			if pack!=null:model.set_meta("job_load",pack);pack.visible=true
 		var model: Node3D=worker_models[key]
-		if model.has_meta("job_tool"):model.get_meta("job_tool").visible=age==0
+		Humans.set_era(model,age)
+		if model.has_meta("job_tool"):model.get_meta("job_tool").visible=Humans.tool_visible(model,age)
 		model.position=Vector3(cargo.x,display_height(cargo.x,cargo.z),cargo.z)
 		model.rotation.y=float(cargo.get("heading",0));model.visible=true
 		worker_motions[key].apply(model,time,cargo.get("moving",false),"carry")
