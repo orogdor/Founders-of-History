@@ -1,0 +1,60 @@
+name: Android heightmaps test build
+on:
+  push:
+    branches: [android-heightmaps-test]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Godot and Android export template
+        run: |
+          set -euo pipefail
+          base=https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable
+          curl -fL --retry 3 "$base/Godot_v4.7.2-stable_linux.x86_64.zip" -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot-export
+          echo "/tmp/godot-export" >> "$GITHUB_PATH"
+          curl -fL --retry 3 "$base/Godot_v4.7.2-stable_export_templates.tpz" -o /tmp/godot-templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          unzip -qj /tmp/godot-templates.tpz templates/android_release.apk templates/version.txt -d "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+      - name: Prepare Android SDK and test installer
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$sdk/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0" "platforms;android-36" "platform-tools"
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.7.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$sdk"
+          EOF
+          sed -i 's/^architectures\/x86_64=true$/architectures\/x86_64=false/;s/^package\/unique_name=.*/package\/unique_name="ee.kuningriigid.godot.heightmaptest"/;s/^package\/name=.*/package\/name="Founders of History Test"/;s/^version\/name=.*/version\/name="0.1.0-heightmaps"/;s/^version\/code=.*/version\/code=20261124/' export_presets.cfg
+      - name: Export and verify Android installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$RUNNER_TEMP/founders-test.p12"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_USER=founders-test
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD"
+          keytool -genkeypair -storetype PKCS12 -keystore "$GODOT_ANDROID_KEYSTORE_RELEASE_PATH" -storepass:env GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD -keypass:env GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD -alias "$GODOT_ANDROID_KEYSTORE_RELEASE_USER" -keyalg RSA -keysize 2048 -validity 3650 -dname 'CN=Founders of History Test'
+          mkdir -p build/android
+          Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --import
+          Godot_v4.7.2-stable_linux.x86_64 --headless --path . --export-release Android build/android/Founders-of-History-Android-Heightmaps.apk
+          "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose build/android/Founders-of-History-Android-Heightmaps.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Founders-of-History-Android-Heightmaps
+          path: build/android/Founders-of-History-Android-Heightmaps.apk
+          if-no-files-found: error
