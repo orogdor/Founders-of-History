@@ -1,6 +1,8 @@
 extends Node3D
 
 const Grid = preload("res://scripts/campaign_grid.gd")
+const MobileProfile = preload("res://scripts/mobile_profile.gd")
+const MapTouch = preload("res://scripts/map_touch.gd")
 const Movement = preload("res://scripts/world_movement.gd")
 const Naval = preload("res://scripts/naval_rules.gd")
 const WorldGenerator = preload("res://scripts/tectonic_world.gd")
@@ -273,8 +275,10 @@ var detail_visual_cache: Dictionary={}
 var detail_landscape_cache: Dictionary={}
 var detail_mesh_cache: Dictionary={}
 var detail_ocean_cache: Dictionary={}
+var map_touch := MapTouch.new()
 
 func _ready() -> void:
+	if MobileProfile.active:graphics_shadows=false
 	DetailView.request_nature_assets()
 	DetailGroundMaterial.request_assets()
 	var settings:=ConfigFile.new()
@@ -320,7 +324,7 @@ func _ready() -> void:
 	build_ui()
 	fpv_walker=preload("res://scripts/fpv_walker.gd").new();fpv_walker.host=self;add_child(fpv_walker)
 	update_camera()
-	update_status("Vali hiirega naaberruut või kaugem maismaaruut.")
+	update_status("Puuduta ruutu või suumi kahe sõrmega." if MobileProfile.active else "Vali hiirega naaberruut või kaugem maismaaruut.")
 	call_deferred("open_initial_menu")
 
 func open_initial_menu() -> void:
@@ -381,12 +385,14 @@ func build_world() -> void:
 	world_height_samples=WorldTerrain.samples(grid)
 	var colors:=PackedColorArray();colors.resize(grid.size())
 	for i in colors.size():colors[i]=terrain_color(i,true)
-	var mesh:=WorldTerrain.build(grid,world_height_samples,colors,true,int(game.seed))
+	var mesh:=WorldTerrain.build(grid,world_height_samples,colors,true,int(game.seed),2 if MobileProfile.active else WorldTerrain.SUBDIVISIONS)
 	world_mesh_samples=mesh.get_meta("atlas_sampler",mesh.get_meta("atlas_heights",PackedFloat32Array()))
 	world_river_graph=WorldRivers.prepare(grid,int(game.seed))
 	WorldRivers.add_surface(mesh,grid,world_height_samples,int(game.seed),world_river_graph)
 	var mesh_instance:=MeshInstance3D.new();terrain=mesh_instance;mesh_instance.mesh=mesh
-	var ground:=ShaderMaterial.new();ground.shader=load("res://scripts/world_terrain.gdshader")
+	var ground:=ShaderMaterial.new()
+	ground.shader=load("res://scripts/mobile_ground.gdshader" if MobileProfile.active else "res://scripts/world_terrain.gdshader")
+	if MobileProfile.active:ground.set_shader_parameter("overview",true)
 	DetailGroundMaterial.attach_world(ground)
 	mesh_instance.set_surface_override_material(0,ground)
 	if mesh.get_surface_count()>1:
@@ -397,7 +403,9 @@ func build_world() -> void:
 		mesh_instance.set_surface_override_material(2,banks)
 	add_child(mesh_instance)
 	var ocean:=MeshInstance3D.new();ocean.mesh=WorldTerrain.build_ocean(mesh)
-	var water:=ShaderMaterial.new();water.shader=load("res://scripts/world_ocean.gdshader")
+	var water:=ShaderMaterial.new()
+	water.shader=load("res://scripts/mobile_water.gdshader" if MobileProfile.active else "res://scripts/world_ocean.gdshader")
+	if MobileProfile.active:water.set_shader_parameter("overview",true)
 	ocean.material_override=water;mesh_instance.add_child(ocean)
 	if fog!=null:rebuild_fog_mesh();update_fog_symbols()
 
@@ -457,6 +465,9 @@ func build_camera() -> void:
 func update_camera() -> void:
 	if is_instance_valid(fpv_walker) and fpv_walker.active:fpv_walker.apply_camera();return
 	camera.size = zoom
+	if MobileProfile.active:
+		camera.near=clampf(zoom*0.075,0.3,12.0)
+		camera.far=maxf(450.0,zoom*3.5)
 	if sunlight!=null:
 		var elevation:=sin((daylight_hour()-6.0)*PI/12.0)
 		sunlight.shadow_enabled=graphics_shadows and elevation>0.07 and (detail_mode or zoom<19.2)
@@ -467,6 +478,8 @@ func update_camera() -> void:
 		camera.look_at(look_target, Vector3.UP)
 	else:
 		camera.position = camera_target + Vector3(30,228,210).normalized()*zoom/(2.0*tan(deg_to_rad(camera.fov/2.0)))
+		if MobileProfile.active and not world_mesh_samples.is_empty():
+			camera.position.y=maxf(camera.position.y,world_ground_height(camera.position.x,camera.position.z)+1.5)
 		camera.look_at(camera_target,Vector3.UP)
 
 func build_marker() -> void:
@@ -1545,6 +1558,40 @@ func update_status(message: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(house_designer_layer):return
 	if is_instance_valid(fpv_walker) and fpv_walker.handle_input(event):get_viewport().set_input_as_handled();return
+	if event is InputEventMouse and event.device==InputEvent.DEVICE_ID_EMULATION:return
+	if event is InputEventScreenTouch and event.pressed and not menu_open:
+		map_touch.press(event,self)
+		get_viewport().set_input_as_handled()
+		return
+	handle_map_input(event)
+
+func _input(event: InputEvent) -> void:
+	if map_touch.track(event,self):get_viewport().set_input_as_handled()
+
+func cancel_map_pointer() -> void:
+	dragging=false;drag_button=0;drag_double_click=false
+	wall_stroke=[];clear_wall_preview()
+	field_drag_start=null
+	if is_instance_valid(field_preview):field_preview.queue_free();field_preview=null
+
+func zoom_map_gesture(previous_center: Vector2,center: Vector2,factor: float) -> void:
+	var level := camera_target.y
+	if detail_mode and battle_view==null:level=maxf(0.0,detail_rendered_height(camera_target.x,camera_target.z))
+	var plane := Plane(Vector3.UP,level)
+	var before: Variant=plane.intersects_ray(camera.project_ray_origin(previous_center),camera.project_ray_normal(previous_center))
+	var minimum:=18.0 if battle_view!=null else 21.1 if detail_mode else 4.9
+	var maximum:=500.0 if battle_view!=null else 430.5 if detail_mode else 294.6
+	zoom=clampf(zoom*factor,minimum,maximum)
+	update_camera()
+	var after: Variant=plane.intersects_ray(camera.project_ray_origin(center),camera.project_ray_normal(center))
+	if before!=null and after!=null:
+		camera_target+=before-after
+		if not detail_mode and battle_view==null:
+			camera_target.x=clampf(camera_target.x,-Grid.COLS+1,Grid.COLS-1)
+			camera_target.z=clampf(camera_target.z,-Grid.ROWS+1,Grid.ROWS-1)
+		update_camera()
+
+func handle_map_input(event: InputEvent) -> void:
 	if battle_view!=null:
 		if event is InputEventKey and event.pressed and not event.echo:
 			if event.keycode==KEY_SPACE:toggle_simulation_pause()
@@ -2081,7 +2128,7 @@ func update_camera_keys(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	DetailView.poll_nature_assets();DetailView.poll_tree_assets();DetailGroundMaterial.poll()
-	if is_instance_valid(detail_loading_overlay):
+	if is_instance_valid(detail_loading_overlay) and not MobileProfile.active:
 		if detail_mode and not detail_loading_previous:detail_loading_initial=true;detail_loading_seconds=0.0
 		if detail_mode and detail_loading_initial and is_instance_valid(detail_root):
 			var waiting: bool=bool(detail_root.tree_pending) or detail_root.forest_fill!=null or (not detail_root.tree_counts.is_empty() and bool(detail_root.tree_lod_dirty))
@@ -3341,9 +3388,9 @@ func build_fog() -> void:
 	fog = MeshInstance3D.new()
 	rebuild_fog_mesh()
 	var material:=ShaderMaterial.new()
-	material.shader=load("res://scripts/world_fog.gdshader")
+	material.shader=load("res://scripts/mobile_fog.gdshader" if MobileProfile.active else "res://scripts/world_fog.gdshader")
 	material.set_shader_parameter("seen_linear",fog_texture)
-	material.set_shader_parameter("seen_exact",fog_texture)
+	if not MobileProfile.active:material.set_shader_parameter("seen_exact",fog_texture)
 	fog.material_override=material
 	update_fog_symbols()
 	add_child(fog)
@@ -3351,6 +3398,7 @@ func build_fog() -> void:
 	refresh_fog()
 
 func update_fog_symbols() -> void:
+	if MobileProfile.active:return
 	var image:=Image.create(Grid.COLS,Grid.ROWS,false,Image.FORMAT_RGBA8)
 	image.fill(Color.BLACK)
 	for r in Grid.ROWS:

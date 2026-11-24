@@ -1,5 +1,7 @@
 extends Control
 
+const Mobile = preload("res://scripts/mobile_profile.gd")
+
 const Economy=preload("res://scripts/economy_rules.gd")
 const CityRules=preload("res://scripts/city_build_rules.gd")
 const Research=preload("res://scripts/research_rules.gd")
@@ -123,11 +125,18 @@ func set_geometry(pos: Vector2,dimensions: Vector2,card: Vector2) -> void:
 	if visible:rebuild()
 
 func open_menu(mode: String) -> void:
+	if Mobile.active and mode=="build" and not host.city_created:
+		if host.detail_inspection:host.toggle_detail()
+		if not host.detail_mode:host.toggle_detail()
+		if host.detail_mode:host.update_status("Vali linnakoht ja puuduta nuppu „Vali linnakoht”, kui asunik on kohale jõudnud.")
+		return
 	if not host.city_created and mode not in ["armies","cities","diplomacy","journal","trade"]:
 		host.update_status("Raja esmalt linn.");return
 	if mode=="build":
-		if host.detail_inspection and host.detail_district.is_empty():host.update_status("Ava ehitamiseks oma linn.");return
 		if host.settler_mode:host.update_status("Vali esmalt linn.");return
+		if host.detail_inspection and host.detail_district.is_empty():
+			if Mobile.active:host.toggle_detail()
+			else:host.update_status("Ava ehitamiseks oma linn.");return
 	if mode!=kind and search!=null:search.text=""
 	if mode=="diplomacy" and kind!="diplomacy":diplomacy_feedback=""
 	kind=mode;visible=true;last_stamp=""
@@ -135,9 +144,10 @@ func open_menu(mode: String) -> void:
 	hud.legacy_panel.visible=false
 	set_geometry(base_position,base_dimensions,card_size)
 
-func close_menu() -> void:
+func close_menu(cancel_placement:=true) -> void:
 	release_labor()
-	visible=false;kind="";host.cancel_build_placement()
+	visible=false;kind=""
+	if cancel_placement:host.cancel_build_placement()
 	update_paging()
 	hud.set_main_cards_visible(true)
 
@@ -477,6 +487,10 @@ func choose_building(index: int) -> void:
 		if not host.can_build_on_detail():return
 	host.build_select.select(index);host.update_field_controls(index)
 	host.clear_building_preview();host.build_angle=null;host.build_placement_mode=true
+	if Mobile.active:
+		close_menu(false)
+		host.update_status("Lohista kaardil põllu ala." if type=="field" else "Lohista müür kaardile." if host.wall_drawing_active() else "Puuduta kaardil kohta, kuhu hoone ehitada.")
+		return
 	host.update_status("Lohista müür kaardile · C sirge/kumer · T kõrgus · Ctrl + hiireratas pöörab." if type in ["palisade","stonewall","reinforced_wall"] else "Vali detailkaardil ehituskoht · Ctrl + hiireratas pöörab." if type!="field" else "Lohista detailkaardile põllu ala · Ctrl + hiireratas pöörab.")
 
 func populate_villages() -> void:

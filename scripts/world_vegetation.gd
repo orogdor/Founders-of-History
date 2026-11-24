@@ -14,6 +14,7 @@ const Production=preload("res://scripts/production_bonuses.gd")
 const CHUNK:=8
 const SCALE:=0.04
 const MAX_CHUNKS:=96
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const TREE_KINDS:=["oak","lime","birch","pine","spruce","palm"]
 const TREE_HEIGHTS:={"oak":2.4244623,"lime":2.3191163,"birch":2.5285895,"pine":2.95,"spruce":2.95,"palm":2.6344731}
 const REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.0963,"palm":13.54984}
@@ -44,9 +45,9 @@ var near_failed: Dictionary={}
 
 func _ready() -> void:
 	for kind in TREE_KINDS:
-		for variant in 5:
+		for variant in (1 if Mobile.active else 5):
 			var key: String=kind+":"+str(variant)
-			var path: String="res://assets/sapling-trees/%s_%02d/mid.glb" % [kind,variant+1]
+			var path: String="res://assets/sapling-trees/%s_%02d/%s.glb" % [kind,variant+1,"far" if Mobile.active else "mid"]
 			var model: Node=load(path).instantiate()
 			var item:=first_mesh(model)
 			if item!=null:
@@ -60,8 +61,10 @@ func _ready() -> void:
 							tree_material.albedo_texture=tree_textures[kind]
 						tree_material.vertex_color_use_as_albedo=true
 						tree_material.cull_mode=BaseMaterial3D.CULL_DISABLED
+						if Mobile.active:tree_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
 					if tree_material!=null:meshes[key].surface_set_material(surface,tree_material)
 			model.free()
+			if Mobile.active:continue
 			var far_key:=key+":far"
 			var far_path: String="res://assets/sapling-trees/%s_%02d/far.glb" % [kind,variant+1]
 			var far_model: Node=load(far_path).instantiate();var far_item:=first_mesh(far_model)
@@ -221,7 +224,7 @@ func update_wanted() -> void:
 		var pa: Vector2i=candidates[a];var pb: Vector2i=candidates[b]
 		return Vector2(pa*CHUNK).distance_squared_to(Vector2(center_c,center_r))<Vector2(pb*CHUNK).distance_squared_to(Vector2(center_c,center_r)))
 	wanted.clear()
-	for i in mini(MAX_CHUNKS,keys.size()):wanted[keys[i]]=true
+	for i in mini(24 if Mobile.active else MAX_CHUNKS,keys.size()):wanted[keys[i]]=true
 	for key in chunks.keys():
 		if not wanted.has(key):chunks[key].queue_free();chunks.erase(key);chunk_vision.erase(key)
 		elif chunk_vision.get(key,"")!=visibility_stamp(key):chunks[key].queue_free();chunks.erase(key);chunk_vision.erase(key)
@@ -294,7 +297,7 @@ func build_chunk(key: String,serial: int) -> void:
 	var sets: Dictionary={}
 	for mesh_id in meshes:
 		if not str(mesh_id).ends_with(":far") and not str(mesh_id).ends_with(":near"):sets[mesh_id]=[]
-	var spacing:=5.0
+	var spacing:=8.0 if Mobile.active else 5.0
 	for r in range(chunk_r*CHUNK,mini((chunk_r+1)*CHUNK,Grid.ROWS)):
 		for c in range(chunk_c*CHUNK,mini((chunk_c+1)*CHUNK,Grid.COLS)):
 			processed+=1
@@ -307,12 +310,12 @@ func build_chunk(key: String,serial: int) -> void:
 			var index:=r*Grid.COLS+c;var cell: Dictionary=host.grid[index]
 			if not cell.land or cell.mountain:continue
 			var biome: String=host.visual_biome(index)
-			var probability:=Scatter.probability(biome,spacing,0.60)
+			var probability:=Scatter.probability(biome,spacing,0.33 if Mobile.active else 0.60)
 			if probability<=0:continue
 			var forest: bool=biome in ["forest","jungle","taiga"]
 			var center:=Grid.center(c,r)
 			var min_x:=center.x-25;var min_z:=center.y-25
-			add_small_nature(sets,biome,cell,center)
+			if not Mobile.active:add_small_nature(sets,biome,cell,center)
 			var gx0:=floori(min_x/spacing);var gx1:=floori((min_x+50)/spacing)
 			var gz0:=floori(min_z/spacing);var gz1:=floori((min_z+50)/spacing)
 			for gz in range(gz0,gz1+1):
@@ -337,7 +340,7 @@ func build_chunk(key: String,serial: int) -> void:
 						tree_kind="palm" if oasis and choice<0.75 else "cactus"
 					if tree_kind.is_empty():continue
 					var variant_noise:=sin(p.x*12.9898+p.y*78.233)*43758.5453
-					var variant:=mini(4,floori((variant_noise-floorf(variant_noise))*5.0))
+					var variant:=0 if Mobile.active else mini(4,floori((variant_noise-floorf(variant_noise))*5.0))
 					var mesh_key:=tree_kind if tree_kind=="cactus" else tree_kind+":"+str(variant)
 					if not meshes.has(mesh_key):continue
 					var size: float=(3.8+k*4.2)*0.45*(1.2 if forest else 1.0)/(1.25 if tree_kind=="cactus" else 1.7 if tree_kind in ["pine","spruce"] else 1.6 if tree_kind=="birch" else 1.45)*SCALE
@@ -348,6 +351,7 @@ func build_chunk(key: String,serial: int) -> void:
 					sets[mesh_key].append({"transform":Transform3D(rotation,position),"color":tint})
 			if not forest:continue
 			# The original adds a second, larger stand on forest-biome tiles.
+			if Mobile.active:continue
 			var stand_spacing:=14.0
 			for gz in range(floori(min_z/stand_spacing),floori((min_z+50)/stand_spacing)+1):
 				for gx in range(floori(min_x/stand_spacing),floori((min_x+50)/stand_spacing)+1):
@@ -380,6 +384,7 @@ func build_chunk(key: String,serial: int) -> void:
 			multi.set_instance_transform(i,instances[i].transform);multi.set_instance_color(i,instances[i].color)
 			max_height=maxf(max_height,instances[i].transform.basis.get_scale().y*unit_height)
 		var node:=MultiMeshInstance3D.new();node.multimesh=multi
+		if Mobile.active:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(node);node.set_meta("tree_key",tree_kind);node.set_meta("tree_height",max_height);tree_lod(node,center)
 	building_chunk=false;building_key=""
 

@@ -44,12 +44,13 @@ static func elevation(heights: PackedFloat32Array,x: float,z: float) -> float:
 	return maxf(0.0,(height_at(heights,x,z)-0.7)*0.04)
 
 # Match the actual triangles of the overview mesh, including interpolation.
-static func mesh_elevation(samples: Variant,x: float,z: float) -> float:
+static func mesh_elevation(samples: Variant,x: float,z: float,subdivisions:=SUBDIVISIONS) -> float:
 	if samples is Dictionary:
 		var sampler: Dictionary=samples
-		var cell_width:=Grid.COLS*SUBDIVISIONS;var cell_depth:=Grid.ROWS*SUBDIVISIONS
-		var fx:=clampf((x-Grid.ORIGIN_X)*SUBDIVISIONS/50.0,0.0,float(cell_width)-0.00001)
-		var fz:=clampf((z-Grid.ORIGIN_Z)*SUBDIVISIONS/50.0,0.0,float(cell_depth)-0.00001)
+		subdivisions=int(sampler.get("subdivisions",SUBDIVISIONS))
+		var cell_width:=Grid.COLS*subdivisions;var cell_depth:=Grid.ROWS*subdivisions
+		var fx:=clampf((x-Grid.ORIGIN_X)*subdivisions/50.0,0.0,float(cell_width)-0.00001)
+		var fz:=clampf((z-Grid.ORIGIN_Z)*subdivisions/50.0,0.0,float(cell_depth)-0.00001)
 		var c:=floori(fx);var r:=floori(fz);var key:=r*cell_width+c
 		if sampler.cells.has(key):
 			var triangles: PackedFloat32Array=sampler.cells[key];var u:=fx-c;var v:=fz-r
@@ -60,11 +61,11 @@ static func mesh_elevation(samples: Variant,x: float,z: float) -> float:
 				var a: float=((bz-cz)*(u-cx)+(cx-bx)*(v-cz))/denominator
 				var b: float=((cz-az)*(u-cx)+(ax-cx)*(v-cz))/denominator;var d:=1.0-a-b
 				if minf(a,minf(b,d))>=-0.00001:return a*triangles[i+2]+b*triangles[i+5]+d*triangles[i+8]
-		return mesh_elevation(sampler.base,x,z)
-	var width:=Grid.COLS*SUBDIVISIONS+1;var depth:=Grid.ROWS*SUBDIVISIONS+1
+		return mesh_elevation(sampler.base,x,z,subdivisions)
+	var width:=Grid.COLS*subdivisions+1;var depth:=Grid.ROWS*subdivisions+1
 	if samples.size()!=width*depth:return 0.0
-	var fx:=clampf((x-Grid.ORIGIN_X)*SUBDIVISIONS/50.0,0.0,float(width-1)-0.00001)
-	var fz:=clampf((z-Grid.ORIGIN_Z)*SUBDIVISIONS/50.0,0.0,float(depth-1)-0.00001)
+	var fx:=clampf((x-Grid.ORIGIN_X)*subdivisions/50.0,0.0,float(width-1)-0.00001)
+	var fz:=clampf((z-Grid.ORIGIN_Z)*subdivisions/50.0,0.0,float(depth-1)-0.00001)
 	var c:=floori(fx);var r:=floori(fz);var u:=fx-c;var v:=fz-r
 	var a:=maxf(0.0,(samples[r*width+c]-0.7)*0.04)
 	var b:=maxf(0.0,(samples[r*width+c+1]-0.7)*0.04)
@@ -125,8 +126,8 @@ static func coast_height(heights: PackedFloat32Array,x: float,z: float,seed: int
 	var average:=(Visual.base(heights,x+radius,z,seed)+Visual.base(heights,x-radius,z,seed)+Visual.base(heights,x,z+radius,seed)+Visual.base(heights,x,z-radius,seed))*0.25
 	return lerpf(h,average,minf(1.0,(h-34.0)/20.0)*0.55)
 
-static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,adaptive:=true,seed:=0) -> ArrayMesh:
-	var width:=Grid.COLS*SUBDIVISIONS+1;var depth:=Grid.ROWS*SUBDIVISIONS+1
+static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,adaptive:=true,seed:=0,subdivisions:=SUBDIVISIONS) -> ArrayMesh:
+	var width:=Grid.COLS*subdivisions+1;var depth:=Grid.ROWS*subdivisions+1
 	var mask:=coast_mask(cells)
 	var count:=width*depth
 	var vertices:=PackedVector3Array();vertices.resize(count)
@@ -134,16 +135,16 @@ static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorAr
 	var elevation_uv:=PackedVector2Array();elevation_uv.resize(count)
 	var sampled_heights:=PackedFloat32Array();sampled_heights.resize(count)
 	var normals:=PackedVector3Array();normals.resize(count)
-	var step:=2.0/SUBDIVISIONS
+	var step:=2.0/subdivisions
 	for r in depth:
-		var z: float=Grid.ORIGIN_Z+float(r)*50.0/SUBDIVISIONS
+		var z: float=Grid.ORIGIN_Z+float(r)*50.0/subdivisions
 		for c in width:
-			var x: float=Grid.ORIGIN_X+float(c)*50.0/SUBDIVISIONS
+			var x: float=Grid.ORIGIN_X+float(c)*50.0/subdivisions
 			var h:=coast_height(heights,x,z,seed,mask)
 			var i:=r*width+c
 			sampled_heights[i]=h
 			elevation_uv[i]=Vector2(h,0)
-			vertices[i]=Vector3((float(c)/SUBDIVISIONS-Grid.COLS/2.0)*2.0,maxf(0.0,(h-0.7)*0.04),(float(r)/SUBDIVISIONS-Grid.ROWS/2.0)*2.0)
+			vertices[i]=Vector3((float(c)/subdivisions-Grid.COLS/2.0)*2.0,maxf(0.0,(h-0.7)*0.04),(float(r)/subdivisions-Grid.ROWS/2.0)*2.0)
 			vertex_colors[i]=sample_color(cells,colors,x,z,h,seed)
 	for r in depth:
 		for c in width:
@@ -163,15 +164,17 @@ static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorAr
 	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=elevation_uv;arrays[Mesh.ARRAY_INDEX]=indices
 	var mesh:=ArrayMesh.new();mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	mesh.set_meta("atlas_heights",sampled_heights)
-	return refine_coasts(mesh,cells,heights,colors,seed,mask) if adaptive else mesh
+	if adaptive:return refine_coasts(mesh,cells,heights,colors,seed,mask,subdivisions)
+	mesh.set_meta("atlas_sampler",{"base":sampled_heights,"cells":{},"subdivisions":subdivisions})
+	return mesh
 
 # Refine only the coarse quads crossed by sea level. Neighbouring quads add
 # matching edge vertices so there are no cracks where the two densities meet.
-static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,seed:=0,mask:=PackedByteArray()) -> ArrayMesh:
-	var width:=Grid.COLS*SUBDIVISIONS+1;var depth:=Grid.ROWS*SUBDIVISIONS+1
+static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,seed:=0,mask:=PackedByteArray(),subdivisions:=SUBDIVISIONS) -> ArrayMesh:
+	var width:=Grid.COLS*subdivisions+1;var depth:=Grid.ROWS*subdivisions+1
 	var cols:=width-1;var rows:=depth-1;var base: PackedFloat32Array=mesh.get_meta("atlas_heights")
 	var arrays: Array=mesh.surface_get_arrays(0)
-	var context: Dictionary={"width":width,"heights":heights,"cells":cells,"colors":colors,"seed":seed,"mask":mask,"vertices":arrays[Mesh.ARRAY_VERTEX],"extra":[],"cache":{}}
+	var context: Dictionary={"width":width,"subdivisions":subdivisions,"heights":heights,"cells":cells,"colors":colors,"seed":seed,"mask":mask,"vertices":arrays[Mesh.ARRAY_VERTEX],"extra":[],"cache":{}}
 	var flags:=PackedByteArray();flags.resize(cols*rows)
 	for r in rows:
 		for c in cols:
@@ -214,7 +217,7 @@ static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Arr
 	var raw:=base.duplicate()
 	for item in context.extra:
 		vertices.append(item.position);vertex_colors.append(item.color);normals.append(item.normal);uv.append(Vector2(item.height,0));raw.append(item.height)
-	var sampled: Dictionary={};var step:=2.0/SUBDIVISIONS
+	var sampled: Dictionary={};var step:=2.0/subdivisions
 	for key in special:
 		var c:=int(key)%cols;var r:=floori(float(key)/cols);var ox: float=float(c)*step-Grid.COLS;var oz: float=float(r)*step-Grid.ROWS
 		var triangles:=PackedFloat32Array()
@@ -224,21 +227,22 @@ static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Arr
 		sampled[key]=triangles
 	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TANGENT]=null;arrays[Mesh.ARRAY_TEX_UV]=uv;arrays[Mesh.ARRAY_INDEX]=indices
 	var result:=ArrayMesh.new();result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	result.set_meta("atlas_heights",raw);result.set_meta("atlas_sampler",{"base":base,"cells":sampled})
+	result.set_meta("atlas_heights",raw);result.set_meta("atlas_sampler",{"base":base,"cells":sampled,"subdivisions":subdivisions})
 	return result
 
 static func coast_vertex(context: Dictionary,gx: int,gz: int) -> int:
 	var width:=int(context.width)
+	var subdivisions:=int(context.subdivisions)
 	if gx%2==0 and gz%2==0:return (gz/2)*width+gx/2
 	var key:=gz*(width*2-1)+gx
 	if context.cache.has(key):return int(context.cache[key])
-	var x: float=Grid.ORIGIN_X+float(gx)*25.0/SUBDIVISIONS;var z: float=Grid.ORIGIN_Z+float(gz)*25.0/SUBDIVISIONS
+	var x: float=Grid.ORIGIN_X+float(gx)*25.0/subdivisions;var z: float=Grid.ORIGIN_Z+float(gz)*25.0/subdivisions
 	var h:=coast_height(context.heights,x,z,int(context.seed),context.mask);var y:=maxf(0.0,(h-0.7)*0.04)
-	var delta:=25.0/SUBDIVISIONS
+	var delta:=25.0/subdivisions
 	var l:=maxf(0.0,(coast_height(context.heights,x-delta,z,int(context.seed),context.mask)-0.7)*0.04);var r:=maxf(0.0,(coast_height(context.heights,x+delta,z,int(context.seed),context.mask)-0.7)*0.04)
 	var t:=maxf(0.0,(coast_height(context.heights,x,z-delta,int(context.seed),context.mask)-0.7)*0.04);var b:=maxf(0.0,(coast_height(context.heights,x,z+delta,int(context.seed),context.mask)-0.7)*0.04)
-	var normal:=Vector3(l-r,2.0/SUBDIVISIONS,t-b).normalized()
-	var position:=Vector3(float(gx)/SUBDIVISIONS-Grid.COLS,y,float(gz)/SUBDIVISIONS-Grid.ROWS)
+	var normal:=Vector3(l-r,2.0/subdivisions,t-b).normalized()
+	var position:=Vector3(float(gx)/subdivisions-Grid.COLS,y,float(gz)/subdivisions-Grid.ROWS)
 	var index: int=context.vertices.size()+context.extra.size()
 	context.extra.append({"position":position,"height":h,"normal":normal,"color":sample_color(context.cells,context.colors,x,z,h,int(context.seed))})
 	context.cache[key]=index

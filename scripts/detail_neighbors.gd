@@ -3,6 +3,7 @@ extends Node3D
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const Landscape=preload("res://scripts/detail_landscape.gd")
 const GroundMaterial=preload("res://scripts/detail_ground_material.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const DetailOcean=preload("res://scripts/detail_ocean.gd")
 const Grid=preload("res://scripts/campaign_grid.gd")
 const Detail=preload("res://scripts/detail_view.gd")
@@ -43,7 +44,7 @@ func setup(host: Node,center: Vector2i) -> void:
 			ground.set_instance_shader_parameter("blend_neighbours",true);tile.add_child(ground)
 			var water:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(225,195);water.mesh=plane;water.material_override=host.detail_ocean_for(c,r,heights,color_heights);tile.add_child(water)
 			tile.set_meta("river_segments",host.detail_landscape_for(tile,c,r,heights,color_heights))
-			if not add_known_nature(host,tile,Vector2i(c,r),heights,index) and (host.grid[index].land or host.grid[index].get("deposits",{}).get("fish",false)):
+			if not add_known_nature(host,tile,Vector2i(c,r),heights,index) and not Mobile.active and (host.grid[index].land or host.grid[index].get("deposits",{}).get("fish",false)):
 				pending.append({"tile":tile,"at":Vector2i(c,r),"heights":heights,"index":index})
 
 func _process(_delta: float) -> void:

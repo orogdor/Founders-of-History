@@ -1,5 +1,7 @@
 extends Control
 
+const Mobile = preload("res://scripts/mobile_profile.gd")
+
 var host: Node
 var hud: Control
 var seed: LineEdit
@@ -227,9 +229,9 @@ func add_graphics_option(key: String,label_text: String,choices: Array) -> void:
 
 func load_graphics_settings() -> void:
 	var config:=ConfigFile.new();config.load(SETTINGS_PATH)
-	var defaults={"display":"windowed","resolution":100,"antialias":0,"fps":60,"shadows":true,"names":true,"daylight":"dynamic","ambient":"normal","performance":false}
+	var defaults={"display":"windowed","resolution":70 if Mobile.active else 100,"antialias":0,"fps":60,"shadows":not Mobile.active,"names":not Mobile.active,"daylight":"dynamic","ambient":"normal","performance":false}
 	for key in defaults:
-		var option:OptionButton=graphics_controls[key];var value:Variant=config.get_value("graphics",key,defaults[key]);var found:=false
+		var option:OptionButton=graphics_controls[key];var value:Variant=config.get_value("mobile_graphics" if Mobile.active else "graphics",key,defaults[key]);var found:=false
 		for i in option.item_count:
 			if option.get_item_metadata(i)==value:option.select(i);found=true;break
 		if not found:
@@ -247,12 +249,12 @@ func apply_graphics_settings(save: bool) -> void:
 	var mode:=DisplayServer.WINDOW_MODE_WINDOWED
 	if selected.display=="fullscreen":mode=DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 	elif selected.display=="borderless":mode=DisplayServer.WINDOW_MODE_FULLSCREEN
-	if DisplayServer.window_get_mode()!=mode:DisplayServer.window_set_mode(mode)
+	if not Mobile.active and DisplayServer.window_get_mode()!=mode:DisplayServer.window_set_mode(mode)
 	host.graphics_daylight=str(selected.daylight);host.graphics_ambient=str(selected.ambient);host.update_daylight()
 	if performance_label!=null:performance_label.visible=bool(selected.performance)
 	if save:
 		var config:=ConfigFile.new();config.load(SETTINGS_PATH)
-		for key in selected:config.set_value("graphics",key,selected[key])
+		for key in selected:config.set_value("mobile_graphics" if Mobile.active else "graphics",key,selected[key])
 		config.save(SETTINGS_PATH)
 
 func set_graphics_value(key: String,value: Variant) -> void:

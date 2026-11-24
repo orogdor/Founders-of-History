@@ -10,6 +10,7 @@ const BuildingInspector = preload("res://scripts/building_inspector.gd")
 const WorldResourceOverlay = preload("res://scripts/world_resource_overlay.gd")
 const Economy = preload("res://scripts/economy_rules.gd")
 const Campaign = preload("res://scripts/campaign_state.gd")
+const Mobile = preload("res://scripts/mobile_profile.gd")
 var host: Node
 var legacy_panel: Control
 var minimap: Control
@@ -42,16 +43,24 @@ var resource_details_open:=false
 var tile_clock:=0.0
 var ui_font: SystemFont
 var ui_bold: SystemFont
+var mobile_placing:=false
 
 func _ready() -> void:
 	ui_font=SystemFont.new();ui_font.font_names=PackedStringArray(["Georgia","Times New Roman","serif"])
 	ui_bold=SystemFont.new();ui_bold.font_names=ui_font.font_names;ui_bold.font_weight=700
 	var hud_theme:=Theme.new();hud_theme.default_font=ui_font;theme=hud_theme
 	var settings:=ConfigFile.new()
-	if settings.load(SETTINGS_PATH)==OK:user_ui_scale=clampf(float(settings.get_value("interface","scale",1.0)),0.7,1.5)
+	var default_scale:=0.9 if Mobile.active else 1.0
+	user_ui_scale=default_scale
+	if settings.load(SETTINGS_PATH)==OK:user_ui_scale=clampf(float(settings.get_value("interface","scale",default_scale)),0.7,1.5)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	build_hud()
+	if Mobile.active:
+		var settle:=Button.new();settle.text="Vali linnakoht";settle.visible=false
+		settle.pressed.connect(host.select_city_site);add_child(settle);elements["settle_touch"]=settle
+		var cancel:=Button.new();cancel.text="Tühista ehitus";cancel.visible=false
+		cancel.pressed.connect(host.cancel_build_placement);add_child(cancel);elements["cancel_build_touch"]=cancel
 	resource_overlay=Control.new()
 	resource_overlay.set_script(WorldResourceOverlay)
 	resource_overlay.host=host
@@ -266,6 +275,9 @@ func layout() -> void:
 	for row in [["gold",right*0.1663],["food",right*0.2542],["stone",right*0.3337],["population",right*0.6280],["science",right*0.7195]]:place(row[0]+"_button",row[1],6,115,40)
 	place("clock",right*0.824,5,100,40)
 	place("status_line",right*0.30,62,right*0.40,42)
+	if Mobile.active:
+		place("settle_touch",right*0.5-95,116,190,53)
+		place("cancel_build_touch",right*0.5-95,bottom-105,190,53)
 	place("walk",265,60,90,36)
 	place("wall_shape",360,60,100,36)
 	place("wall_tier",465,60,105,36)
@@ -552,6 +564,13 @@ func change_zoom(factor: float) -> void:
 
 func _process(delta: float) -> void:
 	if host==null or host.game.is_empty() or labels.is_empty():return
+	if Mobile.active:
+		elements.settle_touch.visible=host.detail_mode and not host.detail_inspection and host.battle_view==null and (not host.city_created or host.settler_mode)
+		if mobile_placing!=host.build_placement_mode:
+			mobile_placing=host.build_placement_mode
+			elements.cancel_build_touch.visible=mobile_placing
+			elements.dock_background.visible=not mobile_placing
+			set_main_cards_visible(not mobile_placing and not dock_menu.visible)
 	elements.walk.visible=host.detail_mode and host.battle_view==null
 	elements.wall_shape.visible=host.wall_drawing_active();elements.wall_shape.text="Kumer" if host.wall_shape=="curved" else "Sirge"
 	elements.wall_tier.visible=host.wall_drawing_active() and host.build_select.get_item_metadata(host.build_select.selected)=="palisade";elements.wall_tier.text="Tase %d" % host.wall_tier
