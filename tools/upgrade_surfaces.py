@@ -141,10 +141,13 @@ def save_image(image, path, role):
         image.save(path, compress_level=1)
 
 
-def texture_import(path, role):
+def texture_import(path, role, profile):
     # Rendered surfaces use GPU block compression; HUD images retain crisp alpha.
+    mode = 0 if role == "data" else 1 if role == "ui" else 2
+    if profile == "desktop" and role in {"surface", "unlit"}:
+        mode = 4
     params = {
-        "compress/mode": 0 if role == "data" else 1 if role == "ui" else 2,
+        "compress/mode": mode,
         "compress/lossy_quality": 0.92,
         "compress/normal_map": 1 if role == "normal" else 0,
         "mipmaps/generate": "true",
@@ -182,14 +185,17 @@ def build_texture(task):
     color, height = enhance(image, role, profile, int(key[:8], 16))
     output.parent.mkdir(parents=True, exist_ok=True)
     save_image(color, output, role)
-    texture_import(output, role)
+    texture_import(output, role, profile)
     if height is not None and needs_normal is not None:
         # JPEG/WebP colour compression must not change the displacement data.
-        save_image(height, GENERATED / f"{key}-height.png", "data")
-        texture_import(GENERATED / f"{key}-height.png", "data")
+        displacement = height.copy()
+        displacement.thumbnail((1024, 1024) if profile == "desktop" else (512, 512), Image.Resampling.LANCZOS)
+        save_image(displacement, GENERATED / f"{key}-height.png", "data")
+        texture_import(GENERATED / f"{key}-height.png", "data", profile)
         if needs_normal:
+            height.thumbnail((1536, 1536) if profile == "desktop" else (768, 768), Image.Resampling.LANCZOS)
             save_image(make_normal(height), GENERATED / f"{key}-normal.png", "normal")
-            texture_import(GENERATED / f"{key}-normal.png", "normal")
+            texture_import(GENERATED / f"{key}-normal.png", "normal", profile)
     return color.size != image.size, height is not None and needs_normal is not None
 
 
