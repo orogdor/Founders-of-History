@@ -90,6 +90,11 @@ static func visual_rendered_height(heights: Array,values: PackedVector4Array,x: 
 	return a+u*(b-a)+v*(c-a) if u+v<=1.0 else d+(1-u)*(c-d)+(1-v)*(b-d)
 
 static func build_mesh(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=PackedVector4Array()) -> ArrayMesh:
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,mesh_arrays(heights,uv_offset,color_heights))
+	return mesh
+
+static func mesh_arrays(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=PackedVector4Array()) -> Array:
 	var size:=MESH_DIVISIONS+1;var points:=PackedVector3Array();points.resize(size*size)
 	for j in size:
 		for i in size:
@@ -109,7 +114,7 @@ static func build_mesh(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=Pac
 					color_data=Vector2(sample.x,sample.y)
 				surface.set_uv2(color_data);surface.add_vertex(vertex)
 	surface.index();surface.generate_normals();surface.generate_tangents()
-	return surface.commit()
+	return surface.commit_to_arrays()
 
 const TREE_COUNTS := {"forest":300,"jungle":320,"taiga":290,"lush_river":110,"grassland":75,"steppe":24,"tundra":10,"mesa":3,"desert":0,"snow":0,"snow_mountain":0,"mountain":30}
 

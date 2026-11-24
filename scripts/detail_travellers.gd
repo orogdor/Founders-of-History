@@ -35,7 +35,12 @@ static func travel_pose(entity: Dictionary,tile: Vector2i) -> Dictionary:
 func eligible(entity: Dictionary) -> bool:
  if int(entity.team)!=0 and not Campaign.visible_now(host.game,0,entity):return false
  var pose:=travel_pose(entity,center)
- return absf(float(pose.x))<=330 and absf(float(pose.z))<=285
+ return within_view(float(pose.x),float(pose.z))
+
+func within_view(x: float,z: float) -> bool:
+ var focus:=Vector3.ZERO
+ if is_instance_valid(host.fpv_walker) and host.fpv_walker.active:focus=host.fpv_walker.pos
+ return absf(x-focus.x)<=330 and absf(z-focus.z)<=285
 
 func make_person(kind: String,team: int,phase: float) -> Node3D:
  var info:Dictionary=factory.soldier_scene(kind,team);var person:Node3D=info.scene.instantiate();person.scale=Vector3.ONE*float(info.scale)
@@ -84,7 +89,10 @@ func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dic
 
 func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictionary={},heading:=0.0) -> void:
  var x:=float(pose.x);var z:=float(pose.z)
- if absf(x)>330 or absf(z)>285:return
+ if not within_view(x,z):return
+ if is_instance_valid(host.fpv_walker) and host.fpv_walker.active:
+  var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+  if neighbors!=null and not neighbors.can_enter(neighbors.coords_at(Vector2(x,z))):return
  var y:float=host.detail_rendered_height(x,z)
  if kind=="boat" and y> -0.05:return
  if kind!="boat" and y< -0.15:return

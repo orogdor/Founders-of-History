@@ -142,10 +142,10 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 func display_height(x: float,z: float) -> float:
 	return Terrain.visual_rendered_height(heights,visual_heights,x,z)
 
-func add_ground_cover(biome: String,share:=1.0) -> void:
+func add_ground_cover(biome: String,share:=1.0,walking:=false) -> void:
 	if Mobile.active:
-		if share<1.0:return
-		share=0.25
+		if share<1.0 and not walking:return
+		share=minf(share,0.25)
 	if biome in ["mountain","snow_mountain"]:return
 	ground_cover=Node3D.new();ground_cover.set_script(GroundCover);add_child(ground_cover)
 	ground_cover.setup(tree_cell.x,tree_cell.y,biome,heights,river_segments,share,visual_heights)

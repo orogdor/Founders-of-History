@@ -104,8 +104,15 @@ void fragment(){
                       sample_ground(forest_rough,shifted,dx,dy,scale_blend).r);
   ROUGHNESS=mix(0.94,clamp(dot(roughness,weights),0.65,1.0),photo_strength);
  }
- float sand=1.0-smoothstep(0.4+beach_wobble,1.15+beach_wobble,ground_height);
- surface=mix(surface,sand_color.rgb*0.65,sand);
- surface=mix(surface,wet_sand_color.rgb*0.55,(1.0-smoothstep(-0.05,0.35,ground_height))*0.55);
+ float sand=1.0-smoothstep(0.12+beach_wobble,0.83+beach_wobble,ground_height);
+ if(sand>0.0){
+  float grains=dot(textureGrad(soil_color,uv,dx,dy).rgb,vec3(0.31,0.57,0.12));
+  float relief=textureGrad(ground_height_maps,uv,dx,dy).g;
+  float grain_amount=1.0-smoothstep(115.0,280.0,distance_to_camera);
+  float moisture=(1.0-smoothstep(-0.05,0.33,ground_height))*0.72;
+  vec3 shore=mix(sand_color.rgb,wet_sand_color.rgb,moisture);
+  shore*=0.62+0.27*fractal(q*0.10)+grain_amount*(grains*0.34+relief*0.17-0.12);
+  surface=mix(surface,shore,sand);
+ }
  ALBEDO=surface;
 }

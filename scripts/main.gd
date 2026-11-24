@@ -453,6 +453,7 @@ func update_daylight() -> void:
 	fill_light.light_energy=0.16*(0.36+0.64*daylight)
 	world_environment.environment.ambient_light_energy=0.85*(0.32+0.68*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
 	world_environment.environment.background_color=Color("101827").lerp(Color("283741"),daylight)
+	if is_instance_valid(fpv_walker):fpv_walker.update_sky()
 
 func build_camera() -> void:
 	camera = Camera3D.new()
@@ -1714,22 +1715,17 @@ func detail_point(screen: Vector2) -> Variant:
 func detail_rendered_height(x: float,z: float) -> float:
 	if not is_instance_valid(detail_root):return 0.0
 	var dc:=floori((x+112.5)/225.0);var dr:=floori((z+97.5)/195.0)
-	var tile: Vector2i=(selected if detail_inspection else player)+Vector2i(dc,dr)
+	var tile: Vector2i=detail_root.tree_cell+Vector2i(dc,dr)
 	if tile.x<0 or tile.x>=Grid.COLS or tile.y<0 or tile.y>=Grid.ROWS:return 0.0
-	var heights: Array=[]
-	if dc==0 and dr==0:heights=detail_root.heights
-	else:
-		var key:=str(tile.x)+":"+str(tile.y)
-		if not detail_pick_heights.has(key):detail_pick_heights[key]=DetailTerrainScript.tile_heights(grid,tile.x,tile.y)
-		heights=detail_pick_heights[key]
-	var visual:=PackedVector4Array()
-	if dc==0 and dr==0:visual=detail_root.visual_heights
-	else:
-		var neighbors:=detail_root.get_node_or_null("NeighborTiles")
-		if neighbors!=null:
-			for child in neighbors.get_children():
-				if child.get_meta("coords",Vector2i(-1,-1))==tile:visual=child.get_meta("visual_heights",PackedVector4Array());break
-	return DetailTerrainScript.visual_rendered_height(heights,visual,x-dc*225.0,z-dr*195.0)
+	var local:=Vector2(x-dc*225.0,z-dr*195.0)
+	if dc==0 and dr==0:return detail_root.display_height(local.x,local.y)
+	var neighbors:=detail_root.get_node_or_null("NeighborTiles")
+	var surface: Node=neighbors.tiles.get(tile) if neighbors!=null else null
+	if surface!=null:
+		return DetailTerrainScript.visual_rendered_height(surface.get_meta("heights"),surface.get_meta("visual_heights"),local.x,local.y)
+	var key:=str(tile.x)+":"+str(tile.y)
+	if not detail_pick_heights.has(key):detail_pick_heights[key]=DetailTerrainScript.tile_heights(grid,tile.x,tile.y)
+	return DetailTerrainScript.rendered_height(detail_pick_heights[key],local.x,local.y)
 
 func clear_building_preview() -> void:
 	if is_instance_valid(building_preview):building_preview.queue_free()
@@ -2811,13 +2807,11 @@ func visible_city_building_stamp(city: Dictionary) -> int:
 func visible_city_detail(city: Dictionary) -> Node:
 	if not detail_mode or not is_instance_valid(detail_root):return null
 	if int(city.team)!=0 and not Campaign.visible_now(game,0,city):return null
-	if (selected if detail_inspection else player)==Vector2i(int(city.c),int(city.r)):return detail_root
+	if detail_root.tree_cell==Vector2i(int(city.c),int(city.r)):return detail_root
 	var neighbors: Node=detail_root.get_node_or_null("NeighborTiles")
 	if neighbors==null:return null
-	for tile in neighbors.get_children():
-		if tile.get_meta("coords",Vector2i(-1,-1))==Vector2i(int(city.c),int(city.r)):
-			return tile.get_node_or_null("Nature")
-	return null
+	var tile: Node=neighbors.tiles.get(Vector2i(int(city.c),int(city.r)))
+	return tile.get_node_or_null("Nature") if tile!=null else null
 
 func detail_unit_nav(tile: Vector2i,source: int) -> Variant:
 	var context:Variant=DistrictContexts.at_city(game.get("cities",[]),tile);var base:Variant=null

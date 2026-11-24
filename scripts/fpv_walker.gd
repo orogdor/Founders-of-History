@@ -7,11 +7,11 @@ const Grid=preload("res://scripts/campaign_grid.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const HouseCollision=preload("res://scripts/house_collision.gd")
 const Production=preload("res://scripts/production_bonuses.gd")
+const SKY_SHADER=preload("res://scripts/walking_sky.gdshader")
 var host: Node
 var active:=false
 var placing:=false
 var placed:=false
-var switching:=false
 var tile:=Vector2i.ZERO
 var pos:=Vector3.ZERO
 var velocity:=Vector3.ZERO
@@ -28,6 +28,9 @@ var bar: Control
 var hint: Label
 var names_button: Button
 var saved_camera: Dictionary={}
+var walking_environment: Environment
+var sky_material: ShaderMaterial
+var sky_hour: float=-1.0
 var touch_move_id:=-1
 var touch_look_id:=-1
 var touch_origin:=Vector2.ZERO
@@ -65,6 +68,7 @@ func start() -> void:
 	placing=true;hint.visible=true;host.update_status("Klõpsa kaardil tegelase asukoht.")
 
 func current_tile() -> Vector2i:
+	if is_instance_valid(host.detail_root):return host.detail_root.tree_cell
 	return host.selected if host.detail_inspection else host.player
 
 func cancel_placing() -> void:
@@ -72,24 +76,70 @@ func cancel_placing() -> void:
 
 func place_at(x: float,z: float) -> bool:
 	if blocked(x,z):host.update_status("Tegelast ei saa vette või hoonesse asetada.");return false
-	pos=Vector3(x,ground_height(x,z),z);tile=current_tile();placed=true;cancel_placing();yaw=0.54;pitch=-0.08;host.zoom=45.0;enter();return true
+	pos=Vector3(x,ground_height(x,z),z);tile=tile_at(x,z);placed=true;cancel_placing();yaw=0.54;pitch=-0.08;host.zoom=45.0;enter();return true
 
 func enter() -> void:
 	if not placed:return
 	active=true;velocity=Vector3.ZERO;vertical_speed=0;airborne=false;model.visible=false;bar.visible=true
 	if names_button!=null:names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
-	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far}
-	host.camera.fov=68.0;host.camera.near=0.05;host.camera.far=2400.0
+	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far,"environment":host.camera.environment}
+	host.camera.fov=68.0;host.camera.near=0.12;host.camera.far=720.0
+	start_sky()
+	var neighbors:=host.detail_root.get_node_or_null("NeighborTiles") as Node3D
+	if neighbors!=null:neighbors.update_stream(Vector2(pos.x,pos.z),Vector2(-sin(yaw),-cos(yaw)))
 	if is_instance_valid(host.game_hud):host.game_hud.visible=false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED);apply_camera()
 
-func exit_walking() -> void:
+func exit_walking(recenter:=true) -> void:
 	if not active:return
 	active=false;velocity=Vector3.ZERO;bar.visible=false;Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	host.camera.environment=saved_camera.get("environment")
+	var neighbors:=host.detail_root.get_node_or_null("NeighborTiles") as Node3D
+	if neighbors!=null:neighbors.stop_stream()
 	touch_move_id=-1;touch_look_id=-1;touch_movement=Vector2.ZERO;touch_stick.visible=false
 	if not saved_camera.is_empty():host.camera.fov=saved_camera.fov;host.camera.near=saved_camera.near;host.camera.far=saved_camera.far;saved_camera={}
 	if is_instance_valid(host.game_hud):host.game_hud.visible=true
-	host.camera_target=Vector3(pos.x,0,pos.z);host.zoom=minf(host.zoom,70.0);sync_model();host.update_camera()
+	host.camera_target=Vector3(pos.x,0,pos.z);host.zoom=minf(host.zoom,70.0)
+	var shift:=tile-current_tile()
+	if recenter and shift!=Vector2i.ZERO:
+		if host.transition_detail_tile(tile,shift):pos-=Vector3(shift.x*225.0,0,shift.y*195.0)
+		else:placed=false;host.camera_target=Vector3.ZERO
+	sync_model();host.update_camera()
+
+func start_sky() -> void:
+	if sky_material==null:
+		sky_material=ShaderMaterial.new();sky_material.shader=SKY_SHADER
+	var sky:=Sky.new();sky.sky_material=sky_material;sky.radiance_size=Sky.RADIANCE_SIZE_32
+	sky.process_mode=Sky.PROCESS_MODE_INCREMENTAL
+	walking_environment=host.world_environment.environment.duplicate()
+	walking_environment.sky=sky
+	walking_environment.background_mode=Environment.BG_SKY
+	walking_environment.ambient_light_sky_contribution=0.0
+	walking_environment.fog_enabled=true
+	walking_environment.fog_mode=Environment.FOG_MODE_DEPTH
+	walking_environment.fog_depth_begin=110.0
+	walking_environment.fog_depth_end=425.0
+	walking_environment.fog_density=1.0
+	walking_environment.fog_sky_affect=0.0
+	host.camera.environment=walking_environment
+	sky_hour=-1.0
+	update_sky()
+
+func update_sky() -> void:
+	if not active or walking_environment==null:return
+	var hour:=float(host.daylight_hour())
+	if sky_hour>=0.0 and absf(hour-sky_hour)<0.02:return
+	sky_hour=hour
+	var altitude:=sin((hour-6.0)*PI/12.0)
+	var daylight:=smoothstep(-0.16,0.32,altitude)
+	var twilight:=1.0-smoothstep(0.04,0.38,absf(altitude))
+	var horizon:=Color("141f35").lerp(Color("a8c6d5"),daylight).lerp(Color("b77c61"),twilight*0.47)
+	sky_material.set_shader_parameter("horizon",horizon)
+	sky_material.set_shader_parameter("daylight",daylight)
+	sky_material.set_shader_parameter("twilight",twilight)
+	sky_material.set_shader_parameter("sun_direction",host.sunlight.position.normalized())
+	walking_environment.fog_light_color=horizon
+	walking_environment.ambient_light_energy=host.world_environment.environment.ambient_light_energy
 
 func sync_model() -> void:
 	model.position=pos;model.rotation.y=yaw+PI;model.visible=placed and not active and host.detail_mode and tile==current_tile()
@@ -166,11 +216,18 @@ func ground_height(x: float,z: float) -> float:
 	var height:float=host.detail_rendered_height(x,z);var pier: Variant=pier_height(x,z)
 	return maxf(height,float(pier)) if pier!=null else height
 
+func tile_at(x: float,z: float) -> Vector2i:
+	return current_tile()+Vector2i(floori((x+112.5)/225.0),floori((z+97.5)/195.0))
+
 func blocked(x: float,z: float) -> bool:
-	if not host.detail_mode or absf(x)>335.5 or absf(z)>290.5:return true
-	var dc:=floori((x+112.5)/225.0);var dr:=floori((z+97.5)/195.0);var at:=current_tile()+Vector2i(dc,dr)
+	if not host.detail_mode:return true
+	var center:=current_tile()
+	var at:=tile_at(x,z)
+	var offset:=at-center;var dc:=offset.x;var dr:=offset.y
 	if at.x<0 or at.y<0 or at.x>=Grid.COLS or at.y>=Grid.ROWS:return true
 	if not host.reveal_all and not host.game.explored[0].has(str(at.x)+":"+str(at.y)):return true
+	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+	if at!=center and (neighbors==null or not neighbors.can_enter(at)):return true
 	if host.detail_rendered_height(x,z)<-0.25 and pier_height(x,z)==null:return true
 	var contexts:=[]
 	for parent in host.game.get("cities",[]):
@@ -198,6 +255,10 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	var speed:=1.66*(5.6 if run else 2.4)
 	var forward:=Vector3(-sin(yaw),0,-cos(yaw));var side:=Vector3(cos(yaw),0,-sin(yaw))
 	var want:=forward*input.y*speed+side*input.x*speed
+	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+	if neighbors!=null:
+		var heading:=want.normalized() if not want.is_zero_approx() else forward
+		neighbors.update_stream(Vector2(pos.x,pos.z),Vector2(heading.x,heading.z))
 	velocity=velocity.lerp(want,1.0-exp(-dt*(2.0 if airborne else 12.0)));moving=velocity.length_squared()>0.04
 	var nx:=pos.x+velocity.x*dt;var nz:=pos.z+velocity.z*dt
 	if not blocked(nx,pos.z):pos.x=nx
@@ -208,13 +269,7 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	vertical_speed-=1.66*9.5*dt;pos.y+=vertical_speed*dt
 	if pos.y<=ground:pos.y=ground;vertical_speed=0;airborne=false
 	if moving and not airborne:bob+=dt*(13.0 if run else 8.5)
-	var dc:=1 if pos.x>112.5 else -1 if pos.x< -112.5 else 0
-	var dr:=1 if pos.z>97.5 else -1 if pos.z< -97.5 else 0
-	if dc!=0 or dr!=0:
-		var delta:=Vector2i(dc,dr);var next:=current_tile()+delta;switching=true
-		var ok: bool=host.transition_detail_tile(next,delta);switching=false
-		if ok:pos-=Vector3(dc*225.0,0,dr*195.0);tile=next
-		else:pos.x=clampf(pos.x,-112.25,112.25);pos.z=clampf(pos.z,-97.25,97.25)
+	tile=tile_at(pos.x,pos.z)
 	apply_camera()
 
 func update(dt: float) -> void:
@@ -233,6 +288,6 @@ func apply_camera() -> void:
 
 func on_detail_closed() -> void:
 	cancel_placing()
-	if active and not switching:exit_walking()
+	if active:exit_walking(false)
 	model.visible=false
 
