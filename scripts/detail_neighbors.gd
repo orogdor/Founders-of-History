@@ -11,6 +11,7 @@ const Production=preload("res://scripts/production_bonuses.gd")
 const DetailWorld=preload("res://scripts/detail_world.gd")
 const VisualRiver=preload("res://scripts/visual_river.gd")
 const Roads=preload("res://scripts/detail_roads.gd")
+const MAP_FOG=preload("res://scripts/detail_map_fog.gdshader")
 const TILE_SIZE:=Vector2(225.0,195.0)
 const INACTIVE_TILE:=Vector2i(-1,-1)
 var host_node: Node
@@ -27,10 +28,22 @@ var look_ahead:=INACTIVE_TILE
 var vision_revision: int=-1
 var focus:=Vector2.ZERO
 var wanted: Dictionary={}
+var detail_fog: MeshInstance3D
+var map_center:=Vector2i.ZERO
+var map_rect:=Rect2i()
+var map_camera: Transform3D
+var map_viewport:=Rect2()
+var map_vision_revision: int=-1
 
 func setup(host: Node,center: Vector2i) -> void:
 	host_node=host
 	anchor=center
+	map_center=center
+	detail_fog=MeshInstance3D.new();detail_fog.name="DetailMapFog"
+	var plane:=PlaneMesh.new();plane.size=Vector2(3200,3200);detail_fog.mesh=plane
+	detail_fog.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mist:=ShaderMaterial.new();mist.shader=MAP_FOG;mist.set_shader_parameter("map_offset",Vector2(anchor)*TILE_SIZE)
+	detail_fog.material_override=mist;detail_fog.position.y=-20.0;host.detail_root.add_child(detail_fog)
 	for at in neighborhood(center):
 		if at==anchor:continue
 		var heights:=Terrain.tile_heights(host.grid,at.x,at.y)
@@ -67,30 +80,67 @@ func can_enter(at: Vector2i) -> bool:
 	return at==anchor or tiles.has(at)
 
 func update_stream(point: Vector2,direction: Vector2) -> void:
+	if not walking:detail_fog.hide()
 	walking=true
 	var center:=coords_at(point)
 	var ahead:=coords_at(point+direction*72.0)
 	focus=point+direction*42.0
-	var revision:=int(host_node.game.get("visionRevision",0))
+	var revision:=vision_stamp()
 	if center==walked_tile and ahead==look_ahead and revision==vision_revision:return
 	walked_tile=center;look_ahead=ahead;vision_revision=revision
-	wanted.clear()
-	for at in neighborhood(center)+neighborhood(ahead):
-		if at==anchor:continue
-		wanted[at]=true
-		if not tiles.has(at) or (has_nature(at) and not tiles[at].has_meta("nature_ready") and not stages.has(at)):
+	var area: Dictionary={}
+	for at in neighborhood(center)+neighborhood(ahead):area[at]=true
+	set_wanted(area,center)
+
+func vision_stamp() -> int:
+	return hash([host_node.game.get("visionRevision",0),host_node.reveal_all])
+
+func update_map_view(camera: Camera3D,point: Vector2) -> void:
+	var viewport:=camera.get_viewport().get_visible_rect()
+	var revision:=vision_stamp()
+	if camera.global_transform==map_camera and viewport==map_viewport and revision==map_vision_revision:return
+	map_camera=camera.global_transform;map_viewport=viewport
+	var center:=coords_at(point)
+	var bounds:=Rect2i(center-Vector2i.ONE,Vector2i(3,3))
+	var plane:=Plane(Vector3.UP,-20.0)
+	for corner in [viewport.position,Vector2(viewport.end.x,viewport.position.y),Vector2(viewport.position.x,viewport.end.y),viewport.end]:
+		var hit: Variant=plane.intersects_ray(camera.project_ray_origin(corner),camera.project_ray_normal(corner))
+		if hit!=null:
+			var at:=coords_at(Vector2(hit.x,hit.z))
+			at=at.clamp(center-Vector2i(3,3),center+Vector2i(3,3))
+			bounds=bounds.merge(Rect2i(at,Vector2i.ONE))
+	detail_fog.position=Vector3(point.x,-20.0,point.y)
+	focus=point
+	if bounds==map_rect and center==map_center and revision==map_vision_revision:return
+	map_rect=bounds;map_center=center;map_vision_revision=revision
+	var area: Dictionary={}
+	for row in range(bounds.position.y,bounds.end.y):
+		for column in range(bounds.position.x,bounds.end.x):
+			var at:=Vector2i(column,row)
+			if accessible(at):
+				var offset:=at-center
+				area[at]=absi(offset.x)<=1 and absi(offset.y)<=1
+	set_wanted(area,center)
+
+func set_wanted(area: Dictionary,center: Vector2i) -> void:
+	area.erase(anchor)
+	wanted=area
+	for at in wanted:
+		if not tiles.has(at) or (bool(wanted[at]) and has_nature(at) and not tiles[at].has_meta("nature_ready") and not stages.has(at)):
 			if at!=active_at:pending[at]=true
 	for at in pending.keys():
 		if not wanted.has(at):pending.erase(at)
 	for at in tiles.keys():
 		if wanted.has(at):continue
 		var offset: Vector2i=at-center
-		if absi(offset.x)<=2 and absi(offset.y)<=2:continue
+		if accessible(at) and absi(offset.x)<=2 and absi(offset.y)<=2:continue
 		tiles[at].queue_free();tiles.erase(at);stages.erase(at)
 
 func stop_stream() -> void:
 	walking=false
 	walked_tile=INACTIVE_TILE
+	map_vision_revision=-1
+	detail_fog.show()
 	wanted.clear()
 	for at in pending.keys():
 		if not in_initial_area(at):pending.erase(at)
@@ -150,14 +200,14 @@ func _process(_delta: float) -> void:
 	if worker!=null and not worker.is_alive():
 		var result: Dictionary=worker.wait_to_finish();worker=null
 		var at:=active_at;active_at=INACTIVE_TILE
-		if (walking and wanted.has(at)) or (not walking and in_initial_area(at) and tiles.has(at)):
+		if wanted.has(at) or (not walking and in_initial_area(at) and tiles.has(at) and accessible(at)):
 			if active_revision!=revision_stamp():
 				pending[at]=true
 			else:
 				if not tiles.has(at):
-					var mesh:=ArrayMesh.new()
-					mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,result.mesh)
-					add_surface(at,result.heights,result.visual,mesh)
+					var visual: PackedVector4Array=host_node.detail_visual_for(at.x,at.y,result.visual)
+					var mesh: ArrayMesh=host_node.detail_mesh_for(at.x,at.y,result.heights,visual,result.mesh)
+					add_surface(at,result.heights,visual,mesh)
 				stages[at]=result.world
 				return
 	if not stages.is_empty():
@@ -168,8 +218,11 @@ func _process(_delta: float) -> void:
 			return
 		if add_known_nature(host_node,tile,at,tile.get_meta("heights"),index_of(at),stages[at]):
 			tile.set_meta("nature_ready",true)
-		if not in_initial_area(at):
+		elif bool(wanted.get(at,false)) and stages[at].is_empty() and has_nature(at):
+			pending[at]=true
+		if not in_initial_area(at) and not tile.has_node("TileRoads"):
 			var roads:=Roads.new()
+			roads.name="TileRoads"
 			roads.host=host_node;roads.center=at
 			roads.single_tile=true
 			tile.add_child(roads)
@@ -181,7 +234,7 @@ func start_worker(at: Vector2i) -> void:
 	pending.erase(at)
 	var make_surface:=not tiles.has(at)
 	var cell: Dictionary={}
-	if has_nature(at):cell=host_node.city_cell_data({"c":at.x,"r":at.y}).duplicate(true)
+	if bool(wanted.get(at,true)) and has_nature(at):cell=host_node.city_cell_data({"c":at.x,"r":at.y}).duplicate(true)
 	var cells: Array=host_node.grid.duplicate()
 	var source: Dictionary=host_node.world_river_graph
 	var incoming: Dictionary={}

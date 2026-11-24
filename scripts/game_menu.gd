@@ -1,6 +1,7 @@
 extends Control
 
 const Mobile = preload("res://scripts/mobile_profile.gd")
+const BuildLabel = preload("res://scripts/build_label.gd")
 
 var host: Node
 var hud: Control
@@ -62,11 +63,14 @@ func _ready() -> void:
 	panel.content_margin_left=18;panel.content_margin_right=28;panel.content_margin_top=24;panel.content_margin_bottom=20
 	frame.add_theme_stylebox_override("panel",panel);scroll.add_child(frame)
 	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",10);frame.add_child(content)
-	add_label(content,"FOUNDERS OF HISTORY · VAHEVERSIOON",11,Color("d6ba7c"))
+	var version:=add_label(content,BuildLabel.detailed_text(get_tree()),16,Color("f2d992"));version.name="GameVersion"
 	var introduction:=add_label(content,"Ehita oma tsivilisatsioon, avasta maailma ja juhi oma rahvast läbi seitsme ajastu.",14,Color("dde6dc"))
 	introduction.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	continue_button=add_button(content,"Jätka praegust mängu",close_menu,true)
 	menu_status=add_label(content,"",11,Color("e5d8a8"))
+	var updates: Node=get_node_or_null("/root/GameUpdates")
+	if updates!=null:
+		if is_instance_valid(updates.launcher):add_update_controls(content,updates)
 	var expand_world:=add_section(content,"▸ Uus mäng",func():world_body.visible=not world_body.visible)
 	expand_world.tooltip_text="Uue maailma seaded"
 	world_body=VBoxContainer.new();world_body.add_theme_constant_override("separation",6);content.add_child(world_body);world_body.visible=false
@@ -124,11 +128,7 @@ func _ready() -> void:
 	import_dialog=FileDialog.new();import_dialog.access=FileDialog.ACCESS_FILESYSTEM
 	import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;import_dialog.add_filter("*.json ; JSON-fail")
 	import_dialog.file_selected.connect(import_game);add_child(import_dialog)
-	var updates: Node=get_node_or_null("/root/GameUpdates")
-	if updates!=null:
-		add_button(content,"Kontrolli uuendusi",updates.check)
-		update_label=add_label(content,updates.status,12,Color("d9e4d8"));update_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-		updates.status_changed.connect(func(value):update_label.text=value)
+	if updates!=null and not is_instance_valid(updates.launcher):add_update_controls(content,updates)
 	add_button(content,"⏻ Sulge mäng",func():get_tree().quit())
 	var footer:=add_label(content,"60 mängusekundit = 1 käik. Menüü ja pausi ajal mäng seisab.",11,Color("aabeb1"));footer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var theme:=Theme.new();theme.default_font_size=14
@@ -144,6 +144,12 @@ func _ready() -> void:
 	frame.theme=theme
 	get_viewport().size_changed.connect(layout_menu)
 	layout_menu()
+
+func add_update_controls(parent: VBoxContainer,updates: Node) -> void:
+	add_button(parent,"Kontrolli uuendusi",updates.check)
+	update_label=add_label(parent,BuildLabel.update_text(updates),12,Color("d9e4d8"))
+	update_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	updates.status_changed.connect(func(_value):update_label.text=BuildLabel.update_text(updates))
 
 func layout_menu() -> void:
 	var viewport:=get_viewport_rect().size

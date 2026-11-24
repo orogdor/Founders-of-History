@@ -2788,11 +2788,24 @@ func transition_detail_tile(next: Vector2i,delta: Vector2i) -> bool:
 
 func follow_detail_camera() -> void:
 	if not detail_mode or battle_view!=null or menu_open or not is_instance_valid(detail_root):return
-	var dc:=1 if camera_target.x>112.5 else -1 if camera_target.x< -112.5 else 0
-	var dr:=1 if camera_target.z>97.5 else -1 if camera_target.z< -97.5 else 0
-	if dc==0 and dr==0:return
-	var base: Vector2i=selected if detail_inspection else player
-	if not transition_detail_tile(base+Vector2i(dc,dr),Vector2i(dc,dr)):
+	var neighbors:=detail_root.get_node_or_null("NeighborTiles")
+	if neighbors==null:return
+	var point:=Vector2(camera_target.x,camera_target.z)
+	var next: Vector2i=neighbors.coords_at(point)
+	if not neighbors.accessible(next):
+		var center: Vector2i=neighbors.map_center-neighbors.anchor
+		camera_target.x=clampf(camera_target.x,center.x*225.0-112.25,center.x*225.0+112.25)
+		camera_target.z=clampf(camera_target.z,center.y*195.0-97.25,center.y*195.0+97.25)
+		point=Vector2(camera_target.x,camera_target.z)
+		next=neighbors.coords_at(point)
+		update_camera()
+	neighbors.update_map_view(camera,point)
+	var delta: Vector2i=next-neighbors.anchor
+	if delta==Vector2i.ZERO or dragging or map_touch.pinching or not neighbors.can_enter(next):return
+	if Input.get_vector("ui_left","ui_right","ui_up","ui_down")!=Vector2.ZERO:return
+	for key in [KEY_W,KEY_A,KEY_S,KEY_D]:
+		if Input.is_key_pressed(key):return
+	if not transition_detail_tile(next,delta):
 		camera_target.x=clampf(camera_target.x,-112.25,112.25)
 		camera_target.z=clampf(camera_target.z,-97.25,97.25)
 		update_camera()
@@ -3074,24 +3087,28 @@ func river_navigation_for(c: int,r: int,tile_heights: Array) -> RefCounted:
 	river_navigation_cache[key]=nav
 	return nav
 
-func detail_visual_for(c: int,r: int) -> PackedVector4Array:
+func detail_visual_for(c: int,r: int,precomputed:=PackedVector4Array()) -> PackedVector4Array:
 	var key: String="%d:%d:%d:%d" % [c,r,int(game.get("crossingRevision",0)),int(game.get("terrainRevision",0))]
 	if detail_visual_cache.has(key):
 		var cached: PackedVector4Array=detail_visual_cache[key]
 		detail_visual_cache.erase(key);detail_visual_cache[key]=cached
 		return cached
-	var values:=VisualRiver.color_heights(grid,world_height_samples,c,r,int(game.seed),world_river_graph)
+	var values:=precomputed if not precomputed.is_empty() else VisualRiver.color_heights(grid,world_height_samples,c,r,int(game.seed),world_river_graph)
 	detail_visual_cache[key]=values
 	while detail_visual_cache.size()>100:detail_visual_cache.erase(detail_visual_cache.keys()[0])
 	return values
 
-func detail_mesh_for(c: int,r: int,heights: Array,visual: PackedVector4Array) -> ArrayMesh:
+func detail_mesh_for(c: int,r: int,heights: Array,visual: PackedVector4Array,precomputed: Array=[]) -> ArrayMesh:
 	var key: String="%d:%d:%d:%d" % [c,r,int(game.get("crossingRevision",0)),int(game.get("terrainRevision",0))]
 	if detail_mesh_cache.has(key):
 		var cached: ArrayMesh=detail_mesh_cache[key]
 		detail_mesh_cache.erase(key);detail_mesh_cache[key]=cached
 		return cached
-	var mesh:=DetailTerrainScript.build_mesh(heights,Vector2.ZERO,visual)
+	var mesh: ArrayMesh
+	if precomputed.is_empty():mesh=DetailTerrainScript.build_mesh(heights,Vector2.ZERO,visual)
+	else:
+		mesh=ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,precomputed)
 	detail_mesh_cache[key]=mesh
 	while detail_mesh_cache.size()>60:detail_mesh_cache.erase(detail_mesh_cache.keys()[0])
 	return mesh

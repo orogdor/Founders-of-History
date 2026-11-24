@@ -66,7 +66,7 @@ void fragment() {
 	highp vec2 dx = dFdx(uv);
 	highp vec2 dy = dFdy(uv);
 	float range = length(VERTEX);
-	float detail = overview ? 1.0-smoothstep(32.0,78.0,range) : 1.0-smoothstep(70.0,235.0,range);
+	float detail = overview ? 1.0-smoothstep(32.0,78.0,range) : 1.0-smoothstep(82.0,375.0,range);
 	float sand = overview ? 1.0-smoothstep(0.8,4.2,elevation) : 1.0-smoothstep(0.12+shoreline,0.83+shoreline,elevation);
 	float rock = smoothstep(0.15,0.65,1.0-up) * (1.0-sand);
 	float snow = overview ? smoothstep(116.0,144.0,elevation)*up : 0.0;
@@ -74,7 +74,7 @@ void fragment() {
 	vec3 beach = vec3(0.49,0.37,0.23);
 	if (!overview) {
 		float patches = ground_noise(ground_pos*0.052)*0.72 + ground_noise(ground_pos*0.158+6.4)*0.28;
-		col = mix(col*vec3(0.78,0.92,0.73),col*vec3(1.06,0.91,0.67),smoothstep(0.32,0.74,patches));
+		col = mix(col*vec3(0.67,0.84,0.66),col*vec3(1.11,0.99,0.78),smoothstep(0.28,0.73,patches));
 		beach *= mix(0.84,1.19,patches);
 	}
 	if (surface_textures_ready && detail > 0.0) {

@@ -11,6 +11,7 @@ const WorldResourceOverlay = preload("res://scripts/world_resource_overlay.gd")
 const Economy = preload("res://scripts/economy_rules.gd")
 const Campaign = preload("res://scripts/campaign_state.gd")
 const Mobile = preload("res://scripts/mobile_profile.gd")
+const BuildLabel = preload("res://scripts/build_label.gd")
 var host: Node
 var legacy_panel: Control
 var minimap: Control
@@ -196,6 +197,9 @@ func build_hud() -> void:
 		text_item(pair[0]+"_value","0",18)
 	text_item("world_title","Maailmakaart",26)
 	text_item("clock","08:00",16)
+	var version:=text_item("game_version",BuildLabel.short_text(get_tree()),20)
+	version.name="GameVersion";version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+	version.add_theme_color_override("font_outline_color",Color("101820"));version.add_theme_constant_override("outline_size",4)
 	var hint:=text_item("status_line","",15)
 	hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	hotspot("world_toggle","Vaheta kaardivaadet",func():host.toggle_detail())
@@ -275,6 +279,7 @@ func layout() -> void:
 	for row in [["gold",right*0.1663],["food",right*0.2542],["stone",right*0.3337],["population",right*0.6280],["science",right*0.7195]]:place(row[0]+"_button",row[1],6,115,40)
 	place("clock",right*0.824,5,100,40)
 	place("status_line",right*0.30,62,right*0.40,42)
+	place("game_version",right-194,60,172,32)
 	if Mobile.active:
 		place("settle_touch",right*0.5-95,116,190,53)
 		place("cancel_build_touch",right*0.5-95,bottom-105,190,53)

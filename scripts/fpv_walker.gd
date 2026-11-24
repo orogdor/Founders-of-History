@@ -8,6 +8,7 @@ const Terrain=preload("res://scripts/detail_terrain.gd")
 const HouseCollision=preload("res://scripts/house_collision.gd")
 const Production=preload("res://scripts/production_bonuses.gd")
 const SKY_SHADER=preload("res://scripts/walking_sky.gdshader")
+const BuildLabel=preload("res://scripts/build_label.gd")
 var host: Node
 var active:=false
 var placing:=false
@@ -46,6 +47,11 @@ func _ready() -> void:
 	var cross:=Label.new();cross.text="+";cross.add_theme_font_size_override("font_size",24);cross.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;cross.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cross.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(cross)
 	var info:=Label.new();info.text="Esimese isiku vaade · WASD liigu · hiir vaata · Shift jookse · tühik hüppa · Tab hiir · Esc välju";info.position=Vector2(20,20);info.add_theme_font_size_override("font_size",17);info.add_theme_color_override("font_color",Color.WHITE);info.add_theme_color_override("font_shadow_color",Color.BLACK);info.add_theme_constant_override("shadow_offset_x",2);info.add_theme_constant_override("shadow_offset_y",2);bar.add_child(info)
 	var buttons:=HBoxContainer.new();buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT);buttons.position=Vector2(-340,54);bar.add_child(buttons)
+	var version:=Label.new();version.name="GameVersion";version.text=BuildLabel.short_text(get_tree())
+	version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	version.offset_left=-178.0;version.offset_right=-24.0;version.offset_top=15.0
+	version.add_theme_font_size_override("font_size",16);version.add_theme_color_override("font_outline_color",Color("101820"))
+	version.add_theme_constant_override("outline_size",4);version.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(version)
 	names_button=Button.new();names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
 	names_button.pressed.connect(func():
 		host.game_hud.game_menu.set_graphics_value("names",not host.graphics_soldier_names)
