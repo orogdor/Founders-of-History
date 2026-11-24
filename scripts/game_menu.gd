@@ -30,6 +30,10 @@ var performance_clock:=0.0
 var update_label: Label
 const SETTINGS_PATH:="user://kuningriigid_godot_settings.cfg"
 var was_loading:=false
+var pages: Dictionary={}
+var nav_buttons: Dictionary={}
+var page_title: Label
+var sidebar: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -46,16 +50,22 @@ func _ready() -> void:
 	outer.content_margin_left=10;outer.content_margin_right=10;outer.content_margin_top=10;outer.content_margin_bottom=10
 	menu_card.add_theme_stylebox_override("panel",outer)
 	var columns:=HBoxContainer.new();columns.add_theme_constant_override("separation",0);menu_card.add_child(columns)
-	menu_cover=Control.new();menu_cover.size_flags_horizontal=Control.SIZE_EXPAND_FILL;menu_cover.size_flags_stretch_ratio=1.0;columns.add_child(menu_cover)
-	var cover_image:=TextureRect.new();cover_image.texture=background.texture;cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu_cover.add_child(cover_image)
-	var cover_shade:=ColorRect.new();cover_shade.color=Color(0.02,0.06,0.10,0.35);cover_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu_cover.add_child(cover_shade)
-	var cover_text:=VBoxContainer.new();cover_text.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
-	cover_text.offset_left=30;cover_text.offset_top=-70;cover_text.offset_right=430;cover_text.offset_bottom=120
-	cover_text.add_theme_constant_override("separation",12);menu_cover.add_child(cover_text)
-	add_label(cover_text,"ÜKS MAAILM. SINU KUNINGRIIK.",11,Color("e4c384"))
-	add_label(cover_text,"Founders of History",32,Color("fff0cc"))
-	var cover_caption:=add_label(cover_text,"Esimesest asulast uue ajastuni.\nIga avastus muudab maailma.",16,Color("e9dfce"));cover_caption.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	menu_cover=PanelContainer.new();menu_cover.custom_minimum_size.x=230;columns.add_child(menu_cover)
+	var nav_style:=StyleBoxFlat.new();nav_style.bg_color=Color("101d27");nav_style.content_margin_left=18;nav_style.content_margin_right=18;nav_style.content_margin_top=22;nav_style.content_margin_bottom=16
+	menu_cover.add_theme_stylebox_override("panel",nav_style)
+	var nav_scroll:=ScrollContainer.new();nav_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;menu_cover.add_child(nav_scroll)
+	sidebar=VBoxContainer.new();sidebar.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sidebar.size_flags_vertical=Control.SIZE_EXPAND_FILL;sidebar.add_theme_constant_override("separation",6);nav_scroll.add_child(sidebar)
+	var brand:=add_label(sidebar,"FOUNDERS OF
+HISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var subtitle:=add_label(sidebar,"LOO OMA AJALUGU",10,Color("bfa16c"));subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var spacer:=Control.new();spacer.custom_minimum_size.y=8;sidebar.add_child(spacer)
+	continue_button=add_button(sidebar,"▶  Jätka mängu",close_menu,true)
+	add_nav("new","Uus mäng")
+	add_nav("saves","Salvestused")
+	add_nav("options","Seaded")
+	add_nav("extras","Mäng ja uuendused")
+	var nav_space:=Control.new();nav_space.size_flags_vertical=Control.SIZE_EXPAND_FILL;sidebar.add_child(nav_space)
+	add_button(sidebar,"⏻  Sulge mäng",func():get_tree().quit())
 	var scroll:=ScrollContainer.new();menu_scroll=scroll;scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;columns.add_child(scroll)
 	var frame:=PanelContainer.new();menu_frame=frame;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
@@ -63,17 +73,11 @@ func _ready() -> void:
 	panel.content_margin_left=18;panel.content_margin_right=28;panel.content_margin_top=24;panel.content_margin_bottom=20
 	frame.add_theme_stylebox_override("panel",panel);scroll.add_child(frame)
 	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",10);frame.add_child(content)
-	var version:=add_label(content,BuildLabel.detailed_text(get_tree()),16,Color("f2d992"));version.name="GameVersion"
-	var introduction:=add_label(content,"Ehita oma tsivilisatsioon, avasta maailma ja juhi oma rahvast läbi seitsme ajastu.",14,Color("dde6dc"))
-	introduction.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	continue_button=add_button(content,"Jätka praegust mängu",close_menu,true)
-	menu_status=add_label(content,"",11,Color("e5d8a8"))
+	var version:=add_label(content,BuildLabel.detailed_text(get_tree()),12,Color("d5bf90"));version.name="GameVersion"
+	page_title=add_label(content,"",25,Color("f7e5bc"))
+	menu_status=add_label(content,"",12,Color("bfc9b8"));menu_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var updates: Node=get_node_or_null("/root/GameUpdates")
-	if updates!=null:
-		if is_instance_valid(updates.launcher):add_update_controls(content,updates)
-	var expand_world:=add_section(content,"▸ Uus mäng",func():world_body.visible=not world_body.visible)
-	expand_world.tooltip_text="Uue maailma seaded"
-	world_body=VBoxContainer.new();world_body.add_theme_constant_override("separation",6);content.add_child(world_body);world_body.visible=false
+	world_body=VBoxContainer.new();world_body.add_theme_constant_override("separation",6);content.add_child(world_body);pages["new"]=world_body
 	add_label(world_body,"Maailma tüüp",13,Color("d9e4d8"))
 	world_type=OptionButton.new();world_type.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	for entry in [["Loogiline maailm: laamad ja kliima","tectonic"],["Juhuslikud 2–4 kontinenti","continents"],["Suur manner rannikutega","inland"]]:
@@ -93,11 +97,12 @@ func _ready() -> void:
 	seed=LineEdit.new();seed.placeholder_text="Jäta tühjaks juhusliku maailma jaoks";seed.max_length=40;world_body.add_child(seed)
 	var note:=add_label(world_body,"Alustad asuniku ja kolme töölisega. Eelmisest salvestusest tehakse võimalusel varukoopia.",12,Color("adbfaf"));note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	add_button(world_body,"Uus mäng · loo maailm",start_new)
-	var utilities:=HBoxContainer.new();utilities.add_theme_constant_override("separation",7);content.add_child(utilities)
+	var extras:=VBoxContainer.new();extras.add_theme_constant_override("separation",8);content.add_child(extras);pages["extras"]=extras
+	var extras_note:=add_label(extras,"Kaardi nähtavus, mängu juhtpaneel ja uuendused.",13,Color("adbfaf"));extras_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	var utilities:=VBoxContainer.new();utilities.add_theme_constant_override("separation",7);extras.add_child(utilities)
 	reveal_button=add_button(utilities,"",toggle_reveal);reveal_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var controls:=add_button(utilities,"⚙ Mängu juhtpaneel",open_controls);controls.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	add_section(content,"▸ ⚙ Valikud",func():options_body.visible=not options_body.visible)
-	options_body=VBoxContainer.new();content.add_child(options_body);options_body.visible=false
+	options_body=VBoxContainer.new();options_body.add_theme_constant_override("separation",6);content.add_child(options_body);pages["options"]=options_body
 	add_label(options_body,"Kasutajaliidese suurus",13,Color("d9e4d8"))
 	scale_select=OptionButton.new();scale_select.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	for percent in [70,80,90,100,110,125,150]:
@@ -115,8 +120,7 @@ func _ready() -> void:
 	add_graphics_option("performance","Jõudlusnäidik",[["Väljas",false],["Sees",true]])
 	create_performance_overlay()
 	load_graphics_settings()
-	add_section(content,"▸ Salvestused",func():saves_body.visible=not saves_body.visible)
-	saves_body=VBoxContainer.new();content.add_child(saves_body);saves_body.visible=false
+	saves_body=VBoxContainer.new();saves_body.add_theme_constant_override("separation",6);content.add_child(saves_body);pages["saves"]=saves_body
 	add_button(saves_body,"Salvesta mäng",save_game)
 	add_button(saves_body,"Laadi automaatsalvestus",load_game)
 	slots=VBoxContainer.new();saves_body.add_child(slots)
@@ -128,8 +132,7 @@ func _ready() -> void:
 	import_dialog=FileDialog.new();import_dialog.access=FileDialog.ACCESS_FILESYSTEM
 	import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;import_dialog.add_filter("*.json ; JSON-fail")
 	import_dialog.file_selected.connect(import_game);add_child(import_dialog)
-	if updates!=null and not is_instance_valid(updates.launcher):add_update_controls(content,updates)
-	add_button(content,"⏻ Sulge mäng",func():get_tree().quit())
+	if updates!=null:add_update_controls(extras,updates)
 	var footer:=add_label(content,"60 mängusekundit = 1 käik. Menüü ja pausi ajal mäng seisab.",11,Color("aabeb1"));footer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var theme:=Theme.new();theme.default_font_size=14
 	if hud.ui_font!=null:theme.default_font=hud.ui_font
@@ -141,7 +144,8 @@ func _ready() -> void:
 			box.content_margin_left=12;box.content_margin_right=12;box.content_margin_top=8;box.content_margin_bottom=8
 			theme.set_stylebox(state,type,box)
 		theme.set_color("font_color",type,Color("f4e3b7"));theme.set_color("font_hover_color",type,Color.WHITE)
-	frame.theme=theme
+	menu_card.theme=theme
+	show_page("new")
 	get_viewport().size_changed.connect(layout_menu)
 	layout_menu()
 
@@ -155,9 +159,24 @@ func layout_menu() -> void:
 	var viewport:=get_viewport_rect().size
 	var width:=maxf(240.0,minf(1060.0,viewport.x-32.0));var height:=maxf(180.0,viewport.y-48.0)
 	menu_card.custom_minimum_size=Vector2(width,height);menu_card.size=menu_card.custom_minimum_size
-	menu_cover.visible=viewport.x>=800
+	menu_cover.custom_minimum_size.x=clampf(width*0.28,150.0,230.0)
 	menu_scroll.custom_minimum_size=Vector2.ZERO
-	menu_frame.custom_minimum_size.x=maxf(180.0,(width-20.0)/(2.0 if menu_cover.visible else 1.0)-14.0)
+	menu_frame.custom_minimum_size.x=maxf(160.0,width-menu_cover.custom_minimum_size.x-30.0)
+
+func add_nav(key: String, caption: String) -> void:
+	var button:=add_button(sidebar,caption,show_page.bind(key))
+	button.alignment=HORIZONTAL_ALIGNMENT_LEFT
+	var selected:=StyleBoxFlat.new();selected.bg_color=Color("34443c");selected.border_color=Color("d5b475");selected.set_border_width_all(1);selected.set_corner_radius_all(3)
+	selected.content_margin_left=12;selected.content_margin_right=12;selected.content_margin_top=8;selected.content_margin_bottom=8
+	button.add_theme_stylebox_override("disabled",selected);button.add_theme_color_override("font_disabled_color",Color("f7e5bc"))
+	nav_buttons[key]=button
+
+func show_page(key: String) -> void:
+	for page in pages:pages[page].visible=page==key
+	for page in nav_buttons:nav_buttons[page].disabled=page==key
+	var titles={"new":"Uus mäng","saves":"Salvestused","options":"Seaded","extras":"Mäng ja uuendused"}
+	page_title.text=titles.get(key,"")
+	if menu_scroll!=null:menu_scroll.scroll_vertical=0
 
 func add_label(parent: Node,text: String,font_size: int,color: Color) -> Label:
 	var label:=Label.new();label.text=text;label.add_theme_font_size_override("font_size",font_size)
@@ -185,7 +204,7 @@ func open_menu() -> void:
 	for i in difficulty.item_count:
 		if difficulty.get_item_metadata(i)==host.game.get("difficulty","normal"):difficulty.select(i);break
 	menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
-	update_reveal();refresh_slots();hud.legacy_panel.visible=false;visible=true;host.menu_open=true
+	update_reveal();refresh_slots();show_page("new");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
 
 func _process(_delta: float) -> void:
 	if performance_label!=null and performance_label.visible:
