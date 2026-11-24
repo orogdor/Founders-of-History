@@ -7,24 +7,27 @@ uniform sampler2D road_color : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D road_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D road_height : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec4 road_tint : source_color = vec4(1.0);
-uniform float tiles_per_meter = 0.5;
+uniform float tiles_per_unit = 0.5;
 uniform float relief_depth = 0.02;
+uniform vec2 texture_distance = vec2(105.0, 220.0);
+uniform vec2 relief_distance = vec2(14.0, 48.0);
 uniform float surface_roughness = 0.94;
 uniform float photo_brightness = 1.0;
 uniform float shoulder_variation = 0.15;
+uniform float atlas_fill = 0.0;
 instance uniform vec2 road_uv_offset = vec2(0.0);
 
 varying vec2 road_uv;
 
 void vertex() {
-	road_uv = (UV + road_uv_offset) * tiles_per_meter;
+	road_uv = (UV + road_uv_offset) * tiles_per_unit;
 }
 
 void fragment() {
 	vec2 dx = dFdx(road_uv);
 	vec2 dy = dFdy(road_uv);
 	float distance_to_camera = length(VERTEX);
-	float detail = 1.0 - smoothstep(105.0, 220.0, distance_to_camera);
+	float detail = 1.0 - smoothstep(texture_distance.x, texture_distance.y, distance_to_camera);
 	float edge = length(UV2);
 	float height = 0.5;
 	vec3 color = road_tint.rgb;
@@ -32,7 +35,7 @@ void fragment() {
 	NORMAL_MAP_DEPTH = 0.0;
 	if (detail > 0.0) {
 		height = textureGrad(road_height, road_uv, dx, dy).r;
-		float depth = relief_depth * (1.0 - smoothstep(14.0, 48.0, distance_to_camera));
+		float depth = relief_depth * (1.0 - smoothstep(relief_distance.x, relief_distance.y, distance_to_camera));
 		vec2 shifted = road_uv - relief_direction(VIEW, TANGENT, BINORMAL, NORMAL) * (1.0 - height) * depth;
 		vec3 photo = textureGrad(road_color, shifted, dx, dy).rgb;
 		color = mix(color, photo * photo_brightness, detail * 0.68);
@@ -45,5 +48,6 @@ void fragment() {
 		discard;
 	}
 	ALBEDO = color * (1.0 - 0.12 * smoothstep(0.65, 1.0, edge));
+	EMISSION = color * atlas_fill * (1.0 - 0.35 * detail);
 	ROUGHNESS = surface_roughness;
 }

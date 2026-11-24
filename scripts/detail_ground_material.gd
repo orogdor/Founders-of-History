@@ -7,6 +7,7 @@ static var requested:=false
 static var requests: Dictionary={}
 static var textures: Dictionary={}
 static var waiting: Array=[]
+static var waiting_world: Array[WeakRef]=[]
 static var poll_frame: int=-1
 static var materials: Dictionary={}
 
@@ -42,6 +43,10 @@ static func poll() -> void:
 			if fallback!=null:textures[key]=fallback
 			requests.erase(key)
 	if not requests.is_empty() or textures.size()!=KINDS.size()*CHANNELS.size()+1:return
+	for pending in waiting_world:
+		var world_material: ShaderMaterial=pending.get_ref()
+		if world_material!=null:apply_world_textures(world_material)
+	waiting_world.clear()
 	var applied:=0
 	while not waiting.is_empty() and applied<4:
 		var entry: Dictionary=waiting.pop_front();var instance: Variant=entry.node.get_ref()
@@ -67,6 +72,19 @@ static func attach(instance: MeshInstance3D,color: Color,forest: float,tile: Vec
 	instance.material_override=fallback
 	waiting.append({"node":weakref(instance),"color":color,"forest":forest})
 
+static func attach_world(material: ShaderMaterial) -> void:
+	request_assets()
+	if requests.is_empty() and textures.size()==KINDS.size()*CHANNELS.size()+1:
+		apply_world_textures(material)
+	else:
+		waiting_world.append(weakref(material))
+
+static func apply_world_textures(material: ShaderMaterial) -> void:
+	for kind in KINDS:
+		material.set_shader_parameter(kind+"_color",textures[kind+"_color"])
+	material.set_shader_parameter("ground_height_maps",textures["ground_height_maps"])
+	material.set_shader_parameter("surface_textures_ready",true)
+
 static func finish_requests() -> void:
 	for key in requests.keys():
 		var request: Dictionary=requests[key]
@@ -77,3 +95,4 @@ static func finish_requests() -> void:
 				if texture!=null:textures[key]=texture
 		requests.erase(key)
 	waiting.clear()
+	waiting_world.clear()

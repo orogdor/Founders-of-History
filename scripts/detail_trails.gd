@@ -1,7 +1,6 @@
 extends Node3D
 
-const RoadSurface=preload("res://scripts/detail_road_surface.gd")
-const WIDTHS:=[0.0,0.78,0.9,1.05,1.575]
+const RoadSurface=preload("res://scripts/road_surface.gd")
 const DIRECTIONS:=[Vector2i(1,0),Vector2i(0,1),Vector2i(1,1),Vector2i(-1,1)]
 var host: Node
 var center:=Vector2i.ZERO
@@ -74,9 +73,9 @@ func rebuild(nav: RefCounted) -> void:
 			if target==null:
 				target=SurfaceTool.new();target.begin(Mesh.PRIMITIVE_TRIANGLES);surfaces[use_level]=target
 			var end_point:=Vector2(float(end.x),float(end.z));var line:=end_point-center_point
-			var normal:=Vector2(-line.y,line.x).normalized()*1.19*float(WIDTHS[use_level])*0.65
+			var normal:=Vector2(-line.y,line.x).normalized()*1.19*float(RoadSurface.WIDTHS[use_level])*0.65
 			counts[use_level]=int(counts.get(use_level,0))+6
 			RoadSurface.add_strip(target,center_point,end_point,normal,normal,height_at,0.02,1)
 	for rank in surfaces:
 		if int(counts.get(rank,0))==0:continue
-		add_child(RoadSurface.make_mesh(surfaces[rank],center,rank,true))
+		add_child(RoadSurface.make_mesh(surfaces[rank],center,rank,RoadSurface.View.TRAIL))

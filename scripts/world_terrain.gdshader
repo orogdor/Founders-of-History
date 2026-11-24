@@ -1,8 +1,16 @@
 shader_type spatial;
 render_mode cull_disabled;
+
+#include "res://scripts/surface_relief.gdshaderinc"
+
 varying vec3 terrain_pos;
 varying vec3 terrain_normal;
 varying float source_height;
+uniform bool surface_textures_ready = false;
+uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D forest_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D ground_height_maps : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec4 beach_color : source_color = vec4(0.8745,0.8078,0.6275,1.0);
 float h149(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float n149(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h149(i),h149(i+vec2(1.0,0.0)),f.x),mix(h149(i+vec2(0.0,1.0)),h149(i+vec2(1.0,1.0)),f.x),f.y);}
@@ -41,6 +49,25 @@ void fragment(){
  col=mix(col,beach_color.rgb,beach);
  float snow_line=118.0+broad*22.0;float snow=smoothstep(snow_line,snow_line+12.0,elev)*(1.0-smoothstep(0.40,0.68,slope+fine*0.1));
  col=mix(col,vec3(0.84,0.86,0.90)*(0.95+fine*0.06),snow);
+ vec2 uv=lp*0.042+vec2(mid,broad)*0.22;
+ vec2 dx=dFdx(uv),dy=dFdy(uv);
+ float surface_strength=(1.0-smoothstep(28.0,90.0,length(VERTEX)))*smoothstep(0.7,4.2,source_height)*(1.0-snow)*(1.0-rock*0.7);
+ if(surface_textures_ready && surface_strength>0.0){
+  float bare=clamp(earth*0.52+(1.0-grassy)*0.60+scree*0.40+rock*0.40,0.0,1.0);
+  float forest=COLOR.a*(1.0-bare);
+  vec3 coverage=vec3(1.0-bare-forest,bare,forest);
+  vec3 heights=textureGrad(ground_height_maps,uv,dx,dy).rgb;
+  vec3 weights=height_blend_weights(coverage,heights);
+  float height=dot(heights,weights);
+  vec3 photo=textureGrad(grass_color,uv,dx,dy).rgb*weights.x
+            +textureGrad(soil_color,uv,dx,dy).rgb*weights.y
+            +textureGrad(forest_color,uv,dx,dy).rgb*weights.z;
+  col=mix(col,photo,surface_strength*0.29)*(1.0+(height-0.5)*surface_strength*0.30);
+  float height_x=dot(textureGrad(ground_height_maps,uv+vec2(0.008,0.0),dx,dy).rgb,weights);
+  float height_z=dot(textureGrad(ground_height_maps,uv+vec2(0.0,0.008),dx,dy).rgb,weights);
+  vec3 relief=vec3(height-height_x,0.0,height-height_z)*surface_strength*0.85;
+  NORMAL=normalize(NORMAL+mat3(VIEW_MATRIX)*relief);
+ }
  vec2 cw=lp*0.0035+vec2(TIME*0.010,TIME*0.004);float cloud=smoothstep(0.52,0.78,n149(cw)*0.65+n149(cw*2.3+4.0)*0.35);
  ALBEDO=col*(1.0-cloud*0.16)+vec3(0.035,0.012,0.035)+rock*vec3(0.06);ROUGHNESS=1.0;METALLIC=0.0;
 }

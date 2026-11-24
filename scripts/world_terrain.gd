@@ -78,13 +78,13 @@ static func seeded_smooth(x: float,z: float,seed: int) -> float:
 	return (Geography.noise(i,j,seed)*(1.0-u)+Geography.noise(i+1,j,seed)*u)*(1.0-v)+(Geography.noise(i,j+1,seed)*(1.0-u)+Geography.noise(i+1,j+1,seed)*u)*v
 
 static func sample_color(cells: Array,colors: PackedColorArray,x: float,z: float,height: float,seed:=0) -> Color:
-	if height<=0.7:return WATER
+	if height<=0.7:return Color(WATER,0.0)
 	var wx:=x+(seeded_smooth(x/41.0+5.3,z/41.0+9.1,seed)-0.5)*46.0+(seeded_smooth(x/13.0+71.0,z/13.0+33.0,seed)-0.5)*12.0
 	var wz:=z+(seeded_smooth(x/41.0+41.7,z/41.0+3.9,seed)-0.5)*46.0+(seeded_smooth(x/13.0+19.0,z/13.0+87.0,seed)-0.5)*12.0
 	var fx: float=(wx-Grid.ORIGIN_X)/50.0-0.5;var fz: float=(wz-Grid.ORIGIN_Z)/50.0-0.5
 	var c:=floori(fx);var r:=floori(fz);var u:=fx-c;var v:=fz-r
 	u=u*u*(3.0-2.0*u);v=v*v*(3.0-2.0*v)
-	var red:=0.0;var green:=0.0;var blue:=0.0;var weight:=0.0
+	var red:=0.0;var green:=0.0;var blue:=0.0;var forest:=0.0;var weight:=0.0
 	for j in 2:
 		for i in 2:
 			var cc:=clampi(c+i,0,Grid.COLS-1);var rr:=clampi(r+j,0,Grid.ROWS-1)
@@ -92,13 +92,14 @@ static func sample_color(cells: Array,colors: PackedColorArray,x: float,z: float
 			if not cells[index].land:continue
 			var w: float=(u if i==1 else 1-u)*(v if j==1 else 1-v)
 			var linear:=colors[index].srgb_to_linear()
-			red+=linear.r*w;green+=linear.g*w;blue+=linear.b*w;weight+=w
+			red+=linear.r*w;green+=linear.g*w;blue+=linear.b*w;forest+=colors[index].a*w;weight+=w
 	var fallback_c:=clampi(floori((x-Grid.ORIGIN_X)/50.0),0,Grid.COLS-1);var fallback_r:=clampi(floori((z-Grid.ORIGIN_Z)/50.0),0,Grid.ROWS-1)
 	var fallback_index:=fallback_r*Grid.COLS+fallback_c
-	var fallback_color: Color=colors[fallback_index] if cells[fallback_index].land else Color("92a365")
+	var fallback_color: Color=colors[fallback_index] if cells[fallback_index].land else Color("92a365",0.0)
 	var ground:=Color(red/weight,green/weight,blue/weight) if weight>0.000001 else fallback_color.srgb_to_linear()
 	if height<3.4:ground=ground.lerp(Color("dfcea0").srgb_to_linear(),clampf((3.4-height)/1.6,0,1)*0.85)
 	ground*=0.92+seeded_smooth(x/17.0+20.0,z/17.0+30.0,seed)*0.14
+	ground.a=forest/weight if weight>0.000001 else fallback_color.a
 	return ground.linear_to_srgb()
 
 static func coast_mask(cells: Array) -> PackedByteArray:

@@ -85,10 +85,7 @@ void fragment(){
   vec3 coverage=vec3((1.0-dirt)*(1.0-forest),dirt*(1.0-forest),forest);
   float scale_blend=smoothstep(0.2,0.8,n(uv*0.11+vec2(71.0,13.0)));
   vec3 heights=sample_ground(ground_height_maps,uv,dx,dy,scale_blend).rgb;
-  vec3 levels=coverage+heights*0.42;
-  float top=max(levels.x,max(levels.y,levels.z))-0.28;
-  vec3 weights=max(levels-vec3(top),vec3(0.0))*coverage;
-  weights/=max(dot(weights,vec3(1.0)),0.0001);
+  vec3 weights=height_blend_weights(coverage,heights);
   float height=dot(heights,weights);
   float relief=(1.0-smoothstep(16.0,52.0,distance_to_camera))*photo_strength;
   vec2 shifted=uv-relief_direction(VIEW,TANGENT,BINORMAL,NORMAL)*(1.0-height)*0.027*relief;

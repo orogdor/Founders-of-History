@@ -4,9 +4,7 @@ const Grid=preload("res://scripts/campaign_grid.gd")
 const Roads=preload("res://scripts/world_roads.gd")
 const Landscape=preload("res://scripts/detail_landscape.gd")
 const LocalNav=preload("res://scripts/local_navigation.gd")
-const RoadSurface=preload("res://scripts/detail_road_surface.gd")
-const WIDTHS:=[0.0,0.78,0.9,1.05,1.575]
-const APPEARANCES:=[[1,1,1,1],[1,2,2,2],[2,3,3,3],[2,3,4,4],[2,3,4,5],[3,6,6,5],[3,6,7,7]]
+const RoadSurface=preload("res://scripts/road_surface.gd")
 var host: Node
 var center:=Vector2i.ZERO
 var stamp: String=""
@@ -30,7 +28,7 @@ func rebuild() -> void:
 		var level:=int(edge.level);var owner: Variant=host.territory_allocation.get("territory",{}).get(str(edge.a.x)+":"+str(edge.a.y))
 		if owner==null:owner=host.territory_allocation.get("territory",{}).get(str(edge.b.x)+":"+str(edge.b.y))
 		var team:=int(owner.team) if owner is Dictionary else 0
-		var appearance: int=APPEARANCES[clampi(int(host.game.ages[team]),0,6)][level-1]
+		var appearance := RoadSurface.appearance_for(int(host.game.ages[team]),level)
 		for dr in range(-1,2):
 			for dc in range(-1,2):
 				var at:=center+Vector2i(dc,dr)
@@ -48,9 +46,9 @@ func rebuild() -> void:
 					var start := Vector2(left.x,left.z)
 					var end := Vector2(right.x,right.z)
 					if start.is_equal_approx(end):continue
-					var half_width := 1.19 * float(WIDTHS[level]) * 0.86
-					var start_side := road_side(local_points,i,half_width)
-					var end_side := road_side(local_points,i+1,half_width)
+					var half_width := 1.19 * float(RoadSurface.WIDTHS[level]) * 0.86
+					var start_side := RoadSurface.road_side(local_points,i,half_width)
+					var end_side := RoadSurface.road_side(local_points,i+1,half_width)
 					var segment_length := a.distance_to(b)
 					var side_at_start := start_side.lerp(end_side,a.distance_to(start)/segment_length)
 					var side_at_end := start_side.lerp(end_side,a.distance_to(end)/segment_length)
@@ -76,14 +74,6 @@ func rebuild() -> void:
 			var nature: Node=tile.get_node_or_null("Nature")
 			if nature!=null and nature.ground_cover!=null:nature.ground_cover.set_roads(segments)
 
-static func road_side(points: Array, i: int, width: float) -> Vector2:
-	var point: Vector2 = points[i]
-	var before := (point - Vector2(points[maxi(0,i-1)])).normalized()
-	var after := (Vector2(points[mini(points.size()-1,i+1)]) - point).normalized()
-	var tangent := (before + after).normalized()
-	var side := Vector2(-tangent.y,tangent.x)
-	return side * width / maxf(0.75,maxf(tangent.dot(before),tangent.dot(after)))
-
 func tile_obstacles(at: Vector2i) -> Array:
 	var result: Array=[]
 	for city in host.game.get("cities",[]):
@@ -108,7 +98,7 @@ static func local_road(points: Array,tile_center: Vector2,obstacles: Array,level
 			var p:=a.lerp(b,float(k)/steps)-tile_center
 			result.append(Vector2(p.x*4.5,p.y*3.9))
 	if obstacles.is_empty():return result
-	var margin: float=2.0*1.19*float(WIDTHS[level])*0.8+1.2
+	var margin: float=2.0*1.19*float(RoadSurface.WIDTHS[level])*0.8+1.2
 	for round_index in 8:
 		var moved:=false
 		for i in range(1,result.size()-1):

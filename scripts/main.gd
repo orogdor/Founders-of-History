@@ -55,6 +55,7 @@ const Recruitment = preload("res://scripts/military_recruitment.gd")
 const Training = preload("res://scripts/military_training.gd")
 const MarketHouseholds = preload("res://scripts/market_households.gd")
 const Roads = preload("res://scripts/world_roads.gd")
+const RoadSurface = preload("res://scripts/road_surface.gd")
 const ModernFreight = preload("res://scripts/modern_freight.gd")
 const BridgeRules = preload("res://scripts/bridge_rules.gd")
 const WorldMinimap = preload("res://scripts/world_minimap.gd")
@@ -361,12 +362,14 @@ func is_forest_core(i:int)->bool:
 	if cell.get("legacyBiomeV250",false) or cell.get("webGeneratedV331",false):return str(cell.get("biome",""))=="forest"
 	return not cell.get("mountain",false) and moisture[i]+(Geography.noise(int(cell.c)+40,int(cell.r)+60,int(game.seed))-0.5)*0.12>0.66
 
-func terrain_color(i: int) -> Color:
+func terrain_color(i: int, include_forest_cover := false) -> Color:
 	var palette := {"sea":"315d70","snow_mountain":"8b928a","mesa":"978067","mountain":"737b6c","snow":"dfe2d9","taiga":"53694c","tundra":"8e9780","desert":"b9a573","jungle":"426640","forest":"4b6945","steppe":"8b9561","lush_river":"718f52","grassland":"768d55"}
 	var wooded: Dictionary={"grassland":"4c6946","lush_river":"4d7046","steppe":"596f48","desert":"a59a6d","tundra":"78836b","taiga":"475e47","jungle":"375f39"}
 	var biome:=visual_biome(i);var cell: Dictionary=grid[i]
 	var forest: bool=cell.land and is_forest_core(i)
-	return Color(wooded[biome] if forest and wooded.has(biome) else palette[biome])
+	var color := Color(wooded[biome] if forest and wooded.has(biome) else palette[biome])
+	if include_forest_cover:color.a=1.0 if forest else 0.0
+	return color
 
 func build_world() -> void:
 	river_navigation_cache.clear()
@@ -377,13 +380,14 @@ func build_world() -> void:
 	detail_ocean_cache.clear()
 	world_height_samples=WorldTerrain.samples(grid)
 	var colors:=PackedColorArray();colors.resize(grid.size())
-	for i in colors.size():colors[i]=terrain_color(i)
+	for i in colors.size():colors[i]=terrain_color(i,true)
 	var mesh:=WorldTerrain.build(grid,world_height_samples,colors,true,int(game.seed))
 	world_mesh_samples=mesh.get_meta("atlas_sampler",mesh.get_meta("atlas_heights",PackedFloat32Array()))
 	world_river_graph=WorldRivers.prepare(grid,int(game.seed))
 	WorldRivers.add_surface(mesh,grid,world_height_samples,int(game.seed),world_river_graph)
 	var mesh_instance:=MeshInstance3D.new();terrain=mesh_instance;mesh_instance.mesh=mesh
 	var ground:=ShaderMaterial.new();ground.shader=load("res://scripts/world_terrain.gdshader")
+	DetailGroundMaterial.attach_world(ground)
 	mesh_instance.set_surface_override_material(0,ground)
 	if mesh.get_surface_count()>1:
 		var river:=ShaderMaterial.new();river.shader=load("res://scripts/world_river.gdshader")
@@ -554,38 +558,37 @@ func update_world_roads() -> void:
 	road_visual_stamp=stamp
 	for child in road_root.get_children():child.queue_free()
 	var surfaces: Dictionary={}
+	var height_at := Callable(self,"world_ground_height")
+	var world_center := Vector2(Grid.WORLD_CENTER_X,Grid.WORLD_CENTER_Z)
 	for edge in Roads.visual_network(game,game.explored[0],reveal_all):
 		var a: Vector2i=edge.a;var b: Vector2i=edge.b;var level:=int(edge.level)
 		var owner: Variant=territory_allocation.get("territory",{}).get(str(a.x)+":"+str(a.y))
 		if owner==null:owner=territory_allocation.get("territory",{}).get(str(b.x)+":"+str(b.y))
 		var team:=int(owner.team) if owner is Dictionary else 0
-		var age:=clampi(int(game.ages[team]),0,6)
-		var surfaces_by_age: Array=[[1,1,1,1],[1,2,2,2],[2,3,3,3],[2,3,4,4],[2,3,4,5],[3,6,6,5],[3,6,7,7]]
-		var appearance: int=surfaces_by_age[age][level-1]
+		var appearance := RoadSurface.appearance_for(int(game.ages[team]),level)
 		if not surfaces.has(appearance):
 			var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surfaces[appearance]=surface
 		var surface: SurfaceTool=surfaces[appearance]
-		var half_width: float=1.1*[0.0,0.78,0.9,1.05,1.575][level]*0.86*0.04
-		for i in range(edge.points.size()-1):
-			var start: Vector2=edge.points[i];var end: Vector2=edge.points[i+1]
-			var p:=Vector3((start.x-Grid.WORLD_CENTER_X)*0.04,0,(start.y-Grid.WORLD_CENTER_Z)*0.04)
-			var q:=Vector3((end.x-Grid.WORLD_CENTER_X)*0.04,0,(end.y-Grid.WORLD_CENTER_Z)*0.04)
-			var direction: Vector3=(q-p).normalized();var normal:=Vector3(-direction.z,0,direction.x)
-			var px:=Grid.ORIGIN_X+(p.x+Grid.COLS)*25.0;var pz:=Grid.ORIGIN_Z+(p.z+Grid.ROWS)*25.0
-			var qx:=Grid.ORIGIN_X+(q.x+Grid.COLS)*25.0;var qz:=Grid.ORIGIN_Z+(q.z+Grid.ROWS)*25.0
-			var edge_p:=0.95+0.055*sin(px*0.19+sin(pz*0.15)*1.3)+0.025*sin(pz*0.39+px*0.22)
-			var edge_q:=0.95+0.055*sin(qx*0.19+sin(qz*0.15)*1.3)+0.025*sin(qz*0.39+qx*0.22)
-			var left:=p-normal*half_width*edge_p;var right:=p+normal*half_width*edge_p
-			var next_left:=q-normal*half_width*edge_q;var next_right:=q+normal*half_width*edge_q
-			for vertex in [left,right,next_right,left,next_right,next_left]:
-				var v: Vector3=vertex
-				v.y=WorldTerrain.mesh_elevation(world_mesh_samples,Grid.ORIGIN_X+(v.x+Grid.COLS)*25.0,Grid.ORIGIN_Z+(v.z+Grid.ROWS)*25.0)+0.09
-				surface.add_vertex(v)
-	var colors: Array=["","716147","7e6b50","817767","8b8170","9a9182","858682","545a5a"]
+		var half_width: float=1.1*float(RoadSurface.WIDTHS[level])*0.86*0.04
+		var points: Array[Vector2]=[]
+		for point: Vector2 in edge.points:points.append((point-world_center)*0.04)
+		var previous_side := Vector2.ZERO
+		var previous_height := 0.0
+		for i in points.size():
+			var at: Vector2=edge.points[i]
+			var width_factor:=0.95+0.055*sin(at.x*0.19+sin(at.y*0.15)*1.3)+0.025*sin(at.y*0.39+at.x*0.22)
+			var side:=RoadSurface.road_side(points,i,half_width*width_factor)
+			var point := points[i]
+			var height := world_ground_height(point.x,point.y)
+			if i>0:
+				var start := points[i-1]
+				# Steep strips need more height samples to follow the atlas creases.
+				var steep := absf(height-previous_height)>start.distance_to(point)*0.65
+				RoadSurface.add_strip(surface,start,point,previous_side,side,height_at,0.075,3 if steep else 1)
+			previous_side=side
+			previous_height=height
 	for appearance in surfaces:
-		var node:=MeshInstance3D.new();node.mesh=surfaces[appearance].commit()
-		var material:=StandardMaterial3D.new();material.albedo_color=Color(colors[appearance]);material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-		node.material_override=material;road_root.add_child(node)
+		road_root.add_child(RoadSurface.make_mesh(surfaces[appearance],Vector2i.ZERO,appearance,RoadSurface.View.WORLD))
 	var rails:=SurfaceTool.new();rails.begin(Mesh.PRIMITIVE_LINES);var rail_count:=0
 	for edge in game.get("railEdges",{}):
 		var parts:=str(edge).split(":")
@@ -1205,9 +1208,10 @@ func update_marker() -> void:
 
 func world_marker_height(position: Vector3) -> float:
 	if world_mesh_samples.is_empty():return 0.0
-	var x:=position.x/0.04+Grid.WORLD_CENTER_X
-	var z:=position.z/0.04+Grid.WORLD_CENTER_Z
-	return WorldTerrain.mesh_elevation(world_mesh_samples,x,z)+0.03
+	return world_ground_height(position.x,position.z)+0.03
+
+func world_ground_height(x: float,z: float) -> float:
+	return WorldTerrain.mesh_elevation(world_mesh_samples,x/0.04+Grid.WORLD_CENTER_X,z/0.04+Grid.WORLD_CENTER_Z)
 
 func build_ui() -> void:
 	var layer := CanvasLayer.new()
