@@ -12,7 +12,7 @@ jobs:
   publish:
     if: github.ref_name == 'terrain-height-maps'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     permissions:
       contents: write
     steps:
@@ -22,9 +22,20 @@ jobs:
           curl -fL --retry 3 https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip -o "$RUNNER_TEMP/godot.zip"
           unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
           echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build enhanced textures
+        run: |
+          python -m pip install Pillow==11.3.0 numpy==2.2.6
+          python tools/upgrade_surfaces.py mobile
       - name: Import and test the game
+        env:
+          FOH_SURFACE_PROFILE: mobile
         run: |
           Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/surface_upgrade.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/main_menu_navigation.gd
           Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/launcher_updates.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_walk_stream.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_camera_coverage.gd
@@ -45,13 +56,9 @@ jobs:
           patch=null
           if gh release view "$base_tag" --json tagName >/dev/null 2>&1; then
             gh release download "$base_tag" --pattern android-base.pck --dir "$bundle"
-            git fetch --depth=1 origin "refs/tags/$base_tag"
-            if git diff --quiet FETCH_HEAD "$GITHUB_SHA" -- assets; then
-              "$godot_bin" --headless --path . --export-pack "Android Game Update" "$bundle/android-patch.pck"
-            else
-              "$godot_bin" --headless --path . --export-patch Android "$bundle/android-patch.pck" --patches "$bundle/android-base.pck"
-            fi
+            "$godot_bin" --headless --path . --export-patch Android "$bundle/android-patch.pck" --patches "$bundle/android-base.pck"
             test -s "$bundle/android-patch.pck"
+            test "$(stat -c%s "$bundle/android-patch.pck")" -le 1610612736
             gh release create "$update_tag" "$bundle/android-patch.pck" --target "$GITHUB_SHA" --prerelease --latest=false --title "Android update $GITHUB_RUN_NUMBER" --notes "Android launcher content for $GITHUB_SHA."
             patch=$(jq -n --arg url "$release_root/$update_tag/android-patch.pck" --arg sha "$(sha256sum "$bundle/android-patch.pck" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$bundle/android-patch.pck")" '{url:$url,sha256:$sha,size:$size}')
           else

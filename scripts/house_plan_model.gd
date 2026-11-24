@@ -1,4 +1,6 @@
 extends Node3D
+const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const PlanCollision=preload("res://scripts/house_plan_collision.gd")
 const Fence=preload("res://scripts/house_fence.gd")
@@ -22,6 +24,7 @@ func material_for(style: String) -> StandardMaterial3D:
  if key.begins_with("proc-"):material.albedo_color=Color.WHITE
  if not key.is_empty() and ResourceLoader.exists(file):material.albedo_texture=load(file);material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;material.uv1_scale=Vector3(2,2,1)
  if style in ["reed","thatch"]:material.uv1_scale=Vector3(0.2,1,1)
+ SurfaceDetail.apply(material,not Mobile.active)
  materials[style]=material;return material
 
 func roof_surface_material() -> Material:
@@ -136,7 +139,7 @@ func add_yard(boundary: Array,design: Dictionary,era: int) -> void:
   var polygon:=PackedVector2Array()
   for point in verts:polygon.append(Vector2(point.x,point.z))
   var triangles:=Geometry2D.triangulate_polygon(polygon);var paved:=SurfaceTool.new();paved.begin(Mesh.PRIMITIVE_TRIANGLES)
-  var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/proc-flags.webp");material.roughness=1;material.cull_mode=BaseMaterial3D.CULL_DISABLED;paved.set_material(material)
+  var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/proc-flags.webp");material.roughness=1;material.cull_mode=BaseMaterial3D.CULL_DISABLED;SurfaceDetail.apply(material,not Mobile.active);paved.set_material(material)
   for index in triangles:paved.set_uv(Vector2(verts[index].x,verts[index].z)*0.81);paved.add_vertex(verts[index])
   paved.generate_normals();var node:=MeshInstance3D.new();node.name="CourtyardPaving";node.mesh=paved.commit();add_child(node);return
  var rim:Array[Vector3]=[]
@@ -163,7 +166,7 @@ func add_yard(boundary: Array,design: Dictionary,era: int) -> void:
    else:indices.append_array(PackedInt32Array([j-cols,k-cols,j,k-cols,k,j]))
  var arrays:=[];arrays.resize(Mesh.ARRAY_MAX);arrays[Mesh.ARRAY_VERTEX]=points;var normals:=PackedVector3Array();normals.resize(points.size());normals.fill(Vector3.UP);arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=uvs;arrays[Mesh.ARRAY_COLOR]=colors;arrays[Mesh.ARRAY_INDEX]=indices
  var mesh:=ArrayMesh.new();mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
- var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/land-dirt.webp");material.vertex_color_use_as_albedo=true;material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED;material.cull_mode=BaseMaterial3D.CULL_DISABLED;material.roughness=0.98;mesh.surface_set_material(0,material)
+ var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/land-dirt.webp");material.vertex_color_use_as_albedo=true;material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED;material.cull_mode=BaseMaterial3D.CULL_DISABLED;material.roughness=0.98;SurfaceDetail.apply(material,not Mobile.active);mesh.surface_set_material(0,material)
  var node:=MeshInstance3D.new();node.name="WeatheredYard";node.mesh=mesh;add_child(node)
 
 func classical_bounds(room: Dictionary,design: Dictionary) -> Dictionary:

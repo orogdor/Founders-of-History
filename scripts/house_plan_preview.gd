@@ -1,5 +1,7 @@
 extends SubViewportContainer
 signal walking_changed(active: bool)
+const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
 const Fence=preload("res://scripts/house_fence.gd")
@@ -40,7 +42,7 @@ func _ready() -> void:
  var world:=WorldEnvironment.new();var environment:=Environment.new();environment.background_mode=Environment.BG_COLOR;environment.background_color=Color("aababc");environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;environment.ambient_light_color=Color("e8e2d1");environment.ambient_light_energy=0.5;world.environment=environment;viewport.add_child(world)
  var light:=DirectionalLight3D.new();light.rotation_degrees=Vector3(-55,-35,0);light.light_energy=0.8;light.shadow_enabled=true;viewport.add_child(light)
  var ground:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(80,80);plane.subdivide_width=92;plane.subdivide_depth=92
- var earth:=StandardMaterial3D.new();earth.albedo_texture=load("res://assets/house_designer/land-earth.webp");earth.albedo_color=Color("b4b891");earth.uv1_scale=Vector3(28.2667,28.2667,1);earth.texture_repeat=true;earth.vertex_color_use_as_albedo=true
+ var earth:=StandardMaterial3D.new();earth.albedo_texture=load("res://assets/house_designer/land-earth.webp");earth.albedo_color=Color("b4b891");earth.uv1_scale=Vector3(28.2667,28.2667,1);earth.texture_repeat=true;earth.vertex_color_use_as_albedo=true;SurfaceDetail.apply(earth,not Mobile.active)
  var arrays:=plane.surface_get_arrays(0);var colors:=PackedColorArray()
  for p in arrays[Mesh.ARRAY_VERTEX]:
   var cover:float=clampf(0.53+0.24*sin(p.x*1.23-p.z*0.52)*cos(p.x*0.51+p.z*0.97)+0.19*sin(p.x*0.42+p.z*0.64)+0.10*cos(p.z*2.18+p.x*1.12),0.06,0.96)

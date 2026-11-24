@@ -1,5 +1,7 @@
 extends Control
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
 const Mobile = preload("res://scripts/mobile_profile.gd")
 const BuildLabel = preload("res://scripts/build_label.gd")
 
@@ -45,19 +47,14 @@ func _ready() -> void:
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(shade)
 	var center:=CenterContainer.new();center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(center)
 	menu_card=PanelContainer.new();center.add_child(menu_card)
-	var outer:=StyleBoxTexture.new();outer.texture=load("res://assets/ui/ui-art-v304_panel.webp")
-	outer.texture_margin_left=70;outer.texture_margin_right=70;outer.texture_margin_top=50;outer.texture_margin_bottom=50
-	outer.content_margin_left=10;outer.content_margin_right=10;outer.content_margin_top=10;outer.content_margin_bottom=10
-	menu_card.add_theme_stylebox_override("panel",outer)
+	menu_card.add_theme_stylebox_override("panel",InterfaceTheme.panel(10))
 	var columns:=HBoxContainer.new();columns.add_theme_constant_override("separation",0);menu_card.add_child(columns)
 	menu_cover=PanelContainer.new();menu_cover.custom_minimum_size.x=230;columns.add_child(menu_cover)
-	var nav_style:=StyleBoxFlat.new();nav_style.bg_color=Color("101d27");nav_style.content_margin_left=18;nav_style.content_margin_right=18;nav_style.content_margin_top=22;nav_style.content_margin_bottom=16
+	var nav_style:=StyleBoxFlat.new();nav_style.bg_color=Color("0d1925");nav_style.border_color=Color("4f483a");nav_style.border_width_right=1;nav_style.content_margin_left=18;nav_style.content_margin_right=18;nav_style.content_margin_top=22;nav_style.content_margin_bottom=16
 	menu_cover.add_theme_stylebox_override("panel",nav_style)
 	var nav_scroll:=ScrollContainer.new();nav_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;menu_cover.add_child(nav_scroll)
 	sidebar=VBoxContainer.new();sidebar.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sidebar.size_flags_vertical=Control.SIZE_EXPAND_FILL;sidebar.add_theme_constant_override("separation",6);nav_scroll.add_child(sidebar)
-	var brand:=add_label(sidebar,"FOUNDERS OF
-HISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	var subtitle:=add_label(sidebar,"LOO OMA AJALUGU",10,Color("bfa16c"));subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var brand:=add_label(sidebar,"FOUNDERS OF\nHISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var spacer:=Control.new();spacer.custom_minimum_size.y=8;sidebar.add_child(spacer)
 	continue_button=add_button(sidebar,"▶  Jätka mängu",close_menu,true)
 	add_nav("new","Uus mäng")
@@ -96,7 +93,7 @@ HISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CEN
 	add_label(world_body,"Maailma seeme (soovi korral)",13,Color("d9e4d8"))
 	seed=LineEdit.new();seed.placeholder_text="Jäta tühjaks juhusliku maailma jaoks";seed.max_length=40;world_body.add_child(seed)
 	var note:=add_label(world_body,"Alustad asuniku ja kolme töölisega. Eelmisest salvestusest tehakse võimalusel varukoopia.",12,Color("adbfaf"));note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	add_button(world_body,"Uus mäng · loo maailm",start_new)
+	add_button(world_body,"Loo maailm",start_new,true)
 	var extras:=VBoxContainer.new();extras.add_theme_constant_override("separation",8);content.add_child(extras);pages["extras"]=extras
 	var extras_note:=add_label(extras,"Kaardi nähtavus, mängu juhtpaneel ja uuendused.",13,Color("adbfaf"));extras_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var utilities:=VBoxContainer.new();utilities.add_theme_constant_override("separation",7);extras.add_child(utilities)
@@ -134,17 +131,7 @@ HISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CEN
 	import_dialog.file_selected.connect(import_game);add_child(import_dialog)
 	if updates!=null:add_update_controls(extras,updates)
 	var footer:=add_label(content,"60 mängusekundit = 1 käik. Menüü ja pausi ajal mäng seisab.",11,Color("aabeb1"));footer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	var theme:=Theme.new();theme.default_font_size=14
-	if hud.ui_font!=null:theme.default_font=hud.ui_font
-	for type in ["Button","OptionButton"]:
-		if hud.ui_bold!=null:theme.set_font("font",type,hud.ui_bold)
-		for state in ["normal","hover","pressed"]:
-			var box:=StyleBoxFlat.new();box.bg_color=Color("20364a") if state=="hover" else Color("0b1b2a")
-			box.border_color=Color("aa8548");box.set_border_width_all(1);box.set_corner_radius_all(3)
-			box.content_margin_left=12;box.content_margin_right=12;box.content_margin_top=8;box.content_margin_bottom=8
-			theme.set_stylebox(state,type,box)
-		theme.set_color("font_color",type,Color("f4e3b7"));theme.set_color("font_hover_color",type,Color.WHITE)
-	menu_card.theme=theme
+	menu_card.theme=InterfaceTheme.get_theme()
 	show_page("new")
 	get_viewport().size_changed.connect(layout_menu)
 	layout_menu()

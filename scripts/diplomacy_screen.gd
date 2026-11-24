@@ -1,4 +1,6 @@
 extends AcceptDialog
+
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 var host: Node
 var body: VBoxContainer
 var feedback: Label
@@ -6,10 +8,7 @@ var scroll: ScrollContainer
 const Rules=preload("res://scripts/diplomacy_rules.gd")
 func _ready() -> void:
  title="Diplomaatia";size=Vector2i(560,560);get_ok_button().text="Sulge"
- var panel:=StyleBoxTexture.new();panel.texture=load("res://assets/ui/ui-art-v304_panel.webp")
- panel.texture_margin_left=70;panel.texture_margin_right=70;panel.texture_margin_top=50;panel.texture_margin_bottom=50
- panel.content_margin_left=20;panel.content_margin_right=20;panel.content_margin_top=20;panel.content_margin_bottom=20
- add_theme_stylebox_override("panel",panel)
+ add_theme_stylebox_override("panel",InterfaceTheme.panel(20))
  scroll=ScrollContainer.new();add_child(scroll)
  body=VBoxContainer.new();body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",12);scroll.add_child(body)
 func open_screen() -> void:

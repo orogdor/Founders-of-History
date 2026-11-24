@@ -1,5 +1,8 @@
 extends Node
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
+const Mobile = preload("res://scripts/mobile_profile.gd")
 const Human=preload("res://assets/people/human_far.glb")
 const Motion=preload("res://scripts/human_motion.gd")
 const Navigation=preload("res://scripts/local_navigation.gd")
@@ -44,8 +47,20 @@ func _ready() -> void:
 	model=Human.instantiate();model.name="FirstPersonWalker";model.scale=Vector3.ONE*1.66;model.visible=false;add_child(model)
 	overlay=CanvasLayer.new();overlay.layer=20;add_child(overlay)
 	bar=Control.new();bar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);bar.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.visible=false;overlay.add_child(bar)
+	bar.theme=InterfaceTheme.get_theme()
 	var cross:=Label.new();cross.text="+";cross.add_theme_font_size_override("font_size",24);cross.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;cross.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cross.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(cross)
-	var info:=Label.new();info.text="Esimese isiku vaade · WASD liigu · hiir vaata · Shift jookse · tühik hüppa · Tab hiir · Esc välju";info.position=Vector2(20,20);info.add_theme_font_size_override("font_size",17);info.add_theme_color_override("font_color",Color.WHITE);info.add_theme_color_override("font_shadow_color",Color.BLACK);info.add_theme_constant_override("shadow_offset_x",2);info.add_theme_constant_override("shadow_offset_y",2);bar.add_child(info)
+	var info := Label.new()
+	info.text = "Liigu vasakul, vaata paremal." if Mobile.active else "WASD liigu · Shift jookse · Tühik hüppa · Tab vabasta hiir"
+	info.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	info.offset_left = 16
+	info.offset_right = -170
+	info.offset_top = 16
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_theme_font_size_override("font_size", 14)
+	info.add_theme_color_override("font_outline_color", Color("101820"))
+	info.add_theme_constant_override("outline_size", 4)
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(info)
 	var buttons:=HBoxContainer.new();buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT);buttons.position=Vector2(-340,54);bar.add_child(buttons)
 	var version:=Label.new();version.name="GameVersion";version.text=BuildLabel.short_text(get_tree())
 	version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.set_anchors_preset(Control.PRESET_TOP_RIGHT)

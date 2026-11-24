@@ -1,5 +1,7 @@
 extends Control
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
 const UI := "res://assets/ui/"
 const ResearchScreen = preload("res://scripts/research_screen.gd")
 const DockMenu = preload("res://scripts/dock_menu.gd")
@@ -47,9 +49,9 @@ var ui_bold: SystemFont
 var mobile_placing:=false
 
 func _ready() -> void:
-	ui_font=SystemFont.new();ui_font.font_names=PackedStringArray(["Georgia","Times New Roman","serif"])
+	theme=InterfaceTheme.get_theme()
+	ui_font=theme.default_font
 	ui_bold=SystemFont.new();ui_bold.font_names=ui_font.font_names;ui_bold.font_weight=700
-	var hud_theme:=Theme.new();hud_theme.default_font=ui_font;theme=hud_theme
 	var settings:=ConfigFile.new()
 	var default_scale:=0.9 if Mobile.active else 1.0
 	user_ui_scale=default_scale
@@ -86,24 +88,16 @@ func _ready() -> void:
 	journal_dialog=AcceptDialog.new();journal_dialog.title="Kuningriigi päevik";journal_dialog.theme=legacy_panel.theme
 	journal_dialog.size=Vector2i(560,500);add_child(journal_dialog)
 	journal_dialog.get_ok_button().text="Sulge"
-	var journal_panel:=StyleBoxTexture.new();journal_panel.texture=art("ui-art-v304_panel")
-	journal_panel.texture_margin_left=70;journal_panel.texture_margin_right=70;journal_panel.texture_margin_top=50;journal_panel.texture_margin_bottom=50
-	journal_panel.content_margin_left=18;journal_panel.content_margin_right=18;journal_panel.content_margin_top=18;journal_panel.content_margin_bottom=18
-	journal_dialog.add_theme_stylebox_override("panel",journal_panel)
+	journal_dialog.add_theme_stylebox_override("panel",InterfaceTheme.panel(18))
 	journal_text=RichTextLabel.new();journal_text.fit_content=false
 	journal_text.bbcode_enabled=false;journal_dialog.add_child(journal_text)
 	diplomacy_screen=AcceptDialog.new();diplomacy_screen.set_script(DiplomacyScreen);diplomacy_screen.host=host;diplomacy_screen.theme=legacy_panel.theme;add_child(diplomacy_screen)
 	city_overview=AcceptDialog.new();city_overview.set_script(CityOverview);city_overview.host=host;add_child(city_overview)
 	stores_panel=PanelContainer.new();stores_panel.visible=false;stores_panel.mouse_filter=Control.MOUSE_FILTER_STOP
-	var stores_style:=StyleBoxTexture.new();stores_style.texture=art("ui-art-v304_panel")
-	stores_style.texture_margin_left=70;stores_style.texture_margin_right=70;stores_style.texture_margin_top=50;stores_style.texture_margin_bottom=50
-	stores_style.content_margin_left=18;stores_style.content_margin_right=18;stores_style.content_margin_top=14;stores_style.content_margin_bottom=18
-	stores_panel.add_theme_stylebox_override("panel",stores_style);stores_panel.theme=legacy_panel.theme;add_child(stores_panel)
+	stores_panel.add_theme_stylebox_override("panel",InterfaceTheme.panel(18));add_child(stores_panel)
 	stores_body=VBoxContainer.new();stores_panel.add_child(stores_body)
 	tile_panel=PanelContainer.new();tile_panel.visible=false;tile_panel.mouse_filter=Control.MOUSE_FILTER_STOP
-	var tile_style:=StyleBoxFlat.new();tile_style.bg_color=Color(0.04,0.12,0.17,0.95);tile_style.border_color=Color("b38e4c");tile_style.set_border_width_all(1);tile_style.set_corner_radius_all(8)
-	tile_style.content_margin_left=12;tile_style.content_margin_right=12;tile_style.content_margin_top=10;tile_style.content_margin_bottom=10
-	tile_panel.add_theme_stylebox_override("panel",tile_style);tile_panel.theme=legacy_panel.theme;add_child(tile_panel)
+	tile_panel.add_theme_stylebox_override("panel",InterfaceTheme.box(Color("122435f5"),InterfaceTheme.BORDER));add_child(tile_panel)
 	var tile_body:=VBoxContainer.new();tile_body.add_theme_constant_override("separation",5);tile_panel.add_child(tile_body)
 	tile_title=Label.new();tile_body.add_child(tile_title)
 	tile_present=Label.new();tile_present.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tile_present.add_theme_color_override("font_color",Color("a8d9a7"));tile_body.add_child(tile_present)
@@ -157,30 +151,9 @@ func menu_box(color: Color, border: Color) -> StyleBoxFlat:
 	return box
 
 func style_menu() -> void:
-	var panel:=StyleBoxTexture.new()
-	panel.texture=art("ui-art-v304_panel")
-	panel.texture_margin_left=70;panel.texture_margin_right=70
-	panel.texture_margin_top=50;panel.texture_margin_bottom=50
-	panel.content_margin_left=14;panel.content_margin_right=14
-	panel.content_margin_top=14;panel.content_margin_bottom=14
-	legacy_panel.add_theme_stylebox_override("panel",panel)
-	var theme:=Theme.new()
-	theme.default_font=ui_font
-	theme.default_font_size=14
-	var normal:=menu_box(Color("172b38"),Color("9c7b43"))
-	var hovered:=menu_box(Color("30485a"),Color("f2d184"))
-	var pressed:=menu_box(Color("544b35"),Color("edce87"))
-	for kind in ["Button","OptionButton"]:
-		theme.set_stylebox("normal",kind,normal)
-		theme.set_stylebox("hover",kind,hovered)
-		theme.set_stylebox("pressed",kind,pressed)
-		theme.set_stylebox("focus",kind,StyleBoxEmpty.new())
-		theme.set_color("font_color",kind,Color("f3deb1"))
-		theme.set_color("font_hover_color",kind,Color("fff0cc"))
-	theme.set_color("font_color","Label",Color("f3deb1"))
-	theme.set_stylebox("normal","LineEdit",normal)
-	theme.set_color("font_color","LineEdit",Color("f3deb1"))
+	legacy_panel.add_theme_stylebox_override("panel",InterfaceTheme.panel(14))
 	legacy_panel.theme=theme
+
 func hotspot(name: String, description: String, action: Callable) -> void:
 	var node:=Button.new()
 	node.flat=true

@@ -1,4 +1,6 @@
 extends Control
+
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 const Canvas=preload("res://scripts/house_plan_canvas.gd")
 const Preview=preload("res://scripts/house_plan_preview.gd")
 const Defaults=preload("res://data/house_default_designs.json")
@@ -123,7 +125,7 @@ var web_selection_buttons: Array[Button]=[]
 func _ready() -> void:
  set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP
  var background:=ColorRect.new();background.color=Color("101820");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(background)
- var root_theme:=Theme.new();var serif:=SystemFont.new();serif.font_names=PackedStringArray(["Georgia","DejaVu Serif","serif"]);root_theme.default_font=serif;root_theme.default_font_size=14;theme=root_theme
+ theme=InterfaceTheme.get_theme()
  var layout:=VBoxContainer.new();layout_ref=layout;layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(layout)
  var header:=PanelContainer.new();header.custom_minimum_size.y=50;var header_style:=StyleBoxTexture.new();header_style.texture=load("res://assets/house_designer/web-header-art.webp");header_style.content_margin_left=5;header_style.content_margin_right=8;header_style.content_margin_top=3;header_style.content_margin_bottom=7;header.add_theme_stylebox_override("panel",header_style);layout.add_child(header)
  var top:=HFlowContainer.new();top.add_theme_constant_override("h_separation",4);header.add_child(top)
@@ -296,7 +298,7 @@ func refresh_ledger() -> void:
  fit_ledger.call_deferred()
 
 func style_web_button(button: Button) -> void:
- var normal:=StyleBoxFlat.new();normal.bg_color=Color("112638");normal.border_color=Color("aa874f");normal.set_border_width_all(1);normal.set_corner_radius_all(18);normal.content_margin_left=9;normal.content_margin_right=9;normal.content_margin_top=3;normal.content_margin_bottom=3
+ var normal:=InterfaceTheme.box(InterfaceTheme.INK,InterfaceTheme.BORDER,9,3)
  var hover:StyleBoxFlat=normal.duplicate();hover.bg_color=Color("27445c");hover.border_color=Color("e8c47e")
  var selected:StyleBoxFlat=normal.duplicate();selected.bg_color=Color("e2c995");selected.border_color=Color("f2d39a")
  button.add_theme_stylebox_override("normal",normal);button.add_theme_stylebox_override("hover",hover);button.add_theme_stylebox_override("pressed",selected);button.add_theme_stylebox_override("hover_pressed",selected);button.add_theme_stylebox_override("disabled",normal)
@@ -390,7 +392,8 @@ func refresh_web_view() -> void:
 
 func editor_panel_style() -> StyleBoxTexture:
  var style:=StyleBoxTexture.new();style.texture=load("res://assets/house_designer/editor-panel-art.webp")
- style.texture_margin_left=45;style.texture_margin_right=45;style.texture_margin_top=45;style.texture_margin_bottom=45
+ style.texture_margin_left=style.texture.get_width()*0.06;style.texture_margin_right=style.texture_margin_left
+ style.texture_margin_top=style.texture.get_height()*0.06;style.texture_margin_bottom=style.texture_margin_top
  style.content_margin_left=16;style.content_margin_right=16;style.content_margin_top=16;style.content_margin_bottom=16
  return style
 

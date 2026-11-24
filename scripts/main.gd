@@ -1,5 +1,7 @@
 extends Node3D
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
 const Grid = preload("res://scripts/campaign_grid.gd")
 const MobileProfile = preload("res://scripts/mobile_profile.gd")
 const MapTouch = preload("res://scripts/map_touch.gd")
@@ -4428,21 +4430,9 @@ func ai_sea_site_ok(person: Dictionary,tile: Dictionary) -> bool:
 	return false
 
 func style_game_dialog(dialog: AcceptDialog) -> void:
-	var panel:=StyleBoxTexture.new();panel.texture=load("res://assets/ui/ui-art-v304_panel.webp")
-	panel.texture_margin_left=70;panel.texture_margin_right=70;panel.texture_margin_top=50;panel.texture_margin_bottom=50
-	panel.content_margin_left=20;panel.content_margin_right=20;panel.content_margin_top=20;panel.content_margin_bottom=20
-	dialog.add_theme_stylebox_override("panel",panel);dialog.get_ok_button().text="Sulge"
-	var theme:=Theme.new()
-	for type in ["Button","OptionButton"]:
-		for state in ["normal","hover","pressed","focus","disabled"]:
-			var style:=StyleBoxFlat.new();style.bg_color=Color("203a48") if state=="hover" else Color("0e202e") if state=="pressed" else Color("172b38")
-			style.border_color=Color("d0a24c") if state!="disabled" else Color("66593c");style.set_border_width_all(1);style.set_corner_radius_all(3)
-			style.content_margin_left=10;style.content_margin_right=10;style.content_margin_top=5;style.content_margin_bottom=5
-			theme.set_stylebox(state,type,style)
-		for state in ["font_color","font_hover_color","font_pressed_color"]:theme.set_color(state,type,Color("f2dca8"))
-		theme.set_color("font_disabled_color",type,Color("8d8a80"))
-	theme.set_color("font_color","Label",Color("f0dcae"));theme.set_color("default_color","RichTextLabel",Color("f0dcae"))
-	dialog.theme=theme
+	dialog.theme=InterfaceTheme.get_theme()
+	dialog.add_theme_stylebox_override("panel",InterfaceTheme.panel(20))
+	dialog.get_ok_button().text="Sulge"
 
 func fit_game_dialog(dialog: AcceptDialog,desired: Vector2i) -> void:
 	# Wrapped labels first measure at zero width; resize after they have laid out.
