@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, specular_disabled;
+render_mode cull_disabled, diffuse_burley;
 
 #include "res://scripts/surface_relief.gdshaderinc"
 #include "res://scripts/detail_map_fog.gdshaderinc"
@@ -79,7 +79,7 @@ void fragment() {
 			+ ground_noise(skew*0.93+vec2(25.0,16.0))*0.12;
 		float ground_cover = smoothstep(0.33,0.72,patches);
 		vec3 damp = col*vec3(0.62,0.79,0.63);
-		vec3 dry = col*vec3(0.96,0.87,0.68)+vec3(0.042,0.022,0.006);
+		vec3 dry = col*vec3(0.88,0.84,0.70)+vec3(0.021,0.013,0.006);
 		float grain = ground_noise((TERRAIN_SECONDARY_ROTATION*ground_pos)*1.8+16.5);
 		float resolvable = 1.0-smoothstep(0.12,0.65,max(length(world_dx),length(world_dy)));
 		col = mix(damp,dry,ground_cover)*(0.93+(grain-0.5)*0.20*resolvable);
@@ -111,8 +111,9 @@ void fragment() {
 		vec3 photo = grass_sample*weights.x+soil_sample*weights.y+forest_sample*weights.z;
 		float strength = detail*(1.0-snow)*(overview ? 1.0-sand : 1.0);
 		float relief = dot(heights,weights);
-		float photo_weight = overview ? 0.30 : mix(0.22,0.63,1.0-smoothstep(9.0,38.0,range));
-		col = mix(col,photo,strength*photo_weight);
+		float photo_weight = overview ? 0.30 : mix(0.28,0.72,1.0-smoothstep(9.0,48.0,range));
+		vec3 natural_photo = mix(photo,photo*land.rgb*2.0,0.30);
+		col = mix(col,overview ? photo : natural_photo,strength*photo_weight);
 		col *= 1.0+(relief-0.5)*strength*(overview ? 0.34 : photo_weight*0.43);
 		if (!overview) {
 			float grains = dot(soil_sample,vec3(0.31,0.57,0.12));
@@ -138,5 +139,6 @@ void fragment() {
 			EMISSION = detail_cloud_color(projection)*mist;
 		}
 	}
-	ROUGHNESS = 1.0;
+	ROUGHNESS = mix(0.97,0.84,sand);
+	SPECULAR = mix(0.08,0.18,sand);
 }

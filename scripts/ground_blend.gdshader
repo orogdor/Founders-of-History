@@ -96,7 +96,8 @@ void fragment(){
   vec3 grass=sample_ground(grass_color,shifted,dx,dy,scale_blend).rgb;
   vec3 soil=sample_ground(soil_color,shifted,dx,dy,scale_blend).rgb;
   vec3 litter=sample_ground(forest_color,shifted,dx,dy,scale_blend).rgb;
-  vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.90+0.13*fractal(q*0.018));
+  vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.84+0.12*fractal(q*0.018));
+  photo=mix(photo,photo*local_ground.rgb*2.0,0.25);
   photo*=mix(1.0,0.84+0.23*height,relief);
   surface=mix(distant,photo,photo_strength);
   vec3 surface_normal=textureGrad(grass_normal,shifted,dx,dy).xyz*weights.x
@@ -121,6 +122,7 @@ void fragment(){
   surface=mix(surface,shore,sand);
  }
  ALBEDO=surface;
+ SPECULAR=mix(0.12,0.22,sand);
  if(dot(undiscovered_edges,vec4(1.0))>0.0){
   float mist=detail_cloud_edge(tile_uv,shifted_uv,undiscovered_edges);
   if(mist>0.0){

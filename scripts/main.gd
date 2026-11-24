@@ -422,7 +422,7 @@ func build_environment() -> void:
 	add_child(env)
 	sunlight = DirectionalLight3D.new()
 	sunlight.light_color=Color("ffe4be");sunlight.light_energy=0.55
-	sunlight.shadow_blur=1.5;sunlight.shadow_opacity=0.72
+	sunlight.shadow_blur=1.25;sunlight.shadow_opacity=0.82
 	sunlight.shadow_bias=0.09;sunlight.shadow_normal_bias=1.2
 	sunlight.light_angular_distance=1.15
 	if MobileProfile.active:
@@ -459,12 +459,12 @@ func update_daylight() -> void:
 		var moon_angle:=angle+PI
 		direction=Vector3(cos(moon_angle)*0.7,maxf(0.35,sin(moon_angle)),0.55)
 	sunlight.position=direction.normalized()*150.0;sunlight.look_at(Vector3.ZERO,Vector3.UP)
-	sunlight.light_energy=(0.88 if local_detail else 0.55)*(pow(daylight,1.25)+0.24*moon)
+	sunlight.light_energy=(0.66 if local_detail else 0.55)*(pow(daylight,1.25)+0.24*moon)
 	var warm:=Color("ffc08b").lerp(Color("fff2d7"),smoothstep(0.09,0.72,elevation))
 	sunlight.light_color=Color("aebfff") if elevation<0 else warm
-	fill_light.light_energy=(0.13 if local_detail else 0.16)*(0.36+0.64*daylight)
-	world_environment.environment.ambient_light_color=Color("e2edee") if local_detail else Color("f0f1e0")
-	world_environment.environment.ambient_light_energy=(0.59 if local_detail else 0.85)*(0.35+0.65*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
+	fill_light.light_energy=(0.05 if local_detail else 0.16)*(0.36+0.64*daylight)
+	world_environment.environment.ambient_light_color=Color("c2d0d7") if local_detail else Color("f0f1e0")
+	world_environment.environment.ambient_light_energy=(0.39 if local_detail else 0.85)*(0.38+0.62*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
 	world_environment.environment.background_color=Color("101827").lerp(Color("283741"),daylight)
 	if is_instance_valid(fpv_walker):fpv_walker.update_sky()
 
@@ -476,7 +476,7 @@ func update_sun_shadows(elevation: float) -> void:
 	elif not detail_mode and zoom>=19.2:
 		strength=0.0
 	sunlight.shadow_enabled=graphics_shadows and strength>0.02
-	if sunlight.shadow_enabled:sunlight.shadow_opacity=0.72*strength
+	if sunlight.shadow_enabled:sunlight.shadow_opacity=0.82*strength
 
 func build_camera() -> void:
 	camera = Camera3D.new()
