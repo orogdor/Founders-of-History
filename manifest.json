@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "runtime": "godot-4.7.2-android-v1",
+  "revision": 1,
+  "source": "c7da9c5858a1c3a2911888fcf1df326e0f24b3c5",
+  "base": {
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/android-launcher-base-v1/android-base.pck",
+    "sha256": "519bfaa99bb22d192e48660211acaddebc35b8c76f947a527bc83ded8c6c866b",
+    "size": 772044368
+  },
+  "patch": null
+}
