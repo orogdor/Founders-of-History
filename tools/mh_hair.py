@@ -132,3 +132,81 @@ def face_parts(mh_dir, body, V):
         gray_texture(tex, f"{texdir}/{name}", keep_color=True)   # kulmud ja ripsmed jäävad oma (tumedat) värvi
         out.append((kind, md, name))
     return out
+
+def delete_verts(path):
+    """mhclo delete_verts: põhivõrgu tipud, mida riie katab (vahemikud 'a - b')."""
+    toks = []; on = False
+    for line in open(path, errors="ignore"):
+        p = line.split()
+        if not p: continue
+        if p[0] == "delete_verts": on = True; continue
+        if on:
+            if not all(t == "-" or t.isdigit() for t in p): break
+            toks += p
+    out = set(); i = 0
+    while i < len(toks):
+        if i + 2 < len(toks) and toks[i + 1] == "-":
+            out.update(range(int(toks[i]), int(toks[i + 2]) + 1)); i += 3
+        else:
+            out.add(int(toks[i])); i += 1
+    return out
+
+# ------------------------------------------------------------------ päris riided (MakeHuman CC0)
+# id: (pakk, kaust, nimi, slot, peidetud kehatsoonid). Värv jääb originaaltekstuurist (mäng ei toonita).
+# MakeHumani logoga särkidega komplekte (casualsuit02/04/06, female_casualsuit01/02) ei kasutata.
+CLOTHES = {
+    "mhc_viking_tunic": ("vik", "assets/clothes/tunic_viking", "Viikingi rõngasrüüga kuub", "torso", ["torso", "upperarms", "forearms", "hips"]),
+    "mhc_viking_pants": ("vik", "assets/clothes/pants_viking", "Viikingi püksid", "legs", ["hips", "thighs", "shins"]),
+    "mhc_viking_boots": ("vik", "assets/clothes/boots_viking", "Viikingi saapad", "feet", ["feet"]),
+    "mhc_shirt_jeans": ("sys", "assets/clothes/male_casualsuit01", "Teksasärk ja teksased", "torso", ["torso", "upperarms", "forearms", "hips", "thighs", "shins"]),
+    "mhc_striped_jeans": ("sys", "assets/clothes/male_casualsuit03", "Triibuline särk ja teksased", "torso", ["torso", "upperarms", "forearms", "hips", "thighs", "shins"]),
+    "mhc_jacket_jeans": ("sys", "assets/clothes/male_casualsuit05", "Jope ja teksased", "torso", ["torso", "upperarms", "forearms", "hips", "thighs", "shins"]),
+    "mhc_suit": ("sys", "assets/clothes/male_elegantsuit01", "Ülikond lipsuga", "torso", ["torso", "upperarms", "forearms", "hips", "thighs", "shins"]),
+    "mhc_overalls": ("sys", "assets/clothes/male_worksuit01", "Töötunked", "torso", ["torso", "hips", "thighs", "shins"]),
+    "mhc_blouse_skirt": ("sys", "assets/clothes/female_elegantsuit01", "Triibuline pluus ja seelik", "torso", ["torso", "upperarms", "forearms", "hips"]),
+    "mhc_shoes_brown": ("sys", "assets/clothes/shoes01", "Pruunid kingad", "feet", ["feet"]),
+    "mhc_shoes_grey": ("sys", "assets/clothes/shoes02", "Hallid tossud", "feet", ["feet"]),
+    "mhc_boots_black": ("sys", "assets/clothes/shoes03", "Mustad poolsaapad", "feet", ["feet"]),
+    "mhc_shoes_black": ("sys", "assets/clothes/shoes04", "Mustad kingad", "feet", ["feet"]),
+    "mhc_sneakers_white": ("sys", "assets/clothes/shoes05", "Valged tossud", "feet", ["feet"]),
+    "mhc_sneakers_blue": ("sys", "assets/clothes/shoes06", "Sinised tossud", "feet", ["feet"]),
+    "mhc_fedora": ("sys", "assets/clothes/fedora01", "Kaabu", "head", []),
+}
+
+def zone_hides(mh_dir, item_id):
+    """Kehatsoonid, mille tippudest riie katab vähemalt poole (mhclo delete_verts järgi)."""
+    pack, rel, _, _, hides = CLOTHES[item_id]
+    if hides is not None: return hides
+    clo, _ = _files(os.path.join(mh_dir, pack), rel)
+    D = delete_verts(clo)
+    body = np.unique(np.concatenate([M.BASE_F[f] for f in M.faces_of("body")]))
+    out = []
+    for z in ("neck", "torso", "upperarms", "forearms", "hips", "thighs", "shins", "feet"):
+        vs = [v for v in body if M.VERTEX_ZONE[v] == z]
+        if vs and sum(v in D for v in vs) / len(vs) >= 0.5: out.append(z)
+    return out
+
+def color_texture(src, dst, size):
+    if os.path.exists(dst): return
+    im = Image.open(src).convert("RGB")
+    if max(im.size) > size: im = im.resize((size, size), Image.LANCZOS)
+    im.save(dst, optimize=True)
+
+def build_clothes(mh_dir, body, V, globals_):
+    texdir = f"{M.PROJECT}/assets/people/textures"
+    for cid, (pack, rel, _, _, _) in CLOTHES.items():
+        root = os.path.join(mh_dir, pack); d = os.path.join(root, rel)
+        md, tex = fit(root, rel, V)
+        color_texture(tex, f"{texdir}/{cid}_albedo.png", 2048)
+        nrm = [p for p in glob.glob(os.path.join(d, "*normal*.png"))]
+        g = M.Glb()
+        t = g.image_uri(f"../../textures/{cid}_albedo.png")
+        n = None
+        if nrm:
+            color_texture(nrm[0], f"{texdir}/{cid}_normal.png", 1024); n = g.image_uri(f"../../textures/{cid}_normal.png")
+        mat = g.material(cid, (1, 1, 1), 0.85, 0.0, t, double=True, normal=n, alpha=0.5)
+        g.mesh(cid, md, mat)
+        os.makedirs(f"{M.PROJECT}/assets/people/clothes/{cid}", exist_ok=True)
+        g.write(f"{M.PROJECT}/assets/people/clothes/{cid}/{body}.glb", globals_, [cid],
+                {"generated": "tools/mh_hair.py", "source": "MakeHuman CC0 clothes (Makehuman-2/MH2_Asset_Repository_CCO)"})
+    return len(CLOTHES)

@@ -637,6 +637,8 @@ def garment_parts(item_id, item, V, N_body, N_tights, N_skirt, N_hair):
              "cuirass": 0.02, "feet": 0.006, "apron": 0.03, "belt": 0.042, "outer": 0.016, "head": 0.01, "jewelry": 0.006}.get(slot, 0.005)
     parts = []
     skirty = any(k in item_id for k in SKIRTY)
+    if slot == "legs" and ("skirt" in item_id or "kilt" in item_id):
+        layer = 0.0068   # seelik särgi/särkkleidi alumise osa peal, kuue all
     if slot in ("hair", "beard"):
         return parts
     if slot == "head":
@@ -805,6 +807,19 @@ def garment_shade(V, P, item_id, fids):
         c -= 0.22 * np.exp(-np.sum((P - q) ** 2, 1) / (2 * 0.45 ** 2))
     crotch = (V[group_vertices("joint-l-upper-leg")].mean(0) + V[group_vertices("joint-r-upper-leg")].mean(0)) / 2 + np.array([0, -0.6, 0])
     c -= 0.2 * np.exp(-np.sum((P - crotch) ** 2, 1) / (2 * 0.5 ** 2))
+    # palistus: ääre lähedal kahekordne kangas (tumedam riba) ja volditud serv (hele joon päris servas)
+    cnt = {}
+    for fi in fids:
+        f = BASE_F[fi]
+        for k in range(len(f)):
+            e = tuple(sorted((f[k], f[(k + 1) % len(f)]))); cnt[e] = cnt.get(e, 0) + 1
+    border = np.unique([v for e, n in cnt.items() if n == 1 for v in e])
+    if len(border):
+        from scipy.spatial import cKDTree
+        dist = np.full(len(P), 9.0); dist[used] = cKDTree(P[border]).query(P[used])[0]
+        hem = 1 - np.clip((dist - 0.16) / 0.1, 0, 1)
+        c -= 0.11 * hem
+        c += 0.06 * (1 - np.clip(dist / 0.05, 0, 1))
     if item_id.startswith(OLD_ERAS):
         ymin = P[used, 1].min()
         c -= 0.18 * np.clip(1 - (P[:, 1] - ymin) / 1.6, 0, 1)   # alumise ääre mustus
@@ -830,7 +845,10 @@ def build_garment(body, item_id, item, V, globals_, normals):
         if grp in DRAPED:
             # kõik kihid samal langenud pinnal (nõgusad kohad täidetud), siis kihi nihe ja siledad servad
             Pd, Nd = DRAPED[grp]
-            extra = np.full(len(V), 0.012 if grp != "helper-skirt" else 0.1)   # seelik veidi lahedam (põlved ei paista läbi)
+            extra = np.full(len(V), 0.012)
+            if grp == "helper-skirt":   # seelik allapoole lahedam: põlved ja püksid ei paista läbi, vöö jääb peale
+                waist = joint_y(V, "joint-pelvis") + 0.3
+                extra = 0.01 + 0.16 * np.clip((waist - V[:, 1]) / 2.0, 0, 1)
             if item["slot"] == "legs" and grp == "helper-tights" and not any(k in item_id for k in ("hose", "leggings", "stockings")):
                 # püksisääred lahedamad, värvel jääb särgi alla
                 crotch = joint_y(V, "joint-l-upper-leg"); ankle = joint_y(V, "joint-l-ankle")
@@ -906,7 +924,9 @@ if __name__ == "__main__":
                 fall = faces_of(grp); Pd = drape(V.copy(), Ng, fall, it_, cap_, lam=0.9, normal_only=True)
                 DRAPED[grp] = (Pd, vertex_normals(Pd, fall))
             made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items()
-                       if it["slot"] not in ("hair", "beard") and (not ONLY_ITEMS or any(iid.startswith(k) for k in ONLY_ITEMS.split(","))))
+                       if it["slot"] not in ("hair", "beard") and it.get("mat") != "mhc" and (not ONLY_ITEMS or any(iid.startswith(k) for k in ONLY_ITEMS.split(","))))
             if MH_DIR and (not ONLY_ITEMS or "mh_" in ONLY_ITEMS or "hair" in ONLY_ITEMS):
                 MHH.init(sys.modules[__name__]); made += MHH.build(MH_DIR, name, V, globals_)
+            if MH_DIR and (not ONLY_ITEMS or "mhc_" in ONLY_ITEMS):
+                MHH.init(sys.modules[__name__]); made += MHH.build_clothes(MH_DIR, name, V, globals_)
             print("  proovirõivaid", made)

@@ -97,6 +97,10 @@ Ilma graafikata (`--headless`) testid kontrollivad sama, kuid pilte ei salvesta.
 
 Rõivad ei kleepu kehale: `tools/mpfb_bodies.py` (`drape`) täidab abivõrgu nõgusad kohad (rinna vahe, selja nõgusus, kõhulihaste vaod, jalgevahe) kuni 2,5 cm ulatuses ja kõik kihid tehakse sellelt samalt pinnalt, nii et kihid (särk, kuub, vöö, põll) ei lõika üksteisest läbi. Riiete servad (kaelus, varrukaotsad, alläär) silutakse piki serva, et need ei oleks sakilised. Püksisääred on lahedamad kui säärised ja sukad, saapasäärte all kitsamad. Heledatel kangastel pole suuri laike. Inimestel on veidi erinev nahatoon (`HumanFactory.tint_skin`).
 
+## Päris riided
+
+Raua-, kesk-, tööstus- ja moodsa ajastu riietes on osaliselt päris MakeHumani CC0 rõivad (`mhc_*`: viikingi kuub, püksid ja saapad; teksasärk ja teksased, jope, ülikond, töötunked, naiste pluus ja seelik; kingad, tossud, poolsaapad, kaabu). Need sobitatakse kehale mhclo-ga, peidavad all olevad kehaosad (`delete_verts` järgi) ja kannavad oma tekstuuri (värvi ei muudeta). Ülejäänud riided on endiselt genereeritud (`tools/mpfb_bodies.py`); neil on nüüd palistused (tumedam kahekordne äär ja hele volditud serv) ning seelikud langevad allapoole laiemaks.
+
 ## Soengud, habemed, kulmud ja ripsmed
 
 Soengud on päris juuksekaartidega MakeHumani varad (CC0): MakeHumani süsteemi soengud, kogukonna CC0 soengupakk ja viikingi komplekt (soeng, habe, vuntsid). `tools/mh_hair.py` sobitab need iga keha külge mhclo failiga (nagu silmad), muudab tekstuuri halliks (alfa jääb, et juuksesalgud oleksid läbipaistvad) ja mäng värvib selle juuksevärviga. Habe ja soeng on sama värvi. Kehadel on ka päris kulmud ja ripsmed (eraldi võrgud keha failis); nahale maalitud kulm on nõrk alustoon. Mütsid ja kiivrid peidavad juuksed. Allikad: `assets/people/ALLIKAD.md`.

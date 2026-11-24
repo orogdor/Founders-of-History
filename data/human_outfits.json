@@ -281,6 +281,180 @@
    "mat": "hair",
    "hair_color": true
   },
+  "mhc_viking_tunic": {
+   "name": "Viikingi rõngasrüüga kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_viking_pants": {
+   "name": "Viikingi püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_viking_boots": {
+   "name": "Viikingi saapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shirt_jeans": {
+   "name": "Teksasärk ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_striped_jeans": {
+   "name": "Triibuline särk ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_jacket_jeans": {
+   "name": "Jope ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_suit": {
+   "name": "Ülikond lipsuga",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_overalls": {
+   "name": "Töötunked",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_blouse_skirt": {
+   "name": "Triibuline pluus ja seelik",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_brown": {
+   "name": "Pruunid kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_grey": {
+   "name": "Hallid tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_boots_black": {
+   "name": "Mustad poolsaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_black": {
+   "name": "Mustad kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_sneakers_white": {
+   "name": "Valged tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_sneakers_blue": {
+   "name": "Sinised tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_fedora": {
+   "name": "Kaabu",
+   "slot": "head",
+   "hides": [],
+   "tints": [],
+   "mat": "mhc",
+   "hides_hair": true
+  },
   "stone_hide_loincloth": {
    "name": "Nahkne niudevöö",
    "slot": "underwear",
@@ -2640,14 +2814,12 @@
      ]
     },
     {
-     "name": "Talveriided",
+     "name": "Viikingi riided",
      "items": [
-      "iron_linen_shirt",
-      "iron_wool_trousers",
-      "iron_wool_tunic",
-      "iron_pastlad",
-      "iron_cloak_brooch",
-      "iron_wool_cap"
+      "mhc_viking_tunic",
+      "mhc_viking_pants",
+      "mhc_viking_boots",
+      "iron_cloak_brooch"
      ]
     },
     {
@@ -2817,7 +2989,7 @@
       "med_wool_hose",
       "med_short_cote",
       "med_wool_mantle",
-      "med_boots",
+      "mhc_viking_boots",
       "med_belt_pouch"
      ]
     },
@@ -3130,13 +3302,14 @@
      ]
     },
     {
-     "name": "Vest ja pintsak",
+     "name": "Vest, pintsak ja kaabu",
      "items": [
       "ind_cotton_shirt",
       "ind_waistcoat",
       "ind_trousers_braces",
       "ind_wool_jacket",
-      "ind_boots"
+      "mhc_shoes_black",
+      "mhc_fedora"
      ]
     },
     {
@@ -3156,7 +3329,7 @@
       "ind_waistcoat",
       "ind_greatcoat",
       "ind_trousers_braces",
-      "ind_boots",
+      "mhc_shoes_black",
       "ind_bowler"
      ]
     },
@@ -3166,7 +3339,7 @@
       "ind_cotton_shirt",
       "ind_trousers_braces",
       "work_leather_apron",
-      "ind_boots"
+      "mhc_boots_black"
      ]
     }
    ],
@@ -3205,7 +3378,7 @@
      "items": [
       "ind_dress",
       "ind_apron",
-      "ind_boots"
+      "mhc_boots_black"
      ]
     },
     {
@@ -3287,36 +3460,31 @@
    "name": "Moodne ajastu",
    "man": [
     {
-     "name": "T-särk ja teksad",
+     "name": "Teksasärk ja teksased",
      "items": [
-      "mod_tshirt",
-      "mod_jeans",
-      "mod_sneakers"
+      "mhc_shirt_jeans",
+      "mhc_shoes_brown"
      ]
     },
     {
-     "name": "Jopega",
+     "name": "Jope ja teksased",
      "items": [
-      "mod_tshirt",
-      "mod_jeans",
-      "mod_work_jacket",
-      "mod_sneakers"
+      "mhc_jacket_jeans",
+      "mhc_boots_black"
      ]
     },
     {
-     "name": "Kampsun",
+     "name": "Triibuline särk",
      "items": [
-      "mod_sweater",
-      "mod_chinos",
-      "mod_shoes"
+      "mhc_striped_jeans",
+      "mhc_sneakers_white"
      ]
     },
     {
-     "name": "Särk ja püksid",
+     "name": "Ülikond",
      "items": [
-      "mod_shirt",
-      "mod_chinos",
-      "mod_shoes"
+      "mhc_suit",
+      "mhc_shoes_black"
      ]
     },
     {
@@ -3325,18 +3493,17 @@
       "mod_tshirt",
       "mod_hoodie",
       "mod_jeans",
-      "mod_sneakers",
+      "mhc_sneakers_blue",
       "mod_cap"
      ]
     }
    ],
    "woman": [
     {
-     "name": "Pluus ja teksad",
+     "name": "Pluus ja seelik",
      "items": [
-      "mod_blouse",
-      "mod_jeans",
-      "mod_shoes"
+      "mhc_blouse_skirt",
+      "mhc_shoes_black"
      ]
     },
     {
@@ -3344,7 +3511,7 @@
      "items": [
       "mod_tshirt",
       "mod_skirt",
-      "mod_sneakers"
+      "mhc_sneakers_white"
      ]
     },
     {
@@ -3352,14 +3519,14 @@
      "items": [
       "mod_sweater",
       "mod_jeans",
-      "mod_shoes"
+      "mhc_shoes_brown"
      ]
     },
     {
      "name": "Kleit",
      "items": [
       "mod_dress",
-      "mod_shoes"
+      "mhc_shoes_black"
      ]
     },
     {
@@ -3368,7 +3535,7 @@
       "mod_tshirt",
       "mod_jeans",
       "mod_work_jacket",
-      "mod_sneakers"
+      "mhc_sneakers_blue"
      ]
     }
    ],
@@ -3565,12 +3732,11 @@
   "infantry": {
    "era": 2,
    "items": [
-    "iron_linen_shirt",
-    "mil_team_tunic",
-    "mil_mail_shirt",
-    "iron_wool_trousers",
-    "iron_pastlad",
-    "mil_spangenhelm"
+    "mhc_viking_tunic",
+    "mhc_viking_pants",
+    "mhc_viking_boots",
+    "mil_spangenhelm",
+    "mil_team_sash"
    ]
   },
   "cavalry": {
