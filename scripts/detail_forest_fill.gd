@@ -27,20 +27,24 @@ var max_gz:=0
 var gx:=0
 var gz:=0
 var done:=false
+var reduced_density:=false
+var dense_forest:=false
 
-func setup(cell: Vector2i,world_seed: int,forest: bool,resources: Array,terrain_heights: Array,rivers: Array,visual:=PackedVector4Array()) -> void:
+func setup(cell: Vector2i,world_seed: int,forest: bool,resources: Array,terrain_heights: Array,rivers: Array,visual:=PackedVector4Array(),mobile:=false) -> void:
 	seed=world_seed;heights=terrain_heights;visual_heights=visual;river_segments=rivers
-	spacing=5.0 if forest else 7.0;radius=36.0 if forest else 24.0
+	reduced_density=mobile;dense_forest=forest
+	spacing=(11.3 if forest else 13.0) if mobile else (5.0 if forest else 7.0)
+	radius=36.0 if forest else 26.0
 	separation_sq=pow(3.6 if forest else 4.6,2);spread=ceili(radius/BIN_SIZE)
 	origin=Vector2(cell.x*225.0,cell.y*195.0)
 	for resource in resources:
 		if resource.get("kind","")!="tree" or (resource.get("cleared",false) and float(resource.get("amount",0))>0):continue
 		note(float(resource.x),float(resource.z),resource)
-		if forest:
+		if forest and not mobile:
 			var value:=sin(float(resource.id)*127.1+cell.x*19.7+cell.y*83.1)*43758.5453
 			var angle:=(value-floorf(value))*TAU
 			var x:=float(resource.x)+cos(angle)*4.2;var z:=float(resource.z)+sin(angle)*4.2
-			if absf(x)<=HALF_X-3 and absf(z)<=HALF_Z-3 and absf(z)>=18:note(x,z,resource)
+			if absf(x)<HALF_X and absf(z)<HALF_Z:note(x,z,resource)
 	if bins.is_empty():done=true;return
 	min_gx=floori((origin.x-HALF_X)/spacing);max_gx=floori((origin.x+HALF_X)/spacing)
 	gx=min_gx;gz=floori((origin.y-HALF_Z)/spacing);max_gz=floori((origin.y+HALF_Z)/spacing)
@@ -62,6 +66,12 @@ func step(limit: int=48) -> void:
 		var x: float=(float(cell_x)+0.12+0.76*Forest.random_value(cell_x,cell_z,seed,346))*spacing-float(origin.x)
 		var z: float=(float(cell_z)+0.12+0.76*Forest.random_value(cell_x,cell_z,seed,347))*spacing-float(origin.y)
 		if x < -HALF_X or x >= HALF_X or z < -HALF_Z or z >= HALF_Z:continue
+		if reduced_density:
+			var clump:=Forest.clump((x+origin.x)/4.5,(z+origin.y)/3.9)
+			var margin:=minf(HALF_X-absf(x),HALF_Z-absf(z))
+			var gap:=maxf(1.0-smoothstep(10.0,34.0,absf(z)),1.0-smoothstep(6.0,20.0,margin))
+			var coverage:=(0.20 if dense_forest else 0.09)+clump*0.29+gap*0.38
+			if Forest.random_value(cell_x,cell_z,seed,350)>coverage:continue
 		var cx:=floori(x/BIN_SIZE);var cz:=floori(z/BIN_SIZE)
 		var owner: Variant=null;var closest:=radius*radius;var blocked:=false
 		for j in range(-spread,spread+1):

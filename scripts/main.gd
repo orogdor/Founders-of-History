@@ -91,6 +91,7 @@ var graphics_soldier_names:=true
 var graphics_daylight: String="dynamic"
 var graphics_shadows: bool=true
 var graphics_ambient: String="normal"
+var lighting_detail:=false
 var sunlight: DirectionalLight3D
 var fill_light: DirectionalLight3D
 var world_environment: WorldEnvironment
@@ -279,7 +280,6 @@ var detail_ocean_cache: Dictionary={}
 var map_touch := MapTouch.new()
 
 func _ready() -> void:
-	if MobileProfile.active:graphics_shadows=false
 	DetailView.request_nature_assets()
 	DetailGroundMaterial.request_assets()
 	var settings:=ConfigFile.new()
@@ -422,6 +422,14 @@ func build_environment() -> void:
 	add_child(env)
 	sunlight = DirectionalLight3D.new()
 	sunlight.light_color=Color("ffe4be");sunlight.light_energy=0.55
+	sunlight.shadow_blur=1.5;sunlight.shadow_opacity=0.72
+	sunlight.shadow_bias=0.09;sunlight.shadow_normal_bias=1.2
+	sunlight.light_angular_distance=1.15
+	if MobileProfile.active:
+		RenderingServer.directional_shadow_atlas_set_size(1024,true)
+		sunlight.directional_shadow_mode=DirectionalLight3D.SHADOW_ORTHOGONAL
+		sunlight.directional_shadow_max_distance=175.0
+		sunlight.directional_shadow_fade_start=0.68
 	sunlight.position=Vector3(-80,150,90)
 	add_child(sunlight);sunlight.look_at(Vector3.ZERO,Vector3.UP)
 	fill_light=DirectionalLight3D.new()
@@ -443,18 +451,32 @@ func update_daylight() -> void:
 	var angle:=(hour-6.0)*PI/12.0;var elevation:=sin(angle)
 	var daylight:=clampf((elevation+0.09)/0.52,0.0,1.0)
 	var moon:=clampf(1.0-daylight*2.2,0.0,1.0)
-	sunlight.shadow_enabled=graphics_shadows and elevation>0.07 and (detail_mode or zoom<19.2)
+	var local_detail:=detail_mode and battle_view==null
+	lighting_detail=local_detail
+	update_sun_shadows(elevation)
 	var direction:=Vector3(cos(angle)*0.85,maxf(0.07,elevation),0.48)
 	if elevation<0:
 		var moon_angle:=angle+PI
 		direction=Vector3(cos(moon_angle)*0.7,maxf(0.35,sin(moon_angle)),0.55)
 	sunlight.position=direction.normalized()*150.0;sunlight.look_at(Vector3.ZERO,Vector3.UP)
-	sunlight.light_energy=0.55*(pow(daylight,1.25)+0.24*moon)
-	sunlight.light_color=Color("aebfff") if elevation<0 else Color("ffb37d") if elevation<0.28 else Color("ffe2b8")
-	fill_light.light_energy=0.16*(0.36+0.64*daylight)
-	world_environment.environment.ambient_light_energy=0.85*(0.32+0.68*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
+	sunlight.light_energy=(0.88 if local_detail else 0.55)*(pow(daylight,1.25)+0.24*moon)
+	var warm:=Color("ffc08b").lerp(Color("fff2d7"),smoothstep(0.09,0.72,elevation))
+	sunlight.light_color=Color("aebfff") if elevation<0 else warm
+	fill_light.light_energy=(0.13 if local_detail else 0.16)*(0.36+0.64*daylight)
+	world_environment.environment.ambient_light_color=Color("e2edee") if local_detail else Color("f0f1e0")
+	world_environment.environment.ambient_light_energy=(0.59 if local_detail else 0.85)*(0.35+0.65*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
 	world_environment.environment.background_color=Color("101827").lerp(Color("283741"),daylight)
 	if is_instance_valid(fpv_walker):fpv_walker.update_sky()
+
+func update_sun_shadows(elevation: float) -> void:
+	var strength:=smoothstep(0.07,0.23,elevation)
+	if MobileProfile.active:
+		var walking: bool=is_instance_valid(fpv_walker) and fpv_walker.active
+		strength*=0.0 if not detail_mode or battle_view!=null else 1.0 if walking else 1.0-smoothstep(78.0,112.0,zoom)
+	elif not detail_mode and zoom>=19.2:
+		strength=0.0
+	sunlight.shadow_enabled=graphics_shadows and strength>0.02
+	if sunlight.shadow_enabled:sunlight.shadow_opacity=0.72*strength
 
 func build_camera() -> void:
 	camera = Camera3D.new()
@@ -471,8 +493,8 @@ func update_camera() -> void:
 		camera.near=clampf(zoom*0.075,0.3,12.0)
 		camera.far=maxf(450.0,zoom*3.5)
 	if sunlight!=null:
-		var elevation:=sin((daylight_hour()-6.0)*PI/12.0)
-		sunlight.shadow_enabled=graphics_shadows and elevation>0.07 and (detail_mode or zoom<19.2)
+		if lighting_detail!=(detail_mode and battle_view==null):update_daylight()
+		else:update_sun_shadows(sin((daylight_hour()-6.0)*PI/12.0))
 	if detail_mode:
 		var look_target:=camera_target+Vector3(0,maxf(0.0,detail_rendered_height(camera_target.x,camera_target.z)),0)
 		camera.position = look_target + Vector3(144,234,240).normalized()*zoom/(2.0*tan(deg_to_rad(camera.fov/2.0)))

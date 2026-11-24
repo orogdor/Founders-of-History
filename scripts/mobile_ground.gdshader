@@ -3,6 +3,7 @@ render_mode cull_disabled, specular_disabled;
 
 #include "res://scripts/surface_relief.gdshaderinc"
 #include "res://scripts/detail_map_fog.gdshaderinc"
+#include "res://scripts/detail_surface_sampling.gdshaderinc"
 
 uniform bool overview = false;
 uniform bool surface_textures_ready = false;
@@ -60,13 +61,11 @@ void fragment() {
 			(tile_pos.y < 0.0 ? ground_ne : ground_se);
 		land = mix(mix(land,horizontal,amount.x),mix(vertical,diagonal,amount.x),amount.y);
 	}
-	highp vec2 uv = ground_pos * (overview ? 0.042 : 0.55);
-	if (!overview) {
-		uv = mat2(vec2(0.85,0.53),vec2(-0.53,0.85))*uv;
-		uv += vec2(ground_noise(ground_pos*0.18),ground_noise(ground_pos*0.18+vec2(39.0,13.0)))*0.84;
-	}
+	highp vec2 uv = overview ? ground_pos*0.042 : terrain_primary_uv(ground_pos);
 	highp vec2 dx = dFdx(uv);
 	highp vec2 dy = dFdy(uv);
+	highp vec2 world_dx = dFdx(ground_pos);
+	highp vec2 world_dy = dFdy(ground_pos);
 	float range = length(VERTEX);
 	float detail = overview ? 1.0-smoothstep(32.0,78.0,range) : 1.0-smoothstep(82.0,375.0,range);
 	float sand = overview ? 1.0-smoothstep(0.8,4.2,elevation) : 1.0-smoothstep(0.12+shoreline,0.83+shoreline,elevation);
@@ -75,9 +74,16 @@ void fragment() {
 	vec3 col = land.rgb;
 	vec3 beach = vec3(0.49,0.37,0.23);
 	if (!overview) {
-		float patches = ground_noise(ground_pos*0.052)*0.72 + ground_noise(ground_pos*0.158+6.4)*0.28;
-		col = mix(col*vec3(0.67,0.84,0.66),col*vec3(1.11,0.99,0.78),smoothstep(0.28,0.73,patches));
-		beach *= mix(0.84,1.19,patches);
+		vec2 skew = TERRAIN_ROTATION*ground_pos;
+		float patches = ground_noise(skew*0.057)*0.59 + ground_noise(ground_pos*0.246+6.4)*0.29
+			+ ground_noise(skew*0.93+vec2(25.0,16.0))*0.12;
+		float ground_cover = smoothstep(0.33,0.72,patches);
+		vec3 damp = col*vec3(0.62,0.79,0.63);
+		vec3 dry = col*vec3(0.96,0.87,0.68)+vec3(0.042,0.022,0.006);
+		float grain = ground_noise((TERRAIN_SECONDARY_ROTATION*ground_pos)*1.8+16.5);
+		float resolvable = 1.0-smoothstep(0.12,0.65,max(length(world_dx),length(world_dy)));
+		col = mix(damp,dry,ground_cover)*(0.93+(grain-0.5)*0.20*resolvable);
+		beach *= mix(0.80,1.14,patches)+(grain-0.5)*0.12*resolvable;
 	}
 	if (surface_textures_ready && detail > 0.0) {
 		float patches = overview ? sin(ground_pos.x*0.12)*sin(ground_pos.y*0.085)
@@ -86,22 +92,36 @@ void fragment() {
 		if (!overview) { soil = mix(soil,1.0,sand); }
 		float forest = land.a*(1.0-soil);
 		vec3 coverage = vec3(1.0-soil-forest,soil,forest);
-		vec3 heights = textureGrad(ground_height_maps,uv,dx,dy).rgb;
-		vec3 weights = height_blend_weights(coverage,heights);
+		vec3 primary_heights = textureGrad(ground_height_maps,uv,dx,dy).rgb;
 		vec3 soil_sample = textureGrad(soil_color,uv,dx,dy).rgb;
-		vec3 photo = textureGrad(grass_color,uv,dx,dy).rgb*weights.x
-			+soil_sample*weights.y+textureGrad(forest_color,uv,dx,dy).rgb*weights.z;
+		vec3 grass_sample = textureGrad(grass_color,uv,dx,dy).rgb;
+		vec3 forest_sample = textureGrad(forest_color,uv,dx,dy).rgb;
+		vec3 heights = primary_heights;
+		if (!overview && range < 164.0) {
+			highp vec2 wide_uv = terrain_secondary_uv(ground_pos);
+			highp vec2 wide_dx = TERRAIN_SECONDARY_ROTATION*world_dx*TERRAIN_SECONDARY_SCALE;
+			highp vec2 wide_dy = TERRAIN_SECONDARY_ROTATION*world_dy*TERRAIN_SECONDARY_SCALE;
+			float depth_mix = terrain_layer_mix(ground_pos)*(1.0-smoothstep(100.0,164.0,range));
+			heights = mix(heights,textureGrad(ground_height_maps,wide_uv,wide_dx,wide_dy).rgb,depth_mix);
+			soil_sample = mix(soil_sample,textureGrad(soil_color,wide_uv,wide_dx,wide_dy).rgb,depth_mix);
+			grass_sample = mix(grass_sample,textureGrad(grass_color,wide_uv,wide_dx,wide_dy).rgb,depth_mix);
+			forest_sample = mix(forest_sample,textureGrad(forest_color,wide_uv,wide_dx,wide_dy).rgb,depth_mix);
+		}
+		vec3 weights = height_blend_weights(coverage,heights);
+		vec3 photo = grass_sample*weights.x+soil_sample*weights.y+forest_sample*weights.z;
 		float strength = detail*(1.0-snow)*(overview ? 1.0-sand : 1.0);
 		float relief = dot(heights,weights);
-		col = mix(col,photo,strength*(overview ? 0.30 : 0.80));
-		col *= 1.0+(relief-0.5)*strength*0.34;
+		float photo_weight = overview ? 0.30 : mix(0.22,0.63,1.0-smoothstep(9.0,38.0,range));
+		col = mix(col,photo,strength*photo_weight);
+		col *= 1.0+(relief-0.5)*strength*(overview ? 0.34 : photo_weight*0.43);
 		if (!overview) {
 			float grains = dot(soil_sample,vec3(0.31,0.57,0.12));
 			beach *= mix(1.0,0.58+0.95*grains+0.24*relief,strength);
 			if (range < 29.0) {
 				float right = dot(textureGrad(ground_height_maps,uv+vec2(0.007,0.0),dx,dy).rgb,weights);
 				float forward = dot(textureGrad(ground_height_maps,uv+vec2(0.0,0.007),dx,dy).rgb,weights);
-				vec2 slope = mat2(vec2(0.85,-0.53),vec2(0.53,0.85))*vec2(relief-right,relief-forward);
+				float primary_relief = dot(primary_heights,weights);
+				vec2 slope = transpose(TERRAIN_ROTATION)*vec2(primary_relief-right,primary_relief-forward);
 				NORMAL_MAP = normalize(vec3(slope*0.82,1.0))*0.5+0.5;
 				NORMAL_MAP_DEPTH = 0.72*(1.0-smoothstep(7.0,29.0,range));
 			}

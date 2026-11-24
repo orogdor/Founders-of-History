@@ -40,6 +40,7 @@ var tree_lod_dirty:=true
 var tree_lod_timer:=0.0
 var tree_lod_camera:=Vector3(INF,INF,INF)
 var tree_lod_view_height:=0.0
+var mobile_tree_shadows:=false
 var tree_groups: Dictionary={}
 var tree_companions: Dictionary={}
 var tree_cell:=Vector2i.ZERO
@@ -602,10 +603,9 @@ static func tree_transform(resource: Dictionary,terrain_heights: Array,now: floa
 	return Transform3D(Basis().scaled(Vector3.ONE*size),Vector3(resource.x,Terrain.visual_rendered_height(terrain_heights,visual,resource.x,resource.z),resource.z))
 
 func start_forest_fill() -> void:
-	if Mobile.active:return
 	if tree_mountain or tree_biome in ["sea","snow","snow_mountain","mesa"]:return
 	forest_fill=ForestFill.new()
-	forest_fill.setup(tree_cell,tree_seed,tree_biome in ["forest","jungle","taiga"],resources,heights,river_segments,visual_heights)
+	forest_fill.setup(tree_cell,tree_seed,tree_biome in ["forest","jungle","taiga"],resources,heights,river_segments,visual_heights,Mobile.active)
 
 func process_forest_fill() -> void:
 	if forest_fill==null:return
@@ -620,7 +620,7 @@ func process_forest_fill() -> void:
 		if key.is_empty():continue
 		var kind: String=key.split(":")[0]
 		var variant_number:=sin(float(entry.x)*12.9898+float(entry.z)*78.233)*43758.5453
-		var variant:=mini(4,floori((variant_number-floorf(variant_number))*5.0))
+		var variant:=0 if Mobile.active else mini(4,floori((variant_number-floorf(variant_number))*5.0))
 		key=kind+":"+str(variant)
 		entry.key=key;entry.index=int(tree_counts.get(key,0));tree_counts[key]=entry.index+1
 		fill_trees.append(entry)
@@ -645,7 +645,7 @@ func register_tree(resource: Dictionary) -> void:
 	var id:=float(resource.id);var n:=sin(id*127.1+tree_cell.x*19.7+tree_cell.y*83.1)*43758.5453;var random:=n-floorf(n)
 	var x: float=float(resource.x)+cos(random*TAU)*4.2;var z: float=float(resource.z)+sin(random*TAU)*4.2
 	var y:=display_height(x,z);var base:=display_height(resource.x,resource.z)
-	if absf(x)>109.5 or absf(z)>94.5 or y<0.5 or absf(y-base)>1.2 or absf(z)<18:return
+	if absf(x)>=112.5 or absf(z)>=97.5 or y<0.5 or absf(y-base)>1.2:return
 	var companion_seed:=id+104729.0;var companion_key:=tree_key(resource,companion_seed)
 	if companion_key.is_empty():return
 	var companion_index:=int(tree_counts.get(companion_key,0));tree_counts[companion_key]=companion_index+1
@@ -685,7 +685,9 @@ func ensure_tree_group(key: String) -> void:
 			if material.albedo_texture!=null and level!="far":
 				if not shared_tree_textures.has(kind):shared_tree_textures[kind]=material.albedo_texture
 				material.albedo_texture=shared_tree_textures[kind]
-			if level=="far":material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+			if level=="far":
+				material.shading_mode=BaseMaterial3D.SHADING_MODE_PER_PIXEL if Mobile.active else BaseMaterial3D.SHADING_MODE_UNSHADED
+				if Mobile.active:material.roughness=1.0;material.metallic_specular=0.0
 			elif material.resource_name.to_lower().contains("foliage"):material.albedo_color=Color(0.55,0.70,0.55)
 			material.cull_mode=BaseMaterial3D.CULL_DISABLED
 			mesh.surface_set_material(surface,material)
@@ -693,11 +695,17 @@ func ensure_tree_group(key: String) -> void:
 	var mesh: Mesh=shared_tree_meshes[key]
 	var multi:=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D;multi.mesh=mesh
 	var node:=MultiMeshInstance3D.new();node.multimesh=multi;node.visible=Mobile.active or parts.size()>2
-	if Mobile.active:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if Mobile.active and not mobile_tree_shadows:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node);tree_instances[key]=node
 
 func update_tree_lods(camera: Camera3D) -> void:
-	if Mobile.active:return
+	if Mobile.active:
+		var shadows:=camera.global_position.distance_squared_to(global_position)<175.0*175.0
+		if shadows==mobile_tree_shadows:return
+		mobile_tree_shadows=shadows
+		for node in tree_instances.values():
+			node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return
 	var view_height:=get_viewport().get_visible_rect().size.y
 	if not tree_lod_dirty and tree_lod_camera.is_equal_approx(camera.global_position) and is_equal_approx(tree_lod_view_height,view_height):return
 	tree_lod_camera=camera.global_position;tree_lod_view_height=view_height;tree_lod_dirty=false

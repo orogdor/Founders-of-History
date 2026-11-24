@@ -3,6 +3,7 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 #include "res://scripts/surface_relief.gdshaderinc"
 #include "res://scripts/detail_map_fog.gdshaderinc"
+#include "res://scripts/detail_surface_sampling.gdshaderinc"
 
 uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -40,14 +41,15 @@ float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.
 float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h(i),h(i+vec2(1.0,0.0)),f.x),mix(h(i+vec2(0.0,1.0)),h(i+vec2(1.0,1.0)),f.x),f.y);}
 float fractal(vec2 p){return n(p)*0.55+n(p*2.07+17.3)*0.30+n(p*4.31+41.9)*0.15;}
 vec4 sample_ground(sampler2D image, vec2 uv, vec2 dx, vec2 dy, float scale_blend) {
+	mat2 wider = TERRAIN_SECONDARY_ROTATION*0.64;
 	return mix(textureGrad(image, uv, dx, dy),
-		textureGrad(image, uv * 0.73 + vec2(0.37, 0.61), dx * 0.73, dy * 0.73),
+		textureGrad(image, wider*uv + vec2(0.37,0.61), wider*dx, wider*dy),
 		scale_blend);
 }
 
 void fragment(){
  vec2 q=shifted_uv;
- vec2 uv=q*0.5;
+ vec2 uv=terrain_primary_uv(q);
  vec2 dx=dFdx(uv)*1.35,dy=dFdy(uv)*1.35;
  float distance_to_camera=length(VERTEX);
  vec4 local_ground=vec4(base_color.rgb,forest_factor);
@@ -85,22 +87,24 @@ void fragment(){
   float dirt=smoothstep(0.50,0.75,fractal(q*0.09+vec2(13.0,29.0))+smoothstep(0.03,0.21,slope)*0.13);
   float forest=local_ground.a*(0.68+0.25*n(q*0.13));
   vec3 coverage=vec3((1.0-dirt)*(1.0-forest),dirt*(1.0-forest),forest);
-  float scale_blend=smoothstep(0.2,0.8,n(uv*0.11+vec2(71.0,13.0)));
+  float scale_blend=terrain_layer_mix(q);
   vec3 heights=sample_ground(ground_height_maps,uv,dx,dy,scale_blend).rgb;
   vec3 weights=height_blend_weights(coverage,heights);
   float height=dot(heights,weights);
   float relief=(1.0-smoothstep(16.0,52.0,distance_to_camera))*photo_strength;
-  vec2 shifted=uv-relief_direction(VIEW,TANGENT,BINORMAL,NORMAL)*(1.0-height)*0.027*relief;
+  vec2 shifted=uv-(TERRAIN_ROTATION*relief_direction(VIEW,TANGENT,BINORMAL,NORMAL))*(1.0-height)*0.027*relief;
   vec3 grass=sample_ground(grass_color,shifted,dx,dy,scale_blend).rgb;
   vec3 soil=sample_ground(soil_color,shifted,dx,dy,scale_blend).rgb;
   vec3 litter=sample_ground(forest_color,shifted,dx,dy,scale_blend).rgb;
   vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.90+0.13*fractal(q*0.018));
   photo*=mix(1.0,0.84+0.23*height,relief);
   surface=mix(distant,photo,photo_strength);
-  NORMAL_MAP=sample_ground(grass_normal,shifted,dx,dy,scale_blend).xyz*weights.x
-            +sample_ground(soil_normal,shifted,dx,dy,scale_blend).xyz*weights.y
-            +sample_ground(forest_normal,shifted,dx,dy,scale_blend).xyz*weights.z;
-  NORMAL_MAP_DEPTH=0.54*photo_strength;
+  vec3 surface_normal=textureGrad(grass_normal,shifted,dx,dy).xyz*weights.x
+                    +textureGrad(soil_normal,shifted,dx,dy).xyz*weights.y
+                    +textureGrad(forest_normal,shifted,dx,dy).xyz*weights.z;
+  surface_normal.xy=transpose(TERRAIN_ROTATION)*(surface_normal.xy-0.5)+0.5;
+  NORMAL_MAP=surface_normal;
+  NORMAL_MAP_DEPTH=0.46*photo_strength;
   vec3 roughness=vec3(sample_ground(grass_rough,shifted,dx,dy,scale_blend).r,
                       sample_ground(soil_rough,shifted,dx,dy,scale_blend).r,
                       sample_ground(forest_rough,shifted,dx,dy,scale_blend).r);

@@ -90,6 +90,7 @@ func enter() -> void:
 	if names_button!=null:names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
 	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far,"environment":host.camera.environment}
 	host.camera.fov=68.0;host.camera.near=0.12;host.camera.far=720.0
+	host.update_daylight()
 	start_sky()
 	var neighbors:=host.detail_root.get_node_or_null("NeighborTiles") as Node3D
 	if neighbors!=null:neighbors.update_stream(Vector2(pos.x,pos.z),Vector2(-sin(yaw),-cos(yaw)))
@@ -146,6 +147,7 @@ func update_sky() -> void:
 	sky_material.set_shader_parameter("sun_direction",host.sunlight.position.normalized())
 	walking_environment.fog_light_color=horizon
 	walking_environment.ambient_light_energy=host.world_environment.environment.ambient_light_energy
+	walking_environment.ambient_light_color=host.world_environment.environment.ambient_light_color
 
 func sync_model() -> void:
 	model.position=pos;model.rotation.y=yaw+PI;model.visible=placed and not active and host.detail_mode and tile==current_tile()

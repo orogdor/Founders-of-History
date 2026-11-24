@@ -235,7 +235,7 @@ func add_graphics_option(key: String,label_text: String,choices: Array) -> void:
 
 func load_graphics_settings() -> void:
 	var config:=ConfigFile.new();config.load(SETTINGS_PATH)
-	var defaults={"display":"windowed","resolution":70 if Mobile.active else 100,"antialias":0,"fps":60,"shadows":not Mobile.active,"names":not Mobile.active,"daylight":"dynamic","ambient":"normal","performance":false}
+	var defaults={"display":"windowed","resolution":70 if Mobile.active else 100,"antialias":0,"fps":60,"shadows":true,"names":not Mobile.active,"daylight":"dynamic","ambient":"normal","performance":false}
 	for key in defaults:
 		var option:OptionButton=graphics_controls[key];var value:Variant=config.get_value("mobile_graphics" if Mobile.active else "graphics",key,defaults[key]);var found:=false
 		for i in option.item_count:
