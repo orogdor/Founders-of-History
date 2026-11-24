@@ -417,12 +417,12 @@ func build_environment() -> void:
 	env.environment.background_mode = Environment.BG_COLOR
 	env.environment.background_color = Color("283741")
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.environment.ambient_light_color = Color("f0f1e0")
-	env.environment.ambient_light_energy = 0.85
+	env.environment.ambient_light_color = Color("ccd8db")
+	env.environment.ambient_light_energy = 0.55
 	add_child(env)
 	sunlight = DirectionalLight3D.new()
 	sunlight.light_color=Color("ffe4be");sunlight.light_energy=0.55
-	sunlight.shadow_blur=1.25;sunlight.shadow_opacity=0.82
+	sunlight.shadow_blur=1.5;sunlight.shadow_opacity=0.76
 	sunlight.shadow_bias=0.09;sunlight.shadow_normal_bias=1.2
 	sunlight.light_angular_distance=1.15
 	if MobileProfile.active:
@@ -433,7 +433,7 @@ func build_environment() -> void:
 	sunlight.position=Vector3(-80,150,90)
 	add_child(sunlight);sunlight.look_at(Vector3.ZERO,Vector3.UP)
 	fill_light=DirectionalLight3D.new()
-	fill_light.light_color=Color("b4d3df");fill_light.light_energy=0.16
+	fill_light.light_color=Color("b4d3df");fill_light.light_energy=0.07
 	fill_light.position=Vector3(130,90,-120)
 	add_child(fill_light);fill_light.look_at(Vector3.ZERO,Vector3.UP)
 	update_daylight()
@@ -459,12 +459,14 @@ func update_daylight() -> void:
 		var moon_angle:=angle+PI
 		direction=Vector3(cos(moon_angle)*0.7,maxf(0.35,sin(moon_angle)),0.55)
 	sunlight.position=direction.normalized()*150.0;sunlight.look_at(Vector3.ZERO,Vector3.UP)
-	sunlight.light_energy=(0.66 if local_detail else 0.55)*(pow(daylight,1.25)+0.24*moon)
+	sunlight.light_energy=(0.72 if local_detail else 0.62)*(pow(daylight,1.25)+0.20*moon)
 	var warm:=Color("ffc08b").lerp(Color("fff2d7"),smoothstep(0.09,0.72,elevation))
 	sunlight.light_color=Color("aebfff") if elevation<0 else warm
-	fill_light.light_energy=(0.05 if local_detail else 0.16)*(0.36+0.64*daylight)
-	world_environment.environment.ambient_light_color=Color("c2d0d7") if local_detail else Color("f0f1e0")
-	world_environment.environment.ambient_light_energy=(0.39 if local_detail else 0.85)*(0.38+0.62*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
+	fill_light.light_energy=(0.025 if local_detail else 0.07)*(0.30+0.70*daylight)
+	var ambient_day:=Color("c2d1da") if local_detail else Color("ccd8db")
+	var ambient_night:=Color("8195ba")
+	world_environment.environment.ambient_light_color=ambient_night.lerp(ambient_day,daylight)
+	world_environment.environment.ambient_light_energy=(0.32 if local_detail else 0.55)*(0.38+0.62*daylight)*(0.7 if graphics_ambient=="low" else 1.3 if graphics_ambient=="bright" else 1.0)
 	world_environment.environment.background_color=Color("101827").lerp(Color("283741"),daylight)
 	if is_instance_valid(fpv_walker):fpv_walker.update_sky()
 
@@ -476,7 +478,7 @@ func update_sun_shadows(elevation: float) -> void:
 	elif not detail_mode and zoom>=19.2:
 		strength=0.0
 	sunlight.shadow_enabled=graphics_shadows and strength>0.02
-	if sunlight.shadow_enabled:sunlight.shadow_opacity=0.82*strength
+	if sunlight.shadow_enabled:sunlight.shadow_opacity=0.76*strength
 
 func build_camera() -> void:
 	camera = Camera3D.new()

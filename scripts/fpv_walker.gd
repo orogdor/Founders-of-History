@@ -134,6 +134,8 @@ func start_sky() -> void:
 
 func update_sky() -> void:
 	if not active or walking_environment==null:return
+	walking_environment.ambient_light_energy=host.world_environment.environment.ambient_light_energy
+	walking_environment.ambient_light_color=host.world_environment.environment.ambient_light_color
 	var hour:=float(host.daylight_hour())
 	if sky_hour>=0.0 and absf(hour-sky_hour)<0.02:return
 	sky_hour=hour
@@ -146,8 +148,6 @@ func update_sky() -> void:
 	sky_material.set_shader_parameter("twilight",twilight)
 	sky_material.set_shader_parameter("sun_direction",host.sunlight.position.normalized())
 	walking_environment.fog_light_color=horizon
-	walking_environment.ambient_light_energy=host.world_environment.environment.ambient_light_energy
-	walking_environment.ambient_light_color=host.world_environment.environment.ambient_light_color
 
 func sync_model() -> void:
 	model.position=pos;model.rotation.y=yaw+PI;model.visible=placed and not active and host.detail_mode and tile==current_tile()
