@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "runtime": "godot-4.7.2-windows-v1",
+  "revision": 1,
+  "source": "d44f386171d6201e336c9d8f9ae6119aec5fbf1b",
+  "base": {
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-base-v1/windows-base.pck",
+    "sha256": "76dc077da861baca0907fc6923412172be96d3a0fbd0e28acd47204adbaacfea",
+    "size": 772092496
+  },
+  "patch": null
+}
