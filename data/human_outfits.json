@@ -1,5 +1,5 @@
 {
- "_info": "Inimeste kehad, riided ja ajastute riidekomplektid. Riidefail: res://assets/people/clothes/<ese>/<keha>.glb. Tööriist: res://assets/people/equipment/<nimi>.glb. Puuduva faili korral jäetakse ese vahele ja kehaosa ei peideta.",
+ "_info": "Inimeste kehad, riided, soengud ja ajastute riidekomplektid. Riidefail: res://assets/people/clothes/<ese>/<keha>.glb. Tööriist: res://assets/people/equipment/<nimi>.glb. Sõdurite relvad ja hobused tulevad res://assets/soldiers/split/<väeliik>.glb failist. Puuduva faili korral jäetakse ese vahele ja kehaosa ei peideta.",
  "zones": [
   "head",
   "neck",
@@ -20,118 +20,440 @@
   "socks",
   "legs",
   "torso",
+  "armor",
   "feet",
+  "armarm",
+  "cuirass",
   "apron",
   "belt",
   "outer",
   "head",
   "jewelry"
  ],
+ "hair_colors": [
+  "e0c898",
+  "c9a46e",
+  "a07a4e",
+  "7a5838",
+  "5a4030",
+  "3b2a1e",
+  "241c17",
+  "9a5a32",
+  "8a4426"
+ ],
+ "team_colors": [
+  "276bd1",
+  "c43d43",
+  "9271ce",
+  "d2a12e"
+ ],
  "bodies": {
   "man": {
    "scene": "res://assets/people/bodies/man.glb",
-   "outfit": "man",
-   "hair": [
-    "hair_short",
-    "hair_long_tied"
-   ],
-   "beard": [
-    "hair_beard_short",
-    ""
-   ]
+   "outfit": "man"
   },
   "woman": {
    "scene": "res://assets/people/bodies/woman.glb",
-   "outfit": "woman",
-   "hair": [
-    "hair_braids",
-    "hair_long_tied",
-    "hair_long_loose"
-   ]
+   "outfit": "woman"
   },
   "boy": {
    "scene": "res://assets/people/bodies/boy.glb",
    "outfit": "man",
-   "child": true,
-   "hair": [
-    "hair_short"
-   ]
+   "child": true
   },
   "girl": {
    "scene": "res://assets/people/bodies/girl.glb",
    "outfit": "woman",
-   "child": true,
-   "hair": [
-    "hair_braids",
-    "hair_long_loose"
-   ]
+   "child": true
   }
  },
  "items": {
-  "hair_short": {
-   "name": "Lühikesed juuksed",
+  "mh_short01": {
+   "name": "Lühike",
    "slot": "hair",
    "hides": [],
-   "tints": [
-    "d8b98a",
-    "a07a4e",
-    "6b4a2e",
-    "3b2a1e",
-    "2a211c",
-    "9a5a32"
-   ]
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_long_tied": {
-   "name": "Pikad seotud juuksed",
+  "mh_short02": {
+   "name": "Lühike siledaks kammitud",
    "slot": "hair",
    "hides": [],
-   "tints": [
-    "d8b98a",
-    "a07a4e",
-    "6b4a2e",
-    "3b2a1e",
-    "2a211c",
-    "9a5a32"
-   ]
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_braids": {
-   "name": "Palmikud",
+  "mh_short03": {
+   "name": "Lühike sasitud",
    "slot": "hair",
    "hides": [],
-   "tints": [
-    "d8b98a",
-    "a07a4e",
-    "6b4a2e",
-    "3b2a1e",
-    "2a211c",
-    "9a5a32"
-   ]
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_beard_short": {
-   "name": "Lühike habe",
-   "slot": "beard",
+  "mh_short04": {
+   "name": "Väga lühike",
+   "slot": "hair",
    "hides": [],
-   "tints": [
-    "d8b98a",
-    "a07a4e",
-    "6b4a2e",
-    "3b2a1e",
-    "2a211c",
-    "9a5a32"
-   ]
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_long_loose": {
+  "mh_bob01": {
+   "name": "Polkpea",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_braid": {
+   "name": "Pats",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_long": {
    "name": "Pikad lahtised juuksed",
    "slot": "hair",
    "hides": [],
-   "tints": [
-    "d8b98a",
-    "a07a4e",
-    "6b4a2e",
-    "3b2a1e",
-    "2a211c",
-    "9a5a32"
-   ]
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_ponytail": {
+   "name": "Hobusesaba",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_bob_blunt_bangs": {
+   "name": "Sirge polkpea tukaga",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_bob_page": {
+   "name": "Potisoeng",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_bob_curled": {
+   "name": "Sissekeeratud polkpea",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_messy": {
+   "name": "Sasitud",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_pixie": {
+   "name": "Poisipea",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_bun_messy": {
+   "name": "Sasitud nutsu",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_bun_braid": {
+   "name": "Patsinutsu",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_shaggy": {
+   "name": "Pikk narmendav",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_short_messy": {
+   "name": "Lühike narmendav",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_long_bangs": {
+   "name": "Pikad juuksed tukaga",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_curly_long": {
+   "name": "Pikad lokid",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_braid_french": {
+   "name": "Prantsuse pats",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_viking": {
+   "name": "Viikingi pats",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_beard_long": {
+   "name": "Pikk habe vuntsidega",
+   "slot": "beard",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true
+  },
+  "mh_beard_goatee": {
+   "name": "Pikk lõuahabe",
+   "slot": "beard",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true
+  },
+  "mh_moustache": {
+   "name": "Vuntsid",
+   "slot": "beard",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true
+  },
+  "mhc_viking_tunic": {
+   "name": "Viikingi rõngasrüüga kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_viking_pants": {
+   "name": "Viikingi püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_viking_boots": {
+   "name": "Viikingi saapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shirt_jeans": {
+   "name": "Teksasärk ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_striped_jeans": {
+   "name": "Triibuline särk ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_jacket_jeans": {
+   "name": "Jope ja teksased",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_suit": {
+   "name": "Ülikond lipsuga",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_overalls": {
+   "name": "Töötunked",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_blouse_skirt": {
+   "name": "Triibuline pluus ja seelik",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_brown": {
+   "name": "Pruunid kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_grey": {
+   "name": "Hallid tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_boots_black": {
+   "name": "Mustad poolsaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_shoes_black": {
+   "name": "Mustad kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_sneakers_white": {
+   "name": "Valged tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_sneakers_blue": {
+   "name": "Sinised tossud",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [],
+   "mat": "mhc"
+  },
+  "mhc_fedora": {
+   "name": "Kaabu",
+   "slot": "head",
+   "hides": [],
+   "tints": [],
+   "mat": "mhc",
+   "hides_hair": true
   },
   "stone_hide_loincloth": {
    "name": "Nahkne niudevöö",
@@ -141,7 +463,8 @@
    ],
    "tints": [
     "8f6e4b"
-   ]
+   ],
+   "mat": "hide"
   },
   "stone_hide_tunic": {
    "name": "Nahkne kuub",
@@ -153,11 +476,12 @@
    "tints": [
     "8f6e4b",
     "7a5a3a"
-   ]
+   ],
+   "mat": "hide"
   },
   "stone_hide_leggings": {
    "name": "Nahksäärised",
-   "slot": "legs",
+   "slot": "socks",
    "hides": [
     "thighs",
     "shins"
@@ -165,7 +489,8 @@
    "tints": [
     "8f6e4b",
     "7a5a3a"
-   ]
+   ],
+   "mat": "hide"
   },
   "stone_moccasins": {
    "name": "Nahkkingad (mokassiinid)",
@@ -175,7 +500,19 @@
    ],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
+  },
+  "stone_fur_boots": {
+   "name": "Karusnahksed säärsaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6e5640"
+   ],
+   "mat": "fur"
   },
   "stone_fur_cloak": {
    "name": "Karusnahkne keep",
@@ -186,7 +523,30 @@
    ],
    "tints": [
     "6e5640"
-   ]
+   ],
+   "mat": "fur"
+  },
+  "stone_fur_cape": {
+   "name": "Karusnahkne õlakate",
+   "slot": "outer",
+   "hides": [],
+   "tints": [
+    "6e5640",
+    "8a7258"
+   ],
+   "mat": "fur"
+  },
+  "stone_fur_vest": {
+   "name": "Karusnahkne vest",
+   "slot": "torso",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "6e5640",
+    "8a7258"
+   ],
+   "mat": "fur"
   },
   "stone_fur_hood": {
    "name": "Karusnahkne kapuuts",
@@ -197,7 +557,20 @@
    "tints": [
     "6e5640"
    ],
+   "mat": "fur",
    "hides_hair": true
+  },
+  "stone_hide_kilt": {
+   "name": "Nahkne põll-seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "8f6e4b"
+   ],
+   "mat": "hide"
   },
   "stone_hide_dress": {
    "name": "Pikk nahkkleit",
@@ -210,7 +583,45 @@
    "tints": [
     "8f6e4b",
     "7a5a3a"
-   ]
+   ],
+   "mat": "hide"
+  },
+  "stone_hide_skirt": {
+   "name": "Pikk nahkseelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "8f6e4b",
+    "7a5a3a"
+   ],
+   "mat": "hide"
+  },
+  "stone_hide_top": {
+   "name": "Nahkne pluus",
+   "slot": "torso",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "8f6e4b"
+   ],
+   "mat": "hide"
+  },
+  "stone_bast_skirt": {
+   "name": "Niinest seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "b59a6a"
+   ],
+   "mat": "straw"
   },
   "stone_amber_necklace": {
    "name": "Merevaigust ja hambaripatsitega kaelakee",
@@ -218,7 +629,8 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "metal"
   },
   "bronze_wool_wrap": {
    "name": "Villane mähisrõivas",
@@ -232,7 +644,37 @@
     "d9cdb1",
     "7a5a3a",
     "9c3b2e"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "bronze_wool_tunic": {
+   "name": "Lühike villane kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a"
+   ],
+   "mat": "wool"
+  },
+  "bronze_kilt": {
+   "name": "Villane põlvseelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1"
+   ],
+   "mat": "wool"
   },
   "bronze_wool_cape": {
    "name": "Ümar villane keep",
@@ -244,7 +686,8 @@
    "tints": [
     "7a5a3a",
     "d9cdb1"
-   ]
+   ],
+   "mat": "wool"
   },
   "bronze_felt_cap": {
    "name": "Villane vildikübar",
@@ -254,6 +697,7 @@
     "2e2925",
     "7a5a3a"
    ],
+   "mat": "felt",
    "hides_hair": true
   },
   "bronze_leather_shoes": {
@@ -264,7 +708,17 @@
    ],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
+  },
+  "bronze_belt": {
+   "name": "Nahkvöö pronkspandlaga",
+   "slot": "belt",
+   "hides": [],
+   "tints": [
+    "6b4a2f"
+   ],
+   "mat": "leather"
   },
   "bronze_wool_blouse": {
    "name": "Lühikeste varrukatega villane pluus",
@@ -276,7 +730,8 @@
    "tints": [
     "7a5a3a",
     "d9cdb1"
-   ]
+   ],
+   "mat": "wool"
   },
   "bronze_cord_skirt": {
    "name": "Nööriseelik",
@@ -287,7 +742,8 @@
    "tints": [
     "d9cdb1",
     "7a5a3a"
-   ]
+   ],
+   "mat": "linen"
   },
   "bronze_long_skirt": {
    "name": "Pikk villane seelik",
@@ -299,8 +755,37 @@
    ],
    "tints": [
     "7a5a3a",
-    "d9cdb1"
-   ]
+    "d9cdb1",
+    "9c3b2e"
+   ],
+   "mat": "wool"
+  },
+  "bronze_wool_dress": {
+   "name": "Pikk villane kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins",
+    "upperarms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "d9cdb1",
+    "3f5a7a"
+   ],
+   "mat": "wool"
+  },
+  "bronze_wool_shawl": {
+   "name": "Villane õlarätt",
+   "slot": "outer",
+   "hides": [],
+   "tints": [
+    "d9cdb1",
+    "9c3b2e"
+   ],
+   "mat": "wool"
   },
   "bronze_belt_disc": {
    "name": "Pronksist vööketas",
@@ -308,7 +793,8 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "metal"
   },
   "bronze_hairnet": {
    "name": "Juuksevõrk",
@@ -316,7 +802,9 @@
    "hides": [],
    "tints": [
     "d9cdb1"
-   ]
+   ],
+   "mat": "hair",
+   "hides_hair": true
   },
   "bronze_neck_ring": {
    "name": "Pronksist kaelavõru",
@@ -324,7 +812,8 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "metal"
   },
   "iron_linen_shirt": {
    "name": "Linane särk",
@@ -336,7 +825,8 @@
    ],
    "tints": [
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "iron_wool_trousers": {
    "name": "Villased püksid",
@@ -350,7 +840,23 @@
     "7a5a3a",
     "d9cdb1",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "iron_trousers_herringbone": {
+   "name": "Kalasabakoes püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "7d7a73"
+   ],
+   "mat": "herringbone"
   },
   "iron_wool_tunic": {
    "name": "Villane kuub",
@@ -368,7 +874,24 @@
     "c8a64a",
     "4f5f3a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "iron_tunic_plaid": {
+   "name": "Ruuduline villane kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms"
+   ],
+   "tints": [
+    "9c3b2e",
+    "4f5f3a",
+    "3f5a7a",
+    "7a5a3a"
+   ],
+   "mat": "plaid"
   },
   "iron_cloak_brooch": {
    "name": "Mantel hoburaudsõlega",
@@ -381,7 +904,19 @@
     "7a5a3a",
     "3f5a7a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "iron_wool_cap": {
+   "name": "Villane müts",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "7a5a3a",
+    "7d7a73"
+   ],
+   "mat": "wool",
+   "hides_hair": true
   },
   "iron_pastlad": {
    "name": "Pastlad ja säärepaelad",
@@ -391,7 +926,8 @@
    ],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
   },
   "iron_belt_knife": {
    "name": "Vöö ja nuga",
@@ -399,7 +935,17 @@
    "hides": [],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
+  },
+  "iron_torc": {
+   "name": "Keerdkaelavõru",
+   "slot": "jewelry",
+   "hides": [],
+   "tints": [
+    "c8a64a"
+   ],
+   "mat": "metal"
   },
   "iron_linen_shift": {
    "name": "Pikk linane särk",
@@ -413,7 +959,8 @@
    ],
    "tints": [
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "iron_wool_skirt": {
    "name": "Villane vaipseelik",
@@ -427,19 +974,74 @@
     "3f5a7a",
     "7a5a3a",
     "d9cdb1"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "iron_skirt_striped": {
+   "name": "Triibuline villane seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a"
+   ],
+   "mat": "stripe"
+  },
+  "iron_skirt_plaid": {
+   "name": "Ruuduline vaipseelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "3f5a7a",
+    "4f5f3a",
+    "9c3b2e"
+   ],
+   "mat": "plaid"
+  },
+  "iron_peplos": {
+   "name": "Villane peplos-kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "3f5a7a",
+    "7a5a3a",
+    "9c3b2e"
+   ],
+   "mat": "wool"
+  },
+  "iron_apron": {
+   "name": "Linane põll",
+   "slot": "apron",
+   "hides": [],
+   "tints": [
+    "e8e1cf",
+    "d9cdb1"
+   ],
+   "mat": "linen"
   },
   "iron_soba": {
    "name": "Õlarätt (sõba)",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "3f5a7a",
     "d9cdb1"
-   ]
+   ],
+   "mat": "wool"
   },
   "iron_spiral_headband": {
    "name": "Pronksspiraalidega peapael",
@@ -447,7 +1049,8 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "metal"
   },
   "iron_breast_ornaments": {
    "name": "Kaelavõru ja rinnalehed",
@@ -455,7 +1058,8 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "metal"
   },
   "med_linen_shirt": {
    "name": "Linane särk",
@@ -467,7 +1071,8 @@
    ],
    "tints": [
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "med_wool_hose": {
    "name": "Villased sukkpüksid",
@@ -482,7 +1087,8 @@
     "9c3b2e",
     "3f5a7a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
   },
   "med_wool_cote": {
    "name": "Põlvini villane kuub",
@@ -502,7 +1108,62 @@
     "c8a64a",
     "4f5f3a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "med_short_cote": {
+   "name": "Lühike villane kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "7a5a3a",
+    "9c3b2e",
+    "3f5a7a",
+    "c8a64a",
+    "4f5f3a",
+    "7d7a73"
+   ],
+   "mat": "wool"
+  },
+  "med_long_robe": {
+   "name": "Pikk villane rüü",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "7a5a3a",
+    "7d7a73",
+    "2e2925",
+    "d9cdb1"
+   ],
+   "mat": "wool"
+  },
+  "med_surcoat": {
+   "name": "Varrukateta pealiskuub",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a"
+   ],
+   "mat": "wool"
   },
   "med_hood": {
    "name": "Kapuuts õlakattega",
@@ -516,6 +1177,7 @@
     "4f5f3a",
     "7a5a3a"
    ],
+   "mat": "wool",
    "hides_hair": true
   },
   "med_turnshoes": {
@@ -526,7 +1188,20 @@
    ],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
+  },
+  "med_boots": {
+   "name": "Nahksaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f",
+    "2e2925"
+   ],
+   "mat": "leather"
   },
   "med_belt_pouch": {
    "name": "Vöö ja kukkur",
@@ -534,7 +1209,8 @@
    "hides": [],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
   },
   "med_linen_chemise": {
    "name": "Linane alussärk",
@@ -548,7 +1224,8 @@
    ],
    "tints": [
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "med_wool_kirtle": {
    "name": "Pikk villane kleit",
@@ -569,7 +1246,43 @@
     "c8a64a",
     "4f5f3a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "med_kirtle_striped": {
+   "name": "Triibuline villane kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a"
+   ],
+   "mat": "stripe"
+  },
+  "med_sideless_gown": {
+   "name": "Varrukateta pealiskleit",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a",
+    "7a5a3a"
+   ],
+   "mat": "wool"
   },
   "med_apron": {
    "name": "Põll",
@@ -578,7 +1291,8 @@
    "tints": [
     "e8e1cf",
     "d9cdb1"
-   ]
+   ],
+   "mat": "linen"
   },
   "med_headcloth": {
    "name": "Linane peakate",
@@ -589,6 +1303,7 @@
    "tints": [
     "e8e1cf"
    ],
+   "mat": "linen",
    "hides_hair": true
   },
   "med_wool_mantle": {
@@ -602,7 +1317,8 @@
     "7a5a3a",
     "3f5a7a",
     "4f5f3a"
-   ]
+   ],
+   "mat": "wool"
   },
   "ren_shirt": {
    "name": "Krae ja kurrutatud kätistega särk",
@@ -615,7 +1331,8 @@
    "tints": [
     "f1efe8",
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "ren_doublet": {
    "name": "Vamss",
@@ -630,7 +1347,53 @@
     "7a5a3a",
     "9c3b2e",
     "4f5f3a"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "ren_doublet_brocade": {
+   "name": "Brokaatvamss",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "9c3b2e",
+    "4f5f3a",
+    "2c3448",
+    "c8a64a"
+   ],
+   "mat": "brocade"
+  },
+  "ren_jerkin": {
+   "name": "Nahkvest",
+   "slot": "outer",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "6b4a2f",
+    "7a5a3a"
+   ],
+   "mat": "leather"
+  },
+  "ren_coat": {
+   "name": "Põlvini kuub",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "2e2925",
+    "7a5a3a",
+    "4f5f3a"
+   ],
+   "mat": "wool"
   },
   "ren_breeches": {
    "name": "Pluuderpüksid",
@@ -643,7 +1406,23 @@
     "2e2925",
     "7a5a3a",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "ren_trousers": {
+   "name": "Laiad püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7a5a3a",
+    "7d7a73",
+    "d9cdb1"
+   ],
+   "mat": "wool"
   },
   "ren_stockings": {
    "name": "Villased sukad",
@@ -655,7 +1434,8 @@
     "d9cdb1",
     "7d7a73",
     "9c3b2e"
-   ]
+   ],
+   "mat": "knit"
   },
   "ren_shoes": {
    "name": "Nahkkingad",
@@ -666,7 +1446,20 @@
    "tints": [
     "6b4a2f",
     "2e2925"
-   ]
+   ],
+   "mat": "leather"
+  },
+  "ren_boots": {
+   "name": "Säärsaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "6b4a2f",
+    "2e2925"
+   ],
+   "mat": "leather"
   },
   "ren_flat_cap": {
    "name": "Barett",
@@ -675,7 +1468,9 @@
    "tints": [
     "2e2925",
     "7a5a3a"
-   ]
+   ],
+   "mat": "felt",
+   "hides_hair": true
   },
   "ren_smock": {
    "name": "Linane särk",
@@ -688,7 +1483,8 @@
    "tints": [
     "f1efe8",
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "ren_bodice_gown": {
    "name": "Liibuga kleit",
@@ -704,7 +1500,68 @@
     "4f5f3a",
     "7a5a3a",
     "3f5a7a"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "ren_gown_brocade": {
+   "name": "Brokaatkleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "4f5f3a",
+    "2c3448",
+    "c8a64a"
+   ],
+   "mat": "brocade"
+  },
+  "ren_bodice": {
+   "name": "Liivik",
+   "slot": "torso",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "2e2925",
+    "9c3b2e",
+    "4f5f3a"
+   ],
+   "mat": "wool"
+  },
+  "ren_skirt": {
+   "name": "Pikk seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "7a5a3a",
+    "3f5a7a",
+    "4f5f3a"
+   ],
+   "mat": "wool"
+  },
+  "ren_skirt_striped": {
+   "name": "Triibuline seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "3f5a7a",
+    "4f5f3a"
+   ],
+   "mat": "stripe"
   },
   "ren_apron": {
    "name": "Põll",
@@ -713,7 +1570,8 @@
    "tints": [
     "f1efe8",
     "e8e1cf"
-   ]
+   ],
+   "mat": "linen"
   },
   "ren_coif": {
    "name": "Tanu",
@@ -722,19 +1580,18 @@
    "tints": [
     "f1efe8"
    ],
+   "mat": "linen",
    "hides_hair": true
   },
   "ren_shawl": {
    "name": "Õlarätt",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "d9cdb1",
     "9c3b2e"
-   ]
+   ],
+   "mat": "wool"
   },
   "ind_cotton_shirt": {
    "name": "Puuvillane särk",
@@ -748,7 +1605,8 @@
     "f1efe8",
     "e8e1cf",
     "b8c4cc"
-   ]
+   ],
+   "mat": "linen"
   },
   "ind_trousers_braces": {
    "name": "Villased püksid traksidega",
@@ -762,7 +1620,8 @@
     "7d7a73",
     "7a5a3a",
     "2e2925"
-   ]
+   ],
+   "mat": "wool"
   },
   "ind_waistcoat": {
    "name": "Vest",
@@ -774,7 +1633,24 @@
     "2e2925",
     "7d7a73",
     "7a5a3a"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "ind_sweater": {
+   "name": "Kootud kampsun",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "8a8f7a",
+    "7d7a73",
+    "2c3448",
+    "7a5a3a"
+   ],
+   "mat": "knit"
   },
   "ind_wool_jacket": {
    "name": "Villane pintsak",
@@ -788,7 +1664,25 @@
     "7d7a73",
     "7a5a3a",
     "2c3448"
-   ]
+   ],
+   "mat": "herringbone"
+  },
+  "ind_greatcoat": {
+   "name": "Pikk mantel",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "2e2925",
+    "7d7a73",
+    "7a5a3a"
+   ],
+   "mat": "wool"
   },
   "ind_boots": {
    "name": "Säärsaapad",
@@ -799,7 +1693,8 @@
    "tints": [
     "2e2925",
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
   },
   "ind_flat_cap": {
    "name": "Nokamüts",
@@ -808,7 +1703,20 @@
    "tints": [
     "7d7a73",
     "7a5a3a"
-   ]
+   ],
+   "mat": "herringbone",
+   "hides_hair": true
+  },
+  "ind_bowler": {
+   "name": "Kõvakübar",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ],
+   "mat": "felt",
+   "hides_hair": true
   },
   "ind_blouse": {
    "name": "Pikkade varrukatega pluus",
@@ -821,8 +1729,9 @@
    "tints": [
     "f1efe8",
     "c9d3dc",
-    "d8c6b0"
-   ]
+    "b7c2cc"
+   ],
+   "mat": "linen"
   },
   "ind_long_skirt": {
    "name": "Pikk seelik",
@@ -837,7 +1746,73 @@
     "7a5a3a",
     "2e2925",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
+  },
+  "ind_skirt_striped": {
+   "name": "Triibuline rahvaseelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "9c3b2e",
+    "c8a64a",
+    "4f5f3a",
+    "3f5a7a"
+   ],
+   "mat": "stripe"
+  },
+  "ind_skirt_plaid": {
+   "name": "Ruuduline seelik",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "4f5f3a",
+    "9c3b2e",
+    "2c3448"
+   ],
+   "mat": "plaid"
+  },
+  "ind_dress": {
+   "name": "Pikk kleit",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "shins",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "2c3448",
+    "2e2925",
+    "7a5a3a",
+    "4f5f3a"
+   ],
+   "mat": "wool"
+  },
+  "ind_cardigan": {
+   "name": "Kootud jakk",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "6f7d6a",
+    "7d7a73",
+    "9c3b2e"
+   ],
+   "mat": "knit"
   },
   "ind_apron": {
    "name": "Põll",
@@ -846,7 +1821,8 @@
    "tints": [
     "f1efe8",
     "c9d3dc"
-   ]
+   ],
+   "mat": "linen"
   },
   "ind_headscarf": {
    "name": "Pearätt",
@@ -857,20 +1833,19 @@
     "3f5a7a",
     "d9cdb1"
    ],
+   "mat": "linen",
    "hides_hair": true
   },
   "ind_wool_shawl": {
    "name": "Villane suurrätt",
    "slot": "outer",
-   "hides": [
-    "torso",
-    "upperarms"
-   ],
+   "hides": [],
    "tints": [
     "7d7a73",
     "7a5a3a",
     "9c3b2e"
-   ]
+   ],
+   "mat": "plaid"
   },
   "mod_tshirt": {
    "name": "T-särk",
@@ -885,7 +1860,55 @@
     "2c3448",
     "4f5f3a",
     "9c3b2e"
-   ]
+   ],
+   "mat": "jersey"
+  },
+  "mod_shirt": {
+   "name": "Nööpidega särk",
+   "slot": "shirt",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "f1efe8",
+    "b8c4cc",
+    "9fb0c4"
+   ],
+   "mat": "linen"
+  },
+  "mod_sweater": {
+   "name": "Kootud kampsun",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "7d7a73",
+    "2c3448",
+    "4f5f3a",
+    "8c6f5a"
+   ],
+   "mat": "knit"
+  },
+  "mod_hoodie": {
+   "name": "Kapuutsiga dressipluus",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "7d7a73",
+    "2e2925",
+    "2c3448",
+    "9c3b2e"
+   ],
+   "mat": "jersey"
   },
   "mod_jeans": {
    "name": "Teksapüksid",
@@ -899,7 +1922,23 @@
     "3a4c66",
     "2c3448",
     "2e2925"
-   ]
+   ],
+   "mat": "denim"
+  },
+  "mod_chinos": {
+   "name": "Riidest püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "8a8160",
+    "6b6355",
+    "2c3448"
+   ],
+   "mat": "twill"
   },
   "mod_work_jacket": {
    "name": "Jope",
@@ -914,7 +1953,8 @@
     "2c3448",
     "2e2925",
     "4f5f3a"
-   ]
+   ],
+   "mat": "denim"
   },
   "mod_sneakers": {
    "name": "Spordijalatsid",
@@ -926,7 +1966,20 @@
     "f1efe8",
     "7d7a73",
     "2e2925"
-   ]
+   ],
+   "mat": "jersey"
+  },
+  "mod_shoes": {
+   "name": "Kingad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ],
+   "mat": "leather"
   },
   "mod_cap": {
    "name": "Nokkmüts",
@@ -936,7 +1989,9 @@
     "2c3448",
     "2e2925",
     "9c3b2e"
-   ]
+   ],
+   "mat": "twill",
+   "hides_hair": true
   },
   "mod_blouse": {
    "name": "Pluus",
@@ -950,7 +2005,8 @@
     "c9d3dc",
     "9c3b2e",
     "4f5f3a"
-   ]
+   ],
+   "mat": "jersey"
   },
   "mod_skirt": {
    "name": "Põlvepikkune seelik",
@@ -963,18 +2019,25 @@
     "2c3448",
     "2e2925",
     "7d7a73"
-   ]
+   ],
+   "mat": "wool"
   },
-  "mod_shoes": {
-   "name": "Kingad",
-   "slot": "feet",
+  "mod_dress": {
+   "name": "Põlvini kleit",
+   "slot": "torso",
    "hides": [
-    "feet"
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms"
    ],
    "tints": [
-    "2e2925",
-    "7a5a3a"
-   ]
+    "2c3448",
+    "9c3b2e",
+    "4f5f3a",
+    "2e2925"
+   ],
+   "mat": "jersey"
   },
   "work_leather_apron": {
    "name": "Nahkpõll",
@@ -982,7 +2045,8 @@
    "hides": [],
    "tints": [
     "6b4a2f"
-   ]
+   ],
+   "mat": "leather"
   },
   "work_straw_hat": {
    "name": "Õlgkübar",
@@ -990,7 +2054,9 @@
    "hides": [],
    "tints": [
     "c8a64a"
-   ]
+   ],
+   "mat": "straw",
+   "hides_hair": true
   },
   "work_oilskin_coat": {
    "name": "Õlirõivast vihmamantel",
@@ -1005,7 +2071,8 @@
    "tints": [
     "c8a64a",
     "8a8160"
-   ]
+   ],
+   "mat": "oilcloth"
   },
   "work_overall": {
    "name": "Tunked",
@@ -1019,7 +2086,8 @@
    "tints": [
     "2c3448",
     "8a8160"
-   ]
+   ],
+   "mat": "denim"
   },
   "work_hard_hat": {
    "name": "Kiiver",
@@ -1029,6 +2097,7 @@
     "e0b030",
     "f1efe8"
    ],
+   "mat": "jersey",
    "hides_hair": true
   },
   "work_hi_vis_vest": {
@@ -1040,53 +2109,491 @@
    "tints": [
     "d8e030",
     "e07030"
-   ]
+   ],
+   "mat": "jersey"
+  },
+  "mil_hide_armor": {
+   "name": "Paksust nahast rüü",
+   "slot": "armor",
+   "hides": [
+    "torso",
+    "hips"
+   ],
+   "tints": [
+    "8f6e4b"
+   ],
+   "mat": "hide"
+  },
+  "mil_team_sash": {
+   "name": "Vägede värvi vööpael",
+   "slot": "belt",
+   "hides": [],
+   "tints": [],
+   "mat": "wool",
+   "team": true
+  },
+  "mil_team_tunic": {
+   "name": "Vägede värvi kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms"
+   ],
+   "tints": [],
+   "mat": "wool",
+   "team": true
+  },
+  "mil_bronze_helmet": {
+   "name": "Pronkskiiver",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "b08a4a"
+   ],
+   "mat": "plate",
+   "hides_hair": true
+  },
+  "mil_bronze_cuirass": {
+   "name": "Pronksist rinnaturvis",
+   "slot": "cuirass",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "b08a4a"
+   ],
+   "mat": "plate"
+  },
+  "mil_leather_cuirass": {
+   "name": "Nahkrinnaturvis",
+   "slot": "cuirass",
+   "hides": [
+    "torso",
+    "hips"
+   ],
+   "tints": [
+    "6b4a2f"
+   ],
+   "mat": "leather"
+  },
+  "mil_spangenhelm": {
+   "name": "Spangenhelm",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "8e9196"
+   ],
+   "mat": "plate",
+   "hides_hair": true
+  },
+  "mil_mail_shirt": {
+   "name": "Rõngassärk",
+   "slot": "armor",
+   "hides": [
+    "torso",
+    "hips",
+    "upperarms"
+   ],
+   "tints": [
+    "8e9196"
+   ],
+   "mat": "mail"
+  },
+  "mil_mail_hauberk": {
+   "name": "Pikk rõngasrüü",
+   "slot": "armor",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "8e9196"
+   ],
+   "mat": "mail"
+  },
+  "mil_mail_coif": {
+   "name": "Rõngaskapuuts",
+   "slot": "head",
+   "hides": [
+    "neck"
+   ],
+   "tints": [
+    "8e9196"
+   ],
+   "mat": "mail",
+   "hides_hair": true
+  },
+  "mil_great_helm": {
+   "name": "Suurkiiver",
+   "slot": "head",
+   "hides": [
+    "neck"
+   ],
+   "tints": [
+    "b9bcc2"
+   ],
+   "mat": "plate",
+   "hides_hair": true
+  },
+  "mil_kettle_hat": {
+   "name": "Rauast kübarkiiver",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "8e9196"
+   ],
+   "mat": "plate",
+   "hides_hair": true
+  },
+  "mil_team_surcoat": {
+   "name": "Vapikuub",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs"
+   ],
+   "tints": [],
+   "mat": "wool",
+   "team": true
+  },
+  "mil_gambeson": {
+   "name": "Vatitikkimisega kuub",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "d9cdb1",
+    "b9a888"
+   ],
+   "mat": "quilted"
+  },
+  "mil_plate_cuirass": {
+   "name": "Plaatrinnaturvis",
+   "slot": "cuirass",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "b9bcc2"
+   ],
+   "mat": "plate"
+  },
+  "mil_plate_legs": {
+   "name": "Jalasoomus",
+   "slot": "socks",
+   "hides": [
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "b9bcc2"
+   ],
+   "mat": "plate"
+  },
+  "mil_plate_arms": {
+   "name": "Käesoomus",
+   "slot": "armarm",
+   "hides": [
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [
+    "b9bcc2"
+   ],
+   "mat": "plate"
+  },
+  "mil_morion": {
+   "name": "Morion-kiiver",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "b9bcc2"
+   ],
+   "mat": "plate",
+   "hides_hair": true
+  },
+  "mil_felt_hat": {
+   "name": "Laia äärega viltkübar",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2e2925",
+    "7a5a3a"
+   ],
+   "mat": "felt",
+   "hides_hair": true
+  },
+  "mil_team_doublet": {
+   "name": "Vägede värvi vamss",
+   "slot": "torso",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [],
+   "mat": "wool",
+   "team": true
+  },
+  "mil_team_coat": {
+   "name": "Vormikuub",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "hips",
+    "thighs",
+    "upperarms",
+    "forearms"
+   ],
+   "tints": [],
+   "mat": "wool",
+   "team": true
+  },
+  "mil_white_trousers": {
+   "name": "Valged vormipüksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "f1efe8",
+    "d9d4c4"
+   ],
+   "mat": "twill"
+  },
+  "mil_shako": {
+   "name": "Šako",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "2e2925"
+   ],
+   "mat": "felt",
+   "hides_hair": true
+  },
+  "mil_kepi": {
+   "name": "Vormimüts",
+   "slot": "head",
+   "hides": [],
+   "tints": [],
+   "mat": "felt",
+   "hides_hair": true,
+   "team": true
+  },
+  "mil_crossbelts": {
+   "name": "Ristirihmad",
+   "slot": "belt",
+   "hides": [],
+   "tints": [
+    "f1efe8"
+   ],
+   "mat": "leather"
+  },
+  "mil_army_boots": {
+   "name": "Sõjaväesaapad",
+   "slot": "feet",
+   "hides": [
+    "feet"
+   ],
+   "tints": [
+    "2e2925"
+   ],
+   "mat": "leather"
+  },
+  "mil_camo_jacket": {
+   "name": "Laigulise mustriga välivormi jope",
+   "slot": "outer",
+   "hides": [
+    "torso",
+    "upperarms",
+    "forearms",
+    "hips"
+   ],
+   "tints": [
+    "ffffff"
+   ],
+   "mat": "camo"
+  },
+  "mil_camo_trousers": {
+   "name": "Laigulise mustriga välivormi püksid",
+   "slot": "legs",
+   "hides": [
+    "hips",
+    "thighs",
+    "shins"
+   ],
+   "tints": [
+    "ffffff"
+   ],
+   "mat": "camo"
+  },
+  "mil_combat_helmet": {
+   "name": "Lahingukiiver",
+   "slot": "head",
+   "hides": [],
+   "tints": [
+    "5b5d3b"
+   ],
+   "mat": "jersey",
+   "hides_hair": true
+  },
+  "mil_plate_carrier": {
+   "name": "Kuulivest",
+   "slot": "cuirass",
+   "hides": [
+    "torso"
+   ],
+   "tints": [
+    "5b5d3b",
+    "6e6a4e"
+   ],
+   "mat": "twill"
+  },
+  "mil_team_armband": {
+   "name": "Vägede värvi käepael",
+   "slot": "jewelry",
+   "hides": [],
+   "tints": [],
+   "mat": "wool",
+   "team": true
   }
  },
  "eras": [
   {
    "id": "stone",
    "name": "Kiviaeg",
-   "man": {
-    "base": [
-     "stone_hide_loincloth",
-     "stone_hide_tunic",
-     "stone_hide_leggings",
-     "stone_moccasins"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [],
-      [
-       "stone_fur_cloak"
-      ]
-     ],
-     "jewelry": [
-      [],
-      [
-       "stone_amber_necklace"
-      ]
+   "man": [
+    {
+     "name": "Nahkriided",
+     "items": [
+      "stone_hide_loincloth",
+      "stone_hide_tunic",
+      "stone_hide_leggings",
+      "stone_moccasins"
+     ]
+    },
+    {
+     "name": "Talveriided",
+     "items": [
+      "stone_hide_loincloth",
+      "stone_hide_tunic",
+      "stone_hide_leggings",
+      "stone_moccasins",
+      "stone_fur_cloak"
+     ]
+    },
+    {
+     "name": "Karusnahkne vest",
+     "items": [
+      "stone_hide_loincloth",
+      "stone_fur_vest",
+      "stone_hide_leggings",
+      "stone_moccasins",
+      "stone_amber_necklace"
+     ]
+    },
+    {
+     "name": "Säärsaabastega",
+     "items": [
+      "stone_hide_loincloth",
+      "stone_hide_tunic",
+      "stone_hide_leggings",
+      "stone_fur_boots",
+      "stone_fur_cape"
+     ]
+    },
+    {
+     "name": "Suveriided",
+     "items": [
+      "stone_hide_loincloth",
+      "stone_hide_kilt",
+      "stone_fur_cape",
+      "stone_moccasins"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "stone_hide_dress",
-     "stone_hide_leggings",
-     "stone_moccasins",
-     "stone_amber_necklace"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [],
-      [
-       "stone_fur_cloak"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Nahkkleit",
+     "items": [
+      "stone_hide_dress",
+      "stone_hide_leggings",
+      "stone_moccasins",
+      "stone_amber_necklace"
+     ]
+    },
+    {
+     "name": "Talvekleit",
+     "items": [
+      "stone_hide_dress",
+      "stone_hide_leggings",
+      "stone_moccasins",
+      "stone_fur_cloak"
+     ]
+    },
+    {
+     "name": "Seelik ja vest",
+     "items": [
+      "stone_hide_skirt",
+      "stone_fur_vest",
+      "stone_moccasins",
+      "stone_amber_necklace"
+     ]
+    },
+    {
+     "name": "Karusnahaga",
+     "items": [
+      "stone_hide_dress",
+      "stone_fur_boots",
+      "stone_fur_cape"
+     ]
+    },
+    {
+     "name": "Niinseelik",
+     "items": [
+      "stone_bast_skirt",
+      "stone_hide_top",
+      "stone_hide_leggings",
+      "stone_moccasins",
+      "stone_amber_necklace"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_shaggy",
+     "mh_long",
+     "mh_messy",
+     "mh_short_messy",
+     "mh_short03"
+    ],
+    "woman": [
+     "mh_long",
+     "mh_shaggy",
+     "mh_braid",
+     "mh_curly_long",
+     "mh_braid_french"
+    ]
    },
+   "beards": [
+    "mh_beard_long",
+    "mh_beard_long",
+    "",
+    "mh_beard_goatee",
+    ""
+   ],
    "jobs": {
     "hunter": {
      "all": [
@@ -1116,55 +2623,123 @@
   {
    "id": "bronze",
    "name": "Pronksiaeg",
-   "man": {
-    "base": [
-     "bronze_wool_wrap",
-     "bronze_leather_shoes"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [
-       "bronze_wool_cape"
-      ]
-     ],
-     "head": [
-      [],
-      [
-       "bronze_felt_cap"
-      ]
+   "man": [
+    {
+     "name": "Mähisrõivas",
+     "items": [
+      "bronze_wool_wrap",
+      "bronze_wool_cape",
+      "bronze_felt_cap",
+      "bronze_leather_shoes"
+     ]
+    },
+    {
+     "name": "Lühike kuub",
+     "items": [
+      "bronze_wool_tunic",
+      "bronze_belt",
+      "bronze_leather_shoes"
+     ]
+    },
+    {
+     "name": "Mähis ja kaelavõru",
+     "items": [
+      "bronze_wool_wrap",
+      "bronze_leather_shoes",
+      "bronze_neck_ring"
+     ]
+    },
+    {
+     "name": "Põlvseelik ja keep",
+     "items": [
+      "bronze_kilt",
+      "bronze_wool_cape",
+      "bronze_belt",
+      "bronze_leather_shoes"
+     ]
+    },
+    {
+     "name": "Kuub ja keep",
+     "items": [
+      "bronze_wool_tunic",
+      "bronze_wool_cape",
+      "bronze_felt_cap",
+      "bronze_leather_shoes"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "bronze_wool_blouse",
-     "bronze_belt_disc",
-     "bronze_leather_shoes"
-    ],
-    "options": {
-     "legs": [
-      [
-       "bronze_cord_skirt"
-      ],
-      [
-       "bronze_long_skirt"
-      ]
-     ],
-     "head": [
-      [],
-      [
-       "bronze_hairnet"
-      ]
-     ],
-     "jewelry": [
-      [],
-      [
-       "bronze_neck_ring"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Nööriseelik",
+     "items": [
+      "bronze_wool_blouse",
+      "bronze_cord_skirt",
+      "bronze_belt_disc",
+      "bronze_leather_shoes",
+      "bronze_neck_ring"
+     ]
+    },
+    {
+     "name": "Pikk seelik",
+     "items": [
+      "bronze_wool_blouse",
+      "bronze_long_skirt",
+      "bronze_belt_disc",
+      "bronze_leather_shoes"
+     ]
+    },
+    {
+     "name": "Õlarätiga",
+     "items": [
+      "bronze_wool_blouse",
+      "bronze_long_skirt",
+      "bronze_wool_shawl",
+      "bronze_leather_shoes",
+      "bronze_hairnet"
+     ]
+    },
+    {
+     "name": "Villane kleit",
+     "items": [
+      "bronze_wool_dress",
+      "bronze_belt_disc",
+      "bronze_wool_cape",
+      "bronze_leather_shoes"
+     ]
+    },
+    {
+     "name": "Nööriseelik ja keep",
+     "items": [
+      "bronze_wool_blouse",
+      "bronze_cord_skirt",
+      "bronze_wool_cape",
+      "bronze_leather_shoes"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_long",
+     "mh_short_messy",
+     "mh_messy",
+     "mh_short03",
+     "mh_ponytail"
+    ],
+    "woman": [
+     "mh_braid",
+     "mh_braid_french",
+     "mh_long",
+     "mh_bun_messy",
+     "mh_bun_braid"
+    ]
    },
+   "beards": [
+    "mh_beard_long",
+    "mh_beard_goatee",
+    "mh_moustache",
+    "",
+    ""
+   ],
    "jobs": {
     "bronze_foundry": {
      "all": [
@@ -1206,45 +2781,131 @@
   {
    "id": "iron",
    "name": "Rauaaeg",
-   "man": {
-    "base": [
-     "iron_linen_shirt",
-     "iron_wool_trousers",
-     "iron_wool_tunic",
-     "iron_pastlad",
-     "iron_belt_knife"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [
-       "iron_cloak_brooch"
-      ]
+   "man": [
+    {
+     "name": "Kuub ja püksid",
+     "items": [
+      "iron_linen_shirt",
+      "iron_wool_trousers",
+      "iron_wool_tunic",
+      "iron_pastlad",
+      "iron_belt_knife"
+     ]
+    },
+    {
+     "name": "Mantliga",
+     "items": [
+      "iron_linen_shirt",
+      "iron_wool_trousers",
+      "iron_wool_tunic",
+      "iron_pastlad",
+      "iron_belt_knife",
+      "iron_cloak_brooch"
+     ]
+    },
+    {
+     "name": "Ruuduline kuub",
+     "items": [
+      "iron_linen_shirt",
+      "iron_trousers_herringbone",
+      "iron_tunic_plaid",
+      "iron_pastlad",
+      "iron_belt_knife"
+     ]
+    },
+    {
+     "name": "Viikingi riided",
+     "items": [
+      "mhc_viking_tunic",
+      "mhc_viking_pants",
+      "mhc_viking_boots",
+      "iron_cloak_brooch"
+     ]
+    },
+    {
+     "name": "Pidulik",
+     "items": [
+      "iron_linen_shirt",
+      "iron_trousers_herringbone",
+      "iron_wool_tunic",
+      "iron_pastlad",
+      "iron_belt_knife",
+      "iron_torc"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "iron_linen_shift",
-     "iron_wool_skirt",
-     "iron_pastlad",
-     "iron_breast_ornaments"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [
-       "iron_soba"
-      ]
-     ],
-     "head": [
-      [
-       "iron_spiral_headband"
-      ],
-      []
+   ],
+   "woman": [
+    {
+     "name": "Vaipseelik",
+     "items": [
+      "iron_linen_shift",
+      "iron_wool_skirt",
+      "iron_pastlad",
+      "iron_breast_ornaments"
+     ]
+    },
+    {
+     "name": "Sõbaga",
+     "items": [
+      "iron_linen_shift",
+      "iron_wool_skirt",
+      "iron_soba",
+      "iron_pastlad",
+      "iron_breast_ornaments"
+     ]
+    },
+    {
+     "name": "Peplos",
+     "items": [
+      "iron_linen_shift",
+      "iron_peplos",
+      "iron_pastlad",
+      "iron_breast_ornaments"
+     ]
+    },
+    {
+     "name": "Triibuline seelik",
+     "items": [
+      "iron_linen_shift",
+      "iron_skirt_striped",
+      "iron_soba",
+      "iron_pastlad"
+     ]
+    },
+    {
+     "name": "Ruuduline seelik ja põll",
+     "items": [
+      "iron_linen_shift",
+      "iron_skirt_plaid",
+      "iron_apron",
+      "iron_pastlad",
+      "iron_spiral_headband"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_viking",
+     "mh_long",
+     "mh_short03",
+     "mh_messy",
+     "mh_ponytail"
+    ],
+    "woman": [
+     "mh_braid",
+     "mh_braid_french",
+     "mh_bun_braid",
+     "mh_long",
+     "mh_bun_messy"
+    ]
    },
+   "beards": [
+    "mh_beard_long",
+    "",
+    "mh_moustache",
+    "",
+    "mh_beard_goatee"
+   ],
    "jobs": {
     "smith": {
      "all": [
@@ -1289,50 +2950,131 @@
   {
    "id": "medieval",
    "name": "Keskaeg",
-   "man": {
-    "base": [
-     "med_linen_shirt",
-     "med_wool_hose",
-     "med_wool_cote",
-     "med_turnshoes",
-     "med_belt_pouch"
-    ],
-    "options": {
-     "head": [
-      [],
-      [
-       "med_hood"
-      ]
+   "man": [
+    {
+     "name": "Põlvini kuub",
+     "items": [
+      "med_linen_shirt",
+      "med_wool_hose",
+      "med_wool_cote",
+      "med_turnshoes",
+      "med_belt_pouch"
+     ]
+    },
+    {
+     "name": "Kapuutsiga",
+     "items": [
+      "med_linen_shirt",
+      "med_wool_hose",
+      "med_wool_cote",
+      "med_turnshoes",
+      "med_belt_pouch",
+      "med_hood"
+     ]
+    },
+    {
+     "name": "Pealiskuub",
+     "items": [
+      "med_linen_shirt",
+      "med_wool_hose",
+      "med_wool_cote",
+      "med_surcoat",
+      "med_turnshoes"
+     ]
+    },
+    {
+     "name": "Lühike kuub ja saapad",
+     "items": [
+      "med_linen_shirt",
+      "med_wool_hose",
+      "med_short_cote",
+      "med_wool_mantle",
+      "mhc_viking_boots",
+      "med_belt_pouch"
+     ]
+    },
+    {
+     "name": "Pikk rüü",
+     "items": [
+      "med_linen_shirt",
+      "med_long_robe",
+      "med_belt_pouch",
+      "med_turnshoes"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "med_linen_chemise",
-     "med_wool_kirtle",
-     "med_turnshoes"
-    ],
-    "options": {
-     "head": [
-      [
-       "med_headcloth"
-      ],
-      []
-     ],
-     "apron": [
-      [
-       "med_apron"
-      ],
-      []
-     ],
-     "outer": [
-      [],
-      [
-       "med_wool_mantle"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Villane kleit",
+     "items": [
+      "med_linen_chemise",
+      "med_wool_kirtle",
+      "med_turnshoes"
+     ]
+    },
+    {
+     "name": "Põll ja peakate",
+     "items": [
+      "med_linen_chemise",
+      "med_wool_kirtle",
+      "med_apron",
+      "med_headcloth",
+      "med_turnshoes"
+     ]
+    },
+    {
+     "name": "Pealiskleit",
+     "items": [
+      "med_linen_chemise",
+      "med_wool_kirtle",
+      "med_sideless_gown",
+      "med_turnshoes"
+     ]
+    },
+    {
+     "name": "Mantliga",
+     "items": [
+      "med_linen_chemise",
+      "med_wool_kirtle",
+      "med_wool_mantle",
+      "med_headcloth",
+      "med_turnshoes"
+     ]
+    },
+    {
+     "name": "Triibuline kleit",
+     "items": [
+      "med_linen_chemise",
+      "med_kirtle_striped",
+      "med_apron",
+      "med_turnshoes"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_bob_page",
+     "mh_short03",
+     "mh_short01",
+     "mh_messy",
+     "mh_bob_curled"
+    ],
+    "woman": [
+     "mh_braid",
+     "mh_bun_braid",
+     "mh_bun_messy",
+     "mh_braid_french",
+     "mh_long"
+    ]
    },
+   "beards": [
+    "",
+    "",
+    "mh_beard_goatee",
+    "mh_beard_long",
+    "",
+    ""
+   ],
    "jobs": {
     "farm": {
      "all": [
@@ -1376,50 +3118,134 @@
   {
    "id": "renaissance",
    "name": "Renessanss",
-   "man": {
-    "base": [
-     "ren_shirt",
-     "ren_doublet",
-     "ren_breeches",
-     "ren_stockings",
-     "ren_shoes"
-    ],
-    "options": {
-     "head": [
-      [],
-      [
-       "ren_flat_cap"
-      ]
+   "man": [
+    {
+     "name": "Vamss ja barett",
+     "items": [
+      "ren_shirt",
+      "ren_doublet",
+      "ren_breeches",
+      "ren_stockings",
+      "ren_shoes",
+      "ren_flat_cap"
+     ]
+    },
+    {
+     "name": "Brokaatvamss",
+     "items": [
+      "ren_shirt",
+      "ren_doublet_brocade",
+      "ren_breeches",
+      "ren_stockings",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Nahkvest",
+     "items": [
+      "ren_shirt",
+      "ren_doublet",
+      "ren_jerkin",
+      "ren_breeches",
+      "ren_stockings",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Pikk kuub",
+     "items": [
+      "ren_shirt",
+      "ren_doublet",
+      "ren_coat",
+      "ren_breeches",
+      "ren_stockings",
+      "ren_shoes",
+      "ren_flat_cap"
+     ]
+    },
+    {
+     "name": "Tööriided",
+     "items": [
+      "ren_shirt",
+      "ren_jerkin",
+      "ren_trousers",
+      "ren_boots"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "ren_smock",
-     "ren_bodice_gown",
-     "ren_shoes"
-    ],
-    "options": {
-     "head": [
-      [
-       "ren_coif"
-      ],
-      []
-     ],
-     "apron": [
-      [
-       "ren_apron"
-      ],
-      []
-     ],
-     "outer": [
-      [],
-      [
-       "ren_shawl"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Liibuga kleit ja tanu",
+     "items": [
+      "ren_smock",
+      "ren_bodice_gown",
+      "ren_apron",
+      "ren_coif",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Brokaatkleit",
+     "items": [
+      "ren_smock",
+      "ren_gown_brocade",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Triibuline seelik",
+     "items": [
+      "ren_smock",
+      "ren_bodice",
+      "ren_skirt_striped",
+      "ren_apron",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Õlarätiga",
+     "items": [
+      "ren_smock",
+      "ren_bodice_gown",
+      "ren_shawl",
+      "ren_coif",
+      "ren_shoes"
+     ]
+    },
+    {
+     "name": "Liivik ja seelik",
+     "items": [
+      "ren_smock",
+      "ren_bodice",
+      "ren_skirt",
+      "ren_shawl",
+      "ren_shoes"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_bob_curled",
+     "mh_bob_page",
+     "mh_short01",
+     "mh_short04",
+     "mh_short03"
+    ],
+    "woman": [
+     "mh_bun_braid",
+     "mh_bun_messy",
+     "mh_braid",
+     "mh_long",
+     "mh_bob_curled"
+    ]
    },
+   "beards": [
+    "mh_beard_goatee",
+    "",
+    "mh_moustache",
+    "",
+    "mh_beard_long"
+   ],
    "jobs": {
     "farm": {
      "all": [
@@ -1465,60 +3291,129 @@
   {
    "id": "industrial",
    "name": "Tööstusajastu",
-   "man": {
-    "base": [
-     "ind_cotton_shirt",
-     "ind_trousers_braces",
-     "ind_boots"
-    ],
-    "options": {
-     "torso": [
-      [
-       "ind_waistcoat"
-      ],
-      []
-     ],
-     "outer": [
-      [],
-      [
-       "ind_wool_jacket"
-      ]
-     ],
-     "head": [
-      [
-       "ind_flat_cap"
-      ],
-      []
+   "man": [
+    {
+     "name": "Traksidega",
+     "items": [
+      "ind_cotton_shirt",
+      "ind_trousers_braces",
+      "ind_boots",
+      "ind_flat_cap"
+     ]
+    },
+    {
+     "name": "Vest, pintsak ja kaabu",
+     "items": [
+      "ind_cotton_shirt",
+      "ind_waistcoat",
+      "ind_trousers_braces",
+      "ind_wool_jacket",
+      "mhc_shoes_black",
+      "mhc_fedora"
+     ]
+    },
+    {
+     "name": "Kampsun",
+     "items": [
+      "ind_cotton_shirt",
+      "ind_sweater",
+      "ind_trousers_braces",
+      "ind_boots",
+      "ind_flat_cap"
+     ]
+    },
+    {
+     "name": "Mantel ja kõvakübar",
+     "items": [
+      "ind_cotton_shirt",
+      "ind_waistcoat",
+      "ind_greatcoat",
+      "ind_trousers_braces",
+      "mhc_shoes_black",
+      "ind_bowler"
+     ]
+    },
+    {
+     "name": "Tööpõll",
+     "items": [
+      "ind_cotton_shirt",
+      "ind_trousers_braces",
+      "work_leather_apron",
+      "mhc_boots_black"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "ind_blouse",
-     "ind_long_skirt",
-     "ind_boots"
-    ],
-    "options": {
-     "head": [
-      [
-       "ind_headscarf"
-      ],
-      []
-     ],
-     "apron": [
-      [
-       "ind_apron"
-      ],
-      []
-     ],
-     "outer": [
-      [],
-      [
-       "ind_wool_shawl"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Pearätt ja põll",
+     "items": [
+      "ind_blouse",
+      "ind_long_skirt",
+      "ind_apron",
+      "ind_headscarf",
+      "ind_boots"
+     ]
+    },
+    {
+     "name": "Triibuline rahvaseelik",
+     "items": [
+      "ind_blouse",
+      "ind_skirt_striped",
+      "ind_apron",
+      "ind_headscarf",
+      "ind_boots"
+     ]
+    },
+    {
+     "name": "Suurrätiga",
+     "items": [
+      "ind_blouse",
+      "ind_long_skirt",
+      "ind_wool_shawl",
+      "ind_boots"
+     ]
+    },
+    {
+     "name": "Pikk kleit",
+     "items": [
+      "ind_dress",
+      "ind_apron",
+      "mhc_boots_black"
+     ]
+    },
+    {
+     "name": "Ruuduline seelik ja jakk",
+     "items": [
+      "ind_blouse",
+      "ind_skirt_plaid",
+      "ind_cardigan",
+      "ind_boots"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_short01",
+     "mh_short02",
+     "mh_short04",
+     "mh_messy",
+     "mh_short03"
+    ],
+    "woman": [
+     "mh_bun_messy",
+     "mh_bun_braid",
+     "mh_ponytail",
+     "mh_braid",
+     "mh_braid_french"
+    ]
    },
+   "beards": [
+    "mh_moustache",
+    "mh_beard_long",
+    "",
+    "mh_moustache",
+    ""
+   ],
    "jobs": {
     "fisher": {
      "all": [
@@ -1563,56 +3458,111 @@
   {
    "id": "modern",
    "name": "Moodne ajastu",
-   "man": {
-    "base": [
-     "mod_tshirt",
-     "mod_jeans",
-     "mod_sneakers"
-    ],
-    "options": {
-     "outer": [
-      [],
-      [
-       "mod_work_jacket"
-      ]
-     ],
-     "head": [
-      [],
-      [
-       "mod_cap"
-      ]
+   "man": [
+    {
+     "name": "Teksasärk ja teksased",
+     "items": [
+      "mhc_shirt_jeans",
+      "mhc_shoes_brown"
+     ]
+    },
+    {
+     "name": "Jope ja teksased",
+     "items": [
+      "mhc_jacket_jeans",
+      "mhc_boots_black"
+     ]
+    },
+    {
+     "name": "Triibuline särk",
+     "items": [
+      "mhc_striped_jeans",
+      "mhc_sneakers_white"
+     ]
+    },
+    {
+     "name": "Ülikond",
+     "items": [
+      "mhc_suit",
+      "mhc_shoes_black"
+     ]
+    },
+    {
+     "name": "Dressipluus",
+     "items": [
+      "mod_tshirt",
+      "mod_hoodie",
+      "mod_jeans",
+      "mhc_sneakers_blue",
+      "mod_cap"
      ]
     }
-   },
-   "woman": {
-    "base": [
-     "mod_shoes"
-    ],
-    "options": {
-     "shirt": [
-      [
-       "mod_tshirt"
-      ],
-      [
-       "mod_blouse"
-      ]
-     ],
-     "legs": [
-      [
-       "mod_jeans"
-      ],
-      [
-       "mod_skirt"
-      ]
-     ],
-     "outer": [
-      [],
-      [
-       "mod_work_jacket"
-      ]
+   ],
+   "woman": [
+    {
+     "name": "Pluus ja seelik",
+     "items": [
+      "mhc_blouse_skirt",
+      "mhc_shoes_black"
+     ]
+    },
+    {
+     "name": "T-särk ja seelik",
+     "items": [
+      "mod_tshirt",
+      "mod_skirt",
+      "mhc_sneakers_white"
+     ]
+    },
+    {
+     "name": "Kampsun",
+     "items": [
+      "mod_sweater",
+      "mod_jeans",
+      "mhc_shoes_brown"
+     ]
+    },
+    {
+     "name": "Kleit",
+     "items": [
+      "mod_dress",
+      "mhc_shoes_black"
+     ]
+    },
+    {
+     "name": "Jopega",
+     "items": [
+      "mod_tshirt",
+      "mod_jeans",
+      "mod_work_jacket",
+      "mhc_sneakers_blue"
      ]
     }
+   ],
+   "hair": {
+    "man": [
+     "mh_short02",
+     "mh_short04",
+     "mh_short_messy",
+     "mh_short01",
+     "mh_messy"
+    ],
+    "woman": [
+     "mh_bob01",
+     "mh_bob_blunt_bangs",
+     "mh_ponytail",
+     "mh_pixie",
+     "mh_long_bangs"
+    ]
    },
+   "beards": [
+    "",
+    "",
+    "mh_moustache",
+    "mh_beard_goatee",
+    "",
+    ""
+   ],
    "jobs": {
     "builder": {
      "all": [
@@ -1658,5 +3608,401 @@
     ]
    }
   }
- ]
+ ],
+ "units": {
+  "scout": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "stone_hide_tunic",
+    "stone_hide_leggings",
+    "stone_moccasins",
+    "stone_fur_hood",
+    "mil_team_sash"
+   ]
+  },
+  "militia": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "stone_hide_tunic",
+    "stone_hide_leggings",
+    "stone_moccasins",
+    "mil_team_sash"
+   ]
+  },
+  "stone_guard": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "mil_hide_armor",
+    "stone_hide_leggings",
+    "stone_fur_boots",
+    "mil_team_sash"
+   ]
+  },
+  "slinger": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "stone_hide_tunic",
+    "stone_hide_leggings",
+    "stone_moccasins",
+    "mil_team_sash"
+   ]
+  },
+  "spearman": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "stone_fur_vest",
+    "stone_hide_leggings",
+    "stone_moccasins",
+    "stone_fur_cape",
+    "mil_team_sash"
+   ]
+  },
+  "axeman": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "mil_hide_armor",
+    "stone_hide_leggings",
+    "stone_fur_boots",
+    "mil_team_sash"
+   ]
+  },
+  "archer": {
+   "era": 0,
+   "items": [
+    "stone_hide_loincloth",
+    "stone_hide_tunic",
+    "stone_hide_leggings",
+    "stone_moccasins",
+    "mil_team_sash"
+   ]
+  },
+  "bronze_spearman": {
+   "era": 1,
+   "items": [
+    "mil_team_tunic",
+    "mil_bronze_cuirass",
+    "bronze_kilt",
+    "bronze_leather_shoes",
+    "mil_bronze_helmet"
+   ]
+  },
+  "bronze_axeman": {
+   "era": 1,
+   "items": [
+    "mil_team_tunic",
+    "mil_leather_cuirass",
+    "bronze_leather_shoes",
+    "mil_bronze_helmet"
+   ]
+  },
+  "bronze_archer": {
+   "era": 1,
+   "items": [
+    "mil_team_tunic",
+    "bronze_leather_shoes",
+    "bronze_belt",
+    "bronze_felt_cap"
+   ]
+  },
+  "chariot": {
+   "era": 1,
+   "items": [
+    "mil_team_tunic",
+    "mil_bronze_cuirass",
+    "bronze_leather_shoes",
+    "mil_bronze_helmet"
+   ]
+  },
+  "bronze_cavalry": {
+   "era": 2,
+   "items": [
+    "mil_team_tunic",
+    "mil_leather_cuirass",
+    "iron_wool_trousers",
+    "iron_pastlad",
+    "mil_bronze_helmet"
+   ]
+  },
+  "infantry": {
+   "era": 2,
+   "items": [
+    "mhc_viking_tunic",
+    "mhc_viking_pants",
+    "mhc_viking_boots",
+    "mil_spangenhelm",
+    "mil_team_sash"
+   ]
+  },
+  "cavalry": {
+   "era": 2,
+   "items": [
+    "iron_linen_shirt",
+    "mil_team_tunic",
+    "mil_mail_shirt",
+    "iron_wool_trousers",
+    "iron_pastlad",
+    "mil_spangenhelm",
+    "iron_cloak_brooch"
+   ]
+  },
+  "iron_archer": {
+   "era": 2,
+   "items": [
+    "iron_linen_shirt",
+    "mil_team_tunic",
+    "iron_wool_trousers",
+    "iron_pastlad",
+    "iron_belt_knife",
+    "iron_wool_cap"
+   ]
+  },
+  "javelinman": {
+   "era": 2,
+   "items": [
+    "iron_linen_shirt",
+    "mil_team_tunic",
+    "iron_wool_trousers",
+    "iron_pastlad",
+    "mil_leather_cuirass"
+   ]
+  },
+  "battering_ram": {
+   "era": 2,
+   "items": [
+    "iron_linen_shirt",
+    "mil_team_tunic",
+    "iron_wool_trousers",
+    "iron_pastlad"
+   ]
+  },
+  "siege_tower": {
+   "era": 2,
+   "items": [
+    "iron_linen_shirt",
+    "mil_team_tunic",
+    "iron_wool_trousers",
+    "iron_pastlad"
+   ]
+  },
+  "knight": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "mil_mail_hauberk",
+    "mil_team_surcoat",
+    "mil_plate_legs",
+    "med_boots",
+    "mil_great_helm"
+   ]
+  },
+  "heavy_cavalry": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "mil_mail_hauberk",
+    "mil_plate_cuirass",
+    "mil_team_surcoat",
+    "mil_plate_legs",
+    "med_boots",
+    "mil_great_helm"
+   ]
+  },
+  "man_at_arms": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "mil_gambeson",
+    "mil_mail_shirt",
+    "mil_team_surcoat",
+    "med_wool_hose",
+    "med_boots",
+    "mil_kettle_hat"
+   ]
+  },
+  "halberdier": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "mil_gambeson",
+    "mil_team_surcoat",
+    "med_wool_hose",
+    "med_boots",
+    "mil_kettle_hat"
+   ]
+  },
+  "crossbowman": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "mil_gambeson",
+    "mil_team_surcoat",
+    "med_wool_hose",
+    "med_boots",
+    "mil_kettle_hat"
+   ]
+  },
+  "catapult": {
+   "era": 3,
+   "items": [
+    "med_linen_shirt",
+    "med_short_cote",
+    "mil_team_sash",
+    "med_wool_hose",
+    "med_boots"
+   ]
+  },
+  "pikeman": {
+   "era": 4,
+   "items": [
+    "ren_shirt",
+    "mil_team_doublet",
+    "mil_plate_cuirass",
+    "ren_breeches",
+    "ren_stockings",
+    "ren_shoes",
+    "mil_morion"
+   ]
+  },
+  "musketeer": {
+   "era": 4,
+   "items": [
+    "ren_shirt",
+    "mil_team_doublet",
+    "ren_breeches",
+    "ren_stockings",
+    "ren_boots",
+    "mil_felt_hat",
+    "mil_crossbelts"
+   ]
+  },
+  "arquebusier": {
+   "era": 4,
+   "items": [
+    "ren_shirt",
+    "mil_team_doublet",
+    "ren_breeches",
+    "ren_stockings",
+    "ren_shoes",
+    "mil_morion"
+   ]
+  },
+  "cuirassier": {
+   "era": 4,
+   "items": [
+    "ren_shirt",
+    "mil_team_doublet",
+    "mil_plate_cuirass",
+    "mil_plate_arms",
+    "ren_breeches",
+    "ren_boots",
+    "mil_morion"
+   ]
+  },
+  "field_cannon": {
+   "era": 4,
+   "items": [
+    "ren_shirt",
+    "mil_team_doublet",
+    "ren_breeches",
+    "ren_stockings",
+    "ren_shoes",
+    "mil_felt_hat"
+   ]
+  },
+  "rifleman": {
+   "era": 5,
+   "items": [
+    "ind_cotton_shirt",
+    "mil_team_coat",
+    "mil_white_trousers",
+    "mil_army_boots",
+    "mil_shako",
+    "mil_crossbelts"
+   ]
+  },
+  "line_infantry": {
+   "era": 5,
+   "items": [
+    "ind_cotton_shirt",
+    "mil_team_coat",
+    "mil_white_trousers",
+    "mil_army_boots",
+    "mil_shako",
+    "mil_crossbelts"
+   ]
+  },
+  "dragoon": {
+   "era": 5,
+   "items": [
+    "ind_cotton_shirt",
+    "mil_team_coat",
+    "mil_white_trousers",
+    "mil_army_boots",
+    "mil_kepi"
+   ]
+  },
+  "industrial_artillery": {
+   "era": 5,
+   "items": [
+    "ind_cotton_shirt",
+    "mil_team_coat",
+    "ind_trousers_braces",
+    "mil_army_boots",
+    "mil_kepi"
+   ]
+  },
+  "modern_infantry": {
+   "era": 6,
+   "items": [
+    "mod_tshirt",
+    "mil_camo_jacket",
+    "mil_camo_trousers",
+    "mil_army_boots",
+    "mil_combat_helmet",
+    "mil_plate_carrier",
+    "mil_team_armband"
+   ]
+  },
+  "machinegun_team": {
+   "era": 6,
+   "items": [
+    "mod_tshirt",
+    "mil_camo_jacket",
+    "mil_camo_trousers",
+    "mil_army_boots",
+    "mil_combat_helmet",
+    "mil_plate_carrier",
+    "mil_team_armband"
+   ]
+  },
+  "rocket_team": {
+   "era": 6,
+   "items": [
+    "mod_tshirt",
+    "mil_camo_jacket",
+    "mil_camo_trousers",
+    "mil_army_boots",
+    "mil_combat_helmet",
+    "mil_plate_carrier",
+    "mil_team_armband"
+   ]
+  },
+  "motorized": {
+   "era": 6,
+   "items": [
+    "mod_tshirt",
+    "mil_camo_jacket",
+    "mil_camo_trousers",
+    "mil_army_boots",
+    "mil_combat_helmet",
+    "mil_team_armband"
+   ]
+  }
+ }
 }

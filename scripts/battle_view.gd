@@ -15,6 +15,8 @@ const SiegeVisual=preload("res://scripts/siege_visual.gd")
 const Formations=preload("res://scripts/battle_formations.gd")
 const Field=preload("res://scripts/battlefield.gd")
 const DATA=preload("res://data/economy.json")
+const Humans=preload("res://scripts/human_factory.gd")
+const WARRIOR_FILES={"spearman":"spearman_v262","axeman":"axeman_v262","slinger":"slinger_v262","stone_guard":"axeman_v262"}
 const HUMAN=preload("res://assets/people/human_far.glb")
 const WARRIORS={"spearman":preload("res://assets/people/spearman_v262.glb"),"axeman":preload("res://assets/people/axeman_v262.glb"),"slinger":preload("res://assets/people/slinger_v262.glb"),"stone_guard":preload("res://assets/people/axeman_v262.glb")}
 const TEAM_COLORS=[Color("eed36f"),Color("e98669"),Color("ad91e3"),Color("e9b74f")]
@@ -206,7 +208,8 @@ func soldier_scene(kind: String,team: int) -> Dictionary:
  var key:=kind+":"+str(team)
  if soldier_scenes.has(key):return soldier_scenes[key]
  if WARRIORS.has(kind):
-  soldier_scenes[key]={"scene":WARRIORS[kind],"scale":1.66,"animated":false};return soldier_scenes[key]
+  var split_warrior: String="res://assets/soldiers/split/%s.glb" % WARRIOR_FILES[kind]
+  soldier_scenes[key]={"scene":load(split_warrior) if ResourceLoader.exists(split_warrior) else WARRIORS[kind],"scale":1.66,"animated":false};return soldier_scenes[key]
  if kind!="scout":
   var machine: String="res://assets/soldiers/%s_team%d.glb" % [kind,clampi(team,0,3)]
   if ResourceLoader.exists(machine):
@@ -215,6 +218,8 @@ func soldier_scene(kind: String,team: int) -> Dictionary:
   if not ResourceLoader.exists(path):
    var visual: String=DATA.data.troops.get(kind,{}).get("visual","")
    if not visual.is_empty():path="res://assets/soldiers/"+visual+".glb"
+  var split: String=path.replace("res://assets/soldiers/","res://assets/soldiers/split/")
+  if ResourceLoader.exists(split):path=split
   if ResourceLoader.exists(path):
    soldier_scenes[key]={"scene":load(path),"scale":1.0,"animated":true};return soldier_scenes[key]
  soldier_scenes[key]={"scene":HUMAN,"scale":1.66,"animated":false};return soldier_scenes[key]
@@ -230,12 +235,16 @@ func animate_model(key: String,man: Dictionary,unit: Dictionary) -> void:
   var attacking: bool=float(battle.elapsed)-float(man.get("attackTime",-100))<0.6
   var name: String="attack_sword" if attacking and man.get("weapon")=="sword" and player.has_animation("attack_sword") else "attack" if attacking and player.has_animation("attack") else "walk" if man.get("moving",false) and player.has_animation("walk") else "idle"
   if not player.has_animation(name):return
+  models[key].set_meta("soldier_anim",name)
   if animation_state.get(key)!=name:
    animation_state[key]=name
    var animation:=player.get_animation(name)
    if name in ["walk","idle"]:animation.loop_mode=Animation.LOOP_LINEAR
    player.play(name,0.12)
- else:motions[key].apply(models[key],float(battle.elapsed),man.get("moving",false),"train" if float(battle.elapsed)-float(man.get("attackTime",-100))<0.4 else "")
+ else:
+  var training: bool=float(battle.elapsed)-float(man.get("attackTime",-100))<0.4
+  models[key].set_meta("soldier_anim","attack" if training else "walk" if man.get("moving",false) else "idle")
+  motions[key].apply(models[key],float(battle.elapsed),man.get("moving",false),"train" if training else "")
  var dog=models[key].get_node_or_null("ScoutDog")
  if dog!=null:dog.pose(float(battle.elapsed),man.get("moving",false))
 
@@ -326,7 +335,8 @@ func sync_models() -> void:
     if unit.kind=="scout":
      var dog:=Dog.new();dog.name="ScoutDog"
      dog.position=Vector3(0.55,0,-0.15)/float(model_info.scale);dog.scale=Vector3.ONE/float(model_info.scale);model.add_child(dog)
-    if not model_info.animated:add_faction_strip(model,int(unit.team))
+    var dressed:=Humans.dress_soldier(model,str(unit.kind),int(unit.team),Humans.stable_hash(key),float(model_info.scale))
+    if not model_info.animated and not dressed:add_faction_strip(model,int(unit.team))
     var player:=animation_player(model)
     if player!=null and model_info.animated:animations[key]=player
     else:
@@ -429,10 +439,19 @@ func refresh_ui() -> void:
 func _process(delta: float) -> void:
  if battle.is_empty():return
  if not outer_tiles_pending.is_empty():load_outer_tile()
- animation_clock-=delta;sync_models();sync_siege_models();sync_ballistas();sync_projectiles()
+ animation_clock-=delta;sync_models();sync_siege_models();sync_ballistas();sync_projectiles();follow_soldiers(0.0 if host.simulation_paused or host.paused or host.menu_open else delta)
  if animation_clock<=0:animation_clock=0.08
  ui_clock+=delta
  if ui_clock>=0.3:ui_clock=0;refresh_ui()
+
+## Uued inimesed järgivad lähedal olevate sõdurite animatsioone (kaugemal on vana mudel).
+func follow_soldiers(dt:=0.0) -> void:
+ var camera: Camera3D=host.camera if host!=null and "camera" in host else get_viewport().get_camera_3d()
+ if camera==null:return
+ var eye:=camera.global_position;var limit:=Humans.SOLDIER_DETAIL_DISTANCE+4.0
+ for key in models:
+  var model: Node3D=models[key]
+  if Humans.is_dressed_soldier(model) and model.visible and model.global_position.distance_to(eye)<limit:Humans.follow_soldier(model,dt)
 
 func handle_click(screen: Vector2,order: bool) -> void:
  if battle.get("result")!=null:return

@@ -72,7 +72,7 @@ def fabric(kind, size=512, seed=3):
         p = 4 if kind == "linen" else 8
         h, over = weave(size, p, False, seed)
         thread = np.where(over, fnoise(size, 2.0, seed + 5, aniso=(0.05, 1)), fnoise(size, 2.0, seed + 6, aniso=(1, 0.05)))
-        alb = 0.86 + 0.07 * (h - 0.75) + 0.06 * (thread - 0.5) - 0.05 * (low - 0.5) + 0.03 * (fine - 0.5)
+        alb = 0.86 + 0.07 * (h - 0.75) + 0.06 * (thread - 0.5) - 0.025 * (low - 0.5) + 0.03 * (fine - 0.5)
         if kind == "straw":
             alb = 0.8 + 0.18 * (h - 0.6) + 0.1 * (thread - 0.5)
         rough = 0.9 - 0.08 * (h - 0.7)
@@ -84,7 +84,7 @@ def fabric(kind, size=512, seed=3):
         if kind == "denim":
             alb = np.where(over, 0.74, 0.97) + 0.05 * (fnoise(size, 2.0, seed + 8, aniso=(0.05, 1)) - 0.5) - 0.08 * (low - 0.5)
         else:
-            alb = 0.88 + 0.06 * (h - 0.6) - 0.07 * (low - 0.5) + 0.05 * (fuzz - 0.5)
+            alb = 0.88 + 0.06 * (h - 0.6) - 0.035 * (low - 0.5) + 0.05 * (fuzz - 0.5)
         rough = np.full_like(h, 0.97 if kind == "wool" else 0.85)
         return gray(alb), normal_from_height(h, 1.6 if kind == "wool" else 2.4), orm(rough)
     if kind == "jersey":
@@ -103,15 +103,131 @@ def fabric(kind, size=512, seed=3):
         alb = 0.8 + 0.12 * (low - 0.5) * (2 if kind == "hide" else 1) + 0.05 * grain - 0.12 * crease
         rough = (0.72 if kind != "oilcloth" else 0.45) + 0.12 * (low - 0.5) + 0.1 * crease
         return gray(alb), normal_from_height(h, 3.0), orm(rough)
-    if kind in ("fur", "hair"):
-        strands = fnoise(size, 1.2, seed + 30, aniso=(0.04 if kind == "hair" else 0.12, 1.0))
+    if kind == "fur":
+        strands = fnoise(size, 1.2, seed + 30, aniso=(0.12, 1.0))
         wave = fnoise(size, 3.0, seed + 31)
-        sx = np.roll(strands, 0, 1)
         h = strands
-        alb = (0.55 + 0.45 * strands) if kind == "fur" else (0.62 + 0.38 * strands)
-        alb = alb - 0.08 * (wave - 0.5)
-        rough = np.full_like(h, 0.95 if kind == "fur" else 0.55)
-        return gray(alb), normal_from_height(h, 5.0 if kind == "fur" else 3.0), orm(rough)
+        alb = 0.55 + 0.45 * strands - 0.08 * (wave - 0.5)
+        return gray(alb), normal_from_height(h, 5.0), orm(np.full_like(h, 0.95))
+    if kind == "hair":
+        fine = fnoise(size, 1.0, seed + 30, aniso=(0.03, 1.0))
+        clump = fnoise(size, 2.2, seed + 32, aniso=(0.08, 1.0))
+        wave = fnoise(size, 3.2, seed + 31)
+        h = 0.55 * fine + 0.45 * clump
+        alb = 0.58 + 0.30 * fine + 0.18 * (clump - 0.5) - 0.06 * (wave - 0.5)
+        rough = 0.5 + 0.12 * (1 - fine)
+        return gray(alb), normal_from_height(h, 4.0), orm(rough)
+    if kind == "hairlock":
+        # juuksesalgud: v = 0 juur, v = 1 ots; otsad teravnevad ja on läbipaistvad (alfa)
+        yy, xx = np.mgrid[0:size, 0:size] / size
+        rng = np.random.default_rng(seed + 40)
+        locks = 16
+        wid = rng.uniform(0.6, 1.5, locks); edges = np.r_[0, np.cumsum(wid)] / wid.sum()
+        xs = (xx + 0.012 * np.sin(2 * np.pi * yy * 1.3) + 0.006 * np.sin(2 * np.pi * (yy * 3.1 + xx * 2))) % 1.0
+        li = np.clip(np.searchsorted(edges, xs, side="right") - 1, 0, locks - 1)
+        xl = (xs - edges[li]) / (edges[li + 1] - edges[li]) * 2 - 1                   # -1..1 salgu sees
+        ends = rng.uniform(0.70, 0.95, locks); taper = rng.uniform(0.08, 0.22, locks)
+        fine = fnoise(size, 1.0, seed + 41, aniso=(0.03, 1.0))
+        clump = fnoise(size, 2.0, seed + 42, aniso=(0.08, 1.0))
+        wisp = (fnoise(size, 1.0, seed + 43, aniso=(0.02, 1.0)) - 0.5) * 0.10        # üksikud juuksekarvad otsas
+        tip = ends[li] - taper[li] * np.abs(xl) ** 1.4 + wisp
+        alpha = (yy < tip) & (yy < 0.985)
+        prof = np.sqrt(np.clip(1 - xl * xl, 0, 1))                                  # salgu ümarus
+        h = 0.25 * prof + 0.5 * fine + 0.25 * clump
+        alb = 0.52 + 0.30 * fine + 0.14 * (clump - 0.5) + 0.06 * prof - 0.08 * np.clip(yy - 0.6, 0, 1)
+        rough = 0.48 + 0.14 * (1 - fine)
+        g = (np.clip(alb, 0, 1) * 255).astype(np.uint8)
+        rgba = Image.fromarray(np.stack([g, g, g, (alpha * 255).astype(np.uint8)], -1), "RGBA")
+        return rgba, normal_from_height(h, 4.0), orm(rough)
+    if kind == "braid":
+        yy, xx = np.mgrid[0:size, 0:size] / size
+        phase = yy * 8 + np.where(xx < 0.5, 0.0, 0.5) + np.abs(xx - 0.5) * 1.2
+        lobe = np.sin(np.pi * (phase % 1.0)) ** 0.6
+        fine = fnoise(size, 1.0, seed + 33, aniso=(0.15, 1.0))
+        h = 0.7 * lobe + 0.3 * fine
+        alb = 0.55 + 0.35 * lobe + 0.12 * (fine - 0.5)
+        return gray(alb), normal_from_height(h, 5.0), orm(0.5 + 0.1 * (1 - lobe))
+    if kind in ("twill", "herringbone"):
+        yy, xx = np.mgrid[0:size, 0:size]; p = 4; i, j = xx // p, yy // p
+        if kind == "herringbone":
+            band = 6
+            d = np.where((i // band) % 2 == 0, 1, -1)
+            over = ((i + d * j) % 4) < 2
+        else:
+            over = ((i - j) % 4) < 2
+        fx, fy = (xx % p + 0.5) / p, (yy % p + 0.5) / p
+        h = np.where(over, np.sin(np.pi * fx) ** 0.7, np.sin(np.pi * fy) ** 0.7) * 0.6 + 0.4 * fnoise(size, 0.9, seed + 7) * (kind == "herringbone")
+        alb = 0.88 + 0.05 * np.where(over, 1, -1) * (kind == "herringbone") - 0.06 * (low - 0.5) + 0.03 * (fine - 0.5)
+        return gray(alb), normal_from_height(h, 2.2), orm(np.full_like(h, 0.9))
+    if kind in ("plaid", "stripe"):
+        h, over = weave(size, 4, True, seed)
+        rng = np.random.default_rng(seed + 50)
+        def bands(n):
+            widths = rng.choice([8, 16, 24, 48, 64], n); widths = (widths * size / widths.sum()).astype(int)
+            widths[-1] += size - widths.sum()
+            levels = rng.choice([0.55, 0.7, 0.85, 1.0], n)
+            return np.repeat(levels, widths)[:size]
+        warp = bands(9)
+        if kind == "plaid":
+            weft = warp.copy()
+            alb = np.where(over, warp[None, :], weft[:, None])
+            alb = (alb + np.sqrt(warp[None, :] * weft[:, None])) / 2
+        else:
+            alb = np.repeat(warp[None, :], size, 0)
+        alb = alb * (0.92 + 0.08 * h) - 0.05 * (low - 0.5)
+        return gray(alb), normal_from_height(h, 1.8), orm(np.full_like(h, 0.92))
+    if kind == "brocade":
+        yy, xx = np.mgrid[0:size, 0:size] / size * 2 * np.pi * 4
+        motif = np.sin(xx) * np.sin(yy) + 0.5 * np.sin(2 * xx + np.sin(yy) * 1.5) * np.cos(2 * yy) + 0.4 * np.cos(xx + yy) * np.sin(xx - yy)
+        motif = (motif - motif.min()) / (motif.max() - motif.min())
+        m = motif > 0.55
+        h, over = weave(size, 2, False, seed)
+        alb = np.where(m, 1.0, 0.72) * (0.94 + 0.06 * h) - 0.03 * (low - 0.5)
+        rough = np.where(m, 0.45, 0.85)
+        return gray(alb), normal_from_height(h * 0.5 + m * 0.5, 2.0), orm(rough)
+    if kind == "knit":
+        yy, xx = np.mgrid[0:size, 0:size]; p = 8
+        u = (xx % p + 0.5) / p; v = (yy % p + 0.5) / p
+        d1 = np.abs(u - 0.5 * (1 - v)); d2 = np.abs(u - (1 - 0.5 * (1 - v)))
+        h = np.exp(-(np.minimum(d1, d2) / 0.2) ** 2) + 0.3 * fnoise(size, 0.8, seed + 8)
+        alb = 0.84 + 0.12 * (h - 0.5) - 0.05 * (low - 0.5)
+        return gray(alb), normal_from_height(h, 3.0), orm(np.full_like(h, 0.97))
+    if kind == "felt":
+        fuzz = fnoise(size, 0.7, seed + 9); h = 0.5 * fuzz + 0.5 * mid
+        alb = 0.86 + 0.08 * (fuzz - 0.5) - 0.06 * (low - 0.5)
+        return gray(alb), normal_from_height(h, 1.2), orm(np.full_like(h, 0.98))
+    if kind == "quilted":
+        yy, xx = np.mgrid[0:size, 0:size] / size; s = 1 / 10
+        a = ((xx + yy) / s) % 1.0; b = ((xx - yy) / s) % 1.0
+        puff = np.sin(np.pi * a) * np.sin(np.pi * b)
+        h0, _ = weave(size, 4, False, seed)
+        h = 0.8 * puff ** 0.5 + 0.2 * h0
+        alb = 0.82 + 0.14 * puff ** 0.5 - 0.05 * (low - 0.5)
+        return gray(alb), normal_from_height(h, 6.0), orm(np.full_like(h, 0.92))
+    if kind == "mail":
+        yy, xx = np.mgrid[0:size, 0:size].astype(float); p = 16
+        row = (yy // (p / 2)); xo = xx + (row % 2) * p / 2
+        cx = (np.floor(xo / p) + 0.5) * p - (row % 2) * p / 2; cy = (row + 0.5) * p / 2
+        d = np.hypot(xx - cx, (yy - cy) * 1.4)
+        ring = np.exp(-((d - p * 0.36) / (p * 0.11)) ** 2)
+        h = ring
+        alb = 0.35 + 0.6 * ring - 0.08 * (low - 0.5)
+        rough = 0.35 + 0.4 * (1 - ring)
+        return gray(alb), normal_from_height(h, 4.0), orm(rough, 0.95 * ring + 0.3)
+    if kind == "plate":
+        brushed = fnoise(size, 0.8, seed + 60, aniso=(1.0, 0.05))
+        dent = fnoise(size, 3.0, seed + 61)
+        h = 0.2 * brushed + 0.8 * dent
+        alb = 0.88 + 0.06 * (brushed - 0.5) - 0.08 * (low - 0.5)
+        rough = 0.22 + 0.08 * brushed + 0.1 * (low - 0.5)
+        return gray(alb), normal_from_height(h, 1.0), orm(rough, np.full_like(h, 0.95))
+    if kind == "camo":
+        a = fnoise(size, 3.4, seed + 70); b = fnoise(size, 3.4, seed + 71); c = fnoise(size, 2.8, seed + 72)
+        cols = np.array([[0.36, 0.37, 0.23], [0.24, 0.29, 0.18], [0.42, 0.35, 0.24], [0.64, 0.60, 0.46]])
+        idx = np.where(a > 0.6, 1, np.where(b > 0.62, 2, np.where(c > 0.68, 3, 0)))
+        rgb = cols[idx] * (0.92 + 0.08 * fine[..., None])
+        h, _ = weave(size, 4, False, seed)
+        return Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8)), normal_from_height(h, 1.6), orm(np.full_like(h, 0.88))
     if kind == "metal":
         f1, _ = worley(size, 160, seed + 40)
         dent = 1 - np.clip(f1 / 26.0, 0, 1) ** 2
@@ -165,7 +281,7 @@ def skin_baked(S, faces_uv, f, masks, tone, seed=1, beard=False):
     base = base * (1 - nails) + np.array([0.94, 0.82, 0.78]) * nails
     # kulmud: karvatõmbed piki kulmu
     hairs = fnoise(S, 0.5, seed + 9, aniso=(0.22, 1.0))
-    ba = np.clip(f["brow"] * (0.7 + 0.6 * hairs), 0, 1)[..., None] * 0.95
+    ba = np.clip(f["brow"] * (0.7 + 0.6 * hairs), 0, 1)[..., None] * 0.35   # päris kulmud on eraldi võrk
     base = base * (1 - ba) + np.array([0.22, 0.16, 0.11]) * ba
     if beard:
         st = np.clip(f["beard"] * (0.35 + 0.9 * fine), 0, 1)[..., None] * 0.28

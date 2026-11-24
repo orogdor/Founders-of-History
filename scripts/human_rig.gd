@@ -139,10 +139,18 @@ func apply_pose(result: Dictionary) -> void:
 		var local: Quaternion=Basis.from_euler(poses.get(name,Vector3.ZERO),EULER_ORDER_XYZ).get_rotation_quaternion()
 		var parent: String=PARENT.get(name,"")
 		delta[name]=(delta[parent]*local) if parent!="" else local
+	_apply(delta,Vector3(0,float(result.get("hip_y",REFERENCE_HIP_HEIGHT))-REFERENCE_HIP_HEIGHT,0))
+
+## Rakendab teise luustiku globaalsed luupöörded (nt sõduri animatsioon). offset: puusa nihe vana mudeli ühikutes.
+## skip: neid luid ei muudeta (nt jalad, mida liigutab samal ajal liigutusteegi klipp).
+func apply_global(delta: Dictionary,offset: Vector3,skip: Array=[]) -> void:
+	_apply(delta,offset,skip)
+
+func _apply(delta: Dictionary,hip_offset: Vector3,skip: Array=[]) -> void:
 	var target: Dictionary={}
 	var inv_space:=space.inverse()
 	for name in CANONICAL:
-		if not index.has(name):continue
+		if not index.has(name) or name in skip:continue
 		var bone: int=index[name]
 		# Puuduva luu korral (nt kael) kasuta lähima vanema liigutust.
 		var d: Quaternion=delta[name]
@@ -152,8 +160,7 @@ func apply_pose(result: Dictionary) -> void:
 		parent_global=(Quaternion(target[a])*Quaternion(between[name])) if a!="" else Quaternion(top_parent[name])
 		skeleton.set_bone_pose_rotation(bone,(parent_global.inverse()*Quaternion(target[name])).normalized())
 	var hips: int=index["hips"]
-	var offset:=(float(result.get("hip_y",REFERENCE_HIP_HEIGHT))-REFERENCE_HIP_HEIGHT)*hip_ratio/unit_scale
-	var local_offset:=hip_parent_rest.inverse()*(space*Vector3(0,offset,0))
+	var local_offset:=hip_parent_rest.inverse()*(space*(hip_offset*hip_ratio/unit_scale))
 	skeleton.set_bone_pose_position(hips,skeleton.get_bone_rest(hips).origin+local_offset)
 
 ## Tegelik luunimi vana nime järgi (nt "hand_R" -> "hand_r").
@@ -166,4 +173,22 @@ func prop_frame(canonical: String) -> Node3D:
 	if index.has(canonical):
 		var q:=(Quaternion(calibration[canonical])*Quaternion(rest_global[index[canonical]])).inverse()*space
 		frame.basis=Basis(q).scaled(Vector3.ONE/unit_scale)
+	return frame
+
+## Haare rusikas (liigutusteegi klippide jaoks): eseme +Y (vars -> pea) läheb väikese sõrme poolt pöidla poole,
+## +X sõrmede suunas; nullpunkt on rusika keskel peopesa pool. Sõrmeluudeta luustikul vana raam.
+func grip_frame(canonical: String) -> Node3D:
+	if not index.has(canonical):return prop_frame(canonical)
+	var side:="_r" if canonical.ends_with("_R") else "_l"
+	var hand: int=index[canonical]
+	var mid:=skeleton.find_bone("middle_01"+side);var ind:=skeleton.find_bone("index_01"+side);var pin:=skeleton.find_bone("pinky_01"+side)
+	if mid<0 or ind<0 or pin<0:return prop_frame(canonical)
+	var gh:=_global_rest(hand)
+	var h:=gh.origin;var f:=_global_rest(mid).origin-h;var length:=f.length();f=f.normalized()
+	var a:=_global_rest(ind).origin-_global_rest(pin).origin;a=(a-f*a.dot(f)).normalized()
+	var palm:=a.cross(f) if side=="_r" else f.cross(a)
+	var center:=h+f*length*0.85+palm*length*0.32
+	var local:=gh.affine_inverse()*Transform3D(Basis(f,a,f.cross(a)).orthonormalized(),center)
+	var frame:=Node3D.new();frame.name="GripFrame"
+	frame.transform=Transform3D(local.basis.orthonormalized().scaled(Vector3.ONE/unit_scale),local.origin)
 	return frame

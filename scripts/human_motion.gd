@@ -1,11 +1,15 @@
 class_name HumanMotion
 extends RefCounted
+## Uutel inimestel (MPFB2) mängitakse liigutusteegi klippe (scripts/human_clips.gd),
+## vanal mudelil ja sõduritel arvutatakse poos siin protseduurselt.
+const Clips=preload("res://scripts/human_clips.gd")
 const BONES := ["hips","spine","chest","neck","head","upperArm_L","forearm_L","hand_L","upperArm_R","forearm_R","hand_R","thigh_L","shin_L","foot_L","thigh_R","shin_R","foot_R"]
 var last_time: Variant=null
 var motion_move: Variant=null
 var motion_work: Variant=null
 var work_clock: Variant=null
 var phase:=0.0
+var current_clip:=""
 
 static func smooth_ease(a: float,b: float,t: float) -> float:
 	var x:=clampf((t-a)/(b-a),0,1)
@@ -157,6 +161,10 @@ static func find_skeleton(node: Node) -> Skeleton3D:
 func apply(model: Node,time: float,moving: bool,action: String="",work_rate:=1.0) -> void:
 	var skeleton:=find_skeleton(model)
 	if skeleton==null:return
+	if model.has_meta("human_player"):
+		var player: Variant=model.get_meta("human_player")
+		if is_instance_valid(player):
+			play_clip(model,player,time,moving,action,work_rate);return
 	var result:=calculate(time,moving,action,work_rate)
 	if skeleton.has_meta("human_rig"):
 		skeleton.get_meta("human_rig").apply_pose(result);return
@@ -167,3 +175,19 @@ func apply(model: Node,time: float,moving: bool,action: String="",work_rate:=1.0
 	if hips>=0:
 		var p:=skeleton.get_bone_rest(hips).origin;p.y=result.hip_y;skeleton.set_bone_pose_position(hips,p)
 
+
+## Liigutusteegi klipp: valik tegevuse järgi, sujuv üleminek, aeg mänguajast (paus peatab liigutuse).
+func play_clip(model: Node,player: AnimationPlayer,time: float,moving: bool,action: String,work_rate: float) -> void:
+	var dt:=0.0 if last_time==null else clampf(time-float(last_time),0,0.25)
+	last_time=time
+	var seed:=int(model.get_meta("human_seed",0))+int(phase*1000.0)
+	var clip:=Clips.clip_for(moving,action,seed,model.has_meta("human_child"))
+	if not player.has_animation(clip):clip="idle"
+	if clip!=current_clip:
+		var first:=current_clip==""
+		player.play(clip,0.0 if first else Clips.BLEND)
+		if first:player.seek(fposmod(phase*1.37+float(absi(seed)%97)*0.113,player.current_animation_length),true)
+		current_clip=clip
+	var speed:=1.0
+	if not moving and not action.is_empty():speed=clampf(work_rate,0.6,1.6)
+	player.advance(dt*speed)

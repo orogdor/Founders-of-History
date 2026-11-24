@@ -6,7 +6,8 @@ Süsteem asub failides `scripts/human_factory.gd` (kehad, riided, tööriistad),
 
 - Kehad: `assets/people/bodies/man.glb`, `woman.glb`, `boy.glb`, `girl.glb`
 - Riided: `assets/people/clothes/<eseme_id>/<keha>.glb`, näiteks `clothes/iron_wool_tunic/woman.glb`
-- Juuksed ja habe on samuti riided: `clothes/hair_braids/girl.glb`
+- Soengud, habemed ja peakatted on samuti riided: `clothes/mh_braid/woman.glb`, `clothes/mh_beard_long/man.glb`
+- Sõdurite relvad, kilbid ja hobused: `assets/soldiers/split/<väeliik>.glb` (vt „Sõdurid”)
 - Tööriistad: `assets/people/equipment/<nimi>.glb` (nimed on JSON-i `tools` all, nt `bronze_axe`)
 
 Kui mõne keha jaoks riidefail puudub, jäetakse see ese vahele ega peideta selle all olevat kehaosa.
@@ -37,73 +38,250 @@ Humans.equip_job(person,"farm",era)   # ajastu tööriist kätte
 Humans.set_era(person,era)            # igal kaadril; vahetab riided, kui ajastu muutus
 ```
 
-Ühendatud on detailvaate töölised, ehitajad, õpetaja, kaubakandjad, asunik, asula elanikud (üks neist on laps) ning maailmal liikuvad asunikud (mees, naine ja laps) ja kaupmehed. Sõdurid kasutavad veel oma senist mudelit.
+Ühendatud on detailvaate töölised, ehitajad, õpetaja, kaubakandjad, asunik, asula elanikud (üks neist on laps), maailmal liikuvad asunikud (mees, naine ja laps) ja kaupmehed ning lahingu ja detailvaate sõdurid.
 
 Test: `godot --headless --path . -s tests/human_outfits.gd`
 
 ## Proovivarad, tekstuurid ja näidispildid
 
-`assets/people/bodies` sisaldab MPFB2 andmetest tehtud kehasid (mees 1,80 m, naine 1,61 m, poiss 1,30 m, tüdruk 1,21 m) ja `assets/people/clothes` automaatseid proovirõivaid kõigi ajastute riietele. Mõlemad tehakse skriptiga `tools/mpfb_bodies.py` (allikad: `assets/people/ALLIKAD.md`). Proovirõivas asendub päris riidega, kui sama nimega fail üle kirjutada.
+`assets/people/bodies` sisaldab MPFB2 andmetest tehtud kehasid (mees 1,80 m, naine 1,61 m, poiss 1,30 m, tüdruk 1,21 m) ja `assets/people/clothes` automaatseid proovirõivaid kõigi ajastute riietele. Riiete ja väeliikide nimekiri tehakse skriptiga `tools/outfits.py` (`data/human_outfits.json`), kehad, rõivad ja tekstuurid skriptiga `tools/mpfb_bodies.py` (allikad ja käsud: `assets/people/ALLIKAD.md`). Proovirõivas asendub päris riidega, kui sama nimega fail üle kirjutada.
 
 Tekstuurid on kaustas `assets/people/textures` ja glb-failid viitavad neile (neid ei korrata igas failis):
 - `skin_<keha>_albedo/normal/orm.png`: küpsetatud nahk MPFB2 maskidega (huuled, silmalaud, kõrvad, küüned), põsepuna, joonistatud kulmud, mehel habemetüü, poorid normaalkaardis.
-- `<kangas>_albedo/normal/orm.png`: korduvad kangad (linane, villane, teksariie, trikoo, nahk, toornahk, õliriie, karusnahk, õled, juuksed, metall). Albedo on hall, mäng värvib riided JSON-i `tints` värvidega.
+- `<kangas>_albedo/normal/orm.png`: korduvad kangad 1024×1024 (varem 512): linane, villane, toimne, kalasaba, ruuduline, triibuline, brokaat, kudum, vilt, tepitud, teksariie, trikoo, nahk, toornahk, õliriie, karusnahk, õled, juuksed, punutud juuksed, metall, rõngasrüü, plaatrüü ja laiguline välivorm. Albedo on hall (välivormil värviline), mäng värvib riided JSON-i `tints` värvidega.
 - Riietel on tipuvärvides varjud: voldid, kaenlaalused, jalgevahe ning vanematel ajastutel äärte mustus. `HumanFactory.tint()` lülitab tipuvärvid sisse.
 - Importimisel on mipmapid ja VRAM-tihendus (ETC2/ASTC Androidile), normaalkaardid normaalkaardi režiimis.
 
 ## Animatsioonid
 
-Liigutused tulevad mängu senisest protseduursest `HumanMotion`-ist; `HumanRig` kannab need 17 luu kaudu MPFB2 luustikule (kontrollitud: luude suunad ühtivad vana mudeliga täpsusega 0,01). Kõik mängus kasutatavad liigutused töötavad: seisab, kõnnib, kannab, raiub, kaevandab, ehitab, korjab, harib, püüab kala, jahib, hiilib, kannab vett, õpib, karjatab, istub, sööb, mängib, valvab, räägib, kaevab.
+Liigutused tulevad Quaternius Universal Animation Library 1 ja 2 teegist (CC0, 49 klippi: seismine, kõnd, jooks, hiilimine, kandmine, istumine, kükitamine, rääkimine, puu raiumine, saagi korjamine, külvamine, kastmine, viskamine, söömine, tantsimine, mõõgavõitlus, kilp, tulirelv, tabamus, surm jne). `tools/retarget_ual.py` kannab need iga keha luustikule üle (`assets/people/animations/<keha>.glb`):
+
+- iga luu maailmapöörde muutus allika puhkeasendi suhtes kantakse MPFB2 luule, mille puhkeasend pööratakse enne allika omaga samaks (luu suund ja teine telg, nt peopesa põiki); sõrmed tulevad kaasa;
+- puusa nihe skaleeritakse puusa kõrguste suhtega;
+- seisuasendites tuuakse jalad lähemale ja pannakse maapinnale (allika „valmis” asend on laiade jalgadega).
+
+Mängus lisab `HumanFactory.create` igale uuele inimesele AnimationPlayeri ja `HumanMotion.apply` valib klipi tegevuse järgi (`scripts/human_clips.gd`, tabel `WORK`), teeb sujuva ülemineku ja liigutab aega mänguaja järgi (paus peatab). Sama tegevusega inimesed ei liigu ühes taktis ja seisjatel on eri seisuasendid. Tööriist on rusikas (`HumanRig.grip_frame`): vars läheb väikese sõrme poolt pöidla poole ja kirve pea kaldub löögi suunas.
+
+| Tegevus | Klipp |
+|---|---|
+| seisab | idle / idle_arms (käed rinnal) / idle_no |
+| kõnnib, kannab | walk, walk_carry; lapsed vahel jog |
+| raiub, sepistab, kaevandab | chop (TreeChopping) |
+| ehitab | fix_kneel / interact |
+| korjab, kaevab | harvest |
+| harib, külvab | plant / harvest |
+| kannab vett | water |
+| püüab kala, karjatab | hold_up (ritv või kepp ees) |
+| jahib | throw |
+| õpib, räägib | talk |
+| istub | crouch (kükitab) |
+| sööb | eat |
+| mängib | dance |
+| valvab | idle_arms |
+| hiilib | sneak / crouch |
+| harjutab (sõdur) | sword_a / sword_b / sword_c / sword_attack |
+
+Sõdurite jalad (sammud, labajalad, seisuasend) tulevad samast teegist, ülakeha ja relvad sõduri enda liigutusest, et relv jääks kätte (test: käsi relvakäest alla 0,22 m). Ratsanikel jääb senine liigutus. Seelikud on reite küljes pehmemalt, et kükitades ei paisuks.
 
 Pildid ja testid:
 - `godot --path . --resolution 1600x900 -s tests/human_showcase.gd -- <kaust>` (üldvaade majaga; lisa `lähivaade` või `nägu`)
 - `godot --path . --resolution 1600x900 -s tests/human_detail_workers.gd -- <kaust>` (detailvaate töölised, ajastu vahetus)
 - `godot --path . --resolution 1600x900 -s tests/human_animations.gd -- <kaust>` (kõik liigutused)
+- `godot --path . --resolution 1600x900 -s tests/human_hair_showcase.gd -- <kaust>` (kõik soengud ja habemed, `soengud.png`)
+- `godot --path . --resolution 1600x900 -s tests/human_outfits_showcase.gd -- <kaust>` (iga ajastu 5 mehe ja 5 naise riietust, `riietused_<ajastu>.png`)
+- `godot --path . --resolution 1600x900 -s tests/human_soldiers.gd -- <kaust>` (kõik väeliigid, käte asukoha kontroll, `sodurid.png`)
 
 Ilma graafikata (`--headless`) testid kontrollivad sama, kuid pilte ei salvesta.
 
-## Ajastute riidekomplektid
+## Riiete langemine
 
-Poiss kannab mehe ja tüdruk naise komplekti, aga ilma ehete, vöö ja põlleta. Valikud valitakse iga inimese jaoks püsivalt tema võtme järgi.
+Rõivad ei kleepu kehale: `tools/mpfb_bodies.py` (`drape`) täidab abivõrgu nõgusad kohad (rinna vahe, selja nõgusus, kõhulihaste vaod, jalgevahe) kuni 2,5 cm ulatuses ja kõik kihid tehakse sellelt samalt pinnalt, nii et kihid (särk, kuub, vöö, põll) ei lõika üksteisest läbi. Riiete servad (kaelus, varrukaotsad, alläär) silutakse piki serva, et need ei oleks sakilised. Püksisääred on lahedamad kui säärised ja sukad, saapasäärte all kitsamad. Heledatel kangastel pole suuri laike. Inimestel on veidi erinev nahatoon (`HumanFactory.tint_skin`).
+
+## Päris riided
+
+Raua-, kesk-, tööstus- ja moodsa ajastu riietes on osaliselt päris MakeHumani CC0 rõivad (`mhc_*`: viikingi kuub, püksid ja saapad; teksasärk ja teksased, jope, ülikond, töötunked, naiste pluus ja seelik; kingad, tossud, poolsaapad, kaabu). Need sobitatakse kehale mhclo-ga, peidavad all olevad kehaosad (`delete_verts` järgi) ja kannavad oma tekstuuri (värvi ei muudeta). Ülejäänud riided on endiselt genereeritud (`tools/mpfb_bodies.py`); neil on nüüd palistused (tumedam kahekordne äär ja hele volditud serv) ning seelikud langevad allapoole laiemaks.
+
+## Soengud, habemed, kulmud ja ripsmed
+
+Soengud on päris juuksekaartidega MakeHumani varad (CC0): MakeHumani süsteemi soengud, kogukonna CC0 soengupakk ja viikingi komplekt (soeng, habe, vuntsid). `tools/mh_hair.py` sobitab need iga keha külge mhclo failiga (nagu silmad), muudab tekstuuri halliks (alfa jääb, et juuksesalgud oleksid läbipaistvad) ja mäng värvib selle juuksevärviga. Habe ja soeng on sama värvi. Kehadel on ka päris kulmud ja ripsmed (eraldi võrgud keha failis); nahale maalitud kulm on nõrk alustoon. Mütsid ja kiivrid peidavad juuksed. Allikad: `assets/people/ALLIKAD.md`.
+
+## Sõdurid
+
+`HumanFactory.dress_soldier(model, kind, team, seed, scale)` paneb lahingu sõdurimudelile uue inimese, kellel on väeliigi riided (`units` JSON-is) ja tiimivärv. Iga kaader kannab `follow_soldier(model)` sõduri luustiku asendi uuele inimesele, nii et relv jääb kätte (test kontrollib, et käsi on relvakäest alla 0,22 m).
+
+- Sõdurimudelid on skriptiga `tools/split_soldiers.py` jagatud kaheks võrguks: `SoldierBody` (vana keha) ja `SoldierGear` (relvad, kilbid, hobune). Lähedal (alla 40 m) on näha uus inimene + `SoldierGear`, kaugemal vana keha (LOD), mis hoiab suure armee kiire.
+- Riietatud on 28 väeliiki 37-st. Masinamudelitega väeliigid (sõjavanker, müürilõhkuja, piiramistorn, katapult, väli- ja vintraudne suurtükk, kuulipilduja- ja tankitõrjerühm, motoriseeritud jalavägi) kasutavad veel oma senist meeskonda.
+
+## Ajastute riidekomplektid, soengud ja habemed
+
+Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemete valik (tühi kirje tähendab habemeta meest, nii et habe on ainult osal meestest). Valik tehakse inimese seemne järgi püsivalt. Poiss kannab mehe ja tüdruk naise riietust, aga ilma `drop` kohtadeta (ehted, vöö, põll jne).
 
 ### Kiviaeg
 
-- **Mees:** Nahkne niudevöö (`stone_hide_loincloth`), Nahkne kuub (`stone_hide_tunic`), Nahksäärised (`stone_hide_leggings`), Nahkkingad (mokassiinid) (`stone_moccasins`). Valikud: üleriie: ilma / Karusnahkne keep; ehe: ilma / Merevaigust ja hambaripatsitega kaelakee
-- **Naine:** Pikk nahkkleit (`stone_hide_dress`), Nahksäärised (`stone_hide_leggings`), Nahkkingad (mokassiinid) (`stone_moccasins`), Merevaigust ja hambaripatsitega kaelakee (`stone_amber_necklace`). Valikud: üleriie: ilma / Karusnahkne keep
+- **Mees:**
+  - Nahkriided: Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid)
+  - Talveriided: Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid), Karusnahkne keep
+  - Karusnahkne vest: Nahkne niudevöö, Karusnahkne vest, Nahksäärised, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
+  - Säärsaabastega: Nahkne niudevöö, Nahkne kuub, Nahksäärised, Karusnahksed säärsaapad, Karusnahkne õlakate
+  - Suveriided: Nahkne niudevöö, Nahkne põll-seelik, Karusnahkne õlakate, Nahkkingad (mokassiinid)
+- **Naine:**
+  - Nahkkleit: Pikk nahkkleit, Nahksäärised, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
+  - Talvekleit: Pikk nahkkleit, Nahksäärised, Nahkkingad (mokassiinid), Karusnahkne keep
+  - Seelik ja vest: Pikk nahkseelik, Karusnahkne vest, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
+  - Karusnahaga: Pikk nahkkleit, Karusnahksed säärsaapad, Karusnahkne õlakate
+  - Niinseelik: Niinest seelik, Nahkne pluus, Nahksäärised, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
+- **Soengud:** mees: Pikk narmendav, Pikad lahtised juuksed, Sasitud, Lühike narmendav, Lühike sasitud; naine: Pikad lahtised juuksed, Pikk narmendav, Pats, Pikad lokid, Prantsuse pats
+- **Habemed:** Pikk habe vuntsidega, Pikk lõuahabe (habe on umbes 60% meestest)
 - **Ametite lisad:** hunter: Karusnahkne kapuuts, Karusnahkne keep
 
 ### Pronksiaeg
 
-- **Mees:** Villane mähisrõivas (`bronze_wool_wrap`), Nahkkingad (`bronze_leather_shoes`). Valikud: üleriie: ilma / Ümar villane keep; peakate: ilma / Villane vildikübar
-- **Naine:** Lühikeste varrukatega villane pluus (`bronze_wool_blouse`), Pronksist vööketas (`bronze_belt_disc`), Nahkkingad (`bronze_leather_shoes`). Valikud: alakeha: Nööriseelik / Pikk villane seelik; peakate: ilma / Juuksevõrk; ehe: ilma / Pronksist kaelavõru
+- **Mees:**
+  - Mähisrõivas: Villane mähisrõivas, Ümar villane keep, Villane vildikübar, Nahkkingad
+  - Lühike kuub: Lühike villane kuub, Nahkvöö pronkspandlaga, Nahkkingad
+  - Mähis ja kaelavõru: Villane mähisrõivas, Nahkkingad, Pronksist kaelavõru
+  - Põlvseelik ja keep: Villane põlvseelik, Ümar villane keep, Nahkvöö pronkspandlaga, Nahkkingad
+  - Kuub ja keep: Lühike villane kuub, Ümar villane keep, Villane vildikübar, Nahkkingad
+- **Naine:**
+  - Nööriseelik: Lühikeste varrukatega villane pluus, Nööriseelik, Pronksist vööketas, Nahkkingad, Pronksist kaelavõru
+  - Pikk seelik: Lühikeste varrukatega villane pluus, Pikk villane seelik, Pronksist vööketas, Nahkkingad
+  - Õlarätiga: Lühikeste varrukatega villane pluus, Pikk villane seelik, Villane õlarätt, Nahkkingad, Juuksevõrk
+  - Villane kleit: Pikk villane kleit, Pronksist vööketas, Ümar villane keep, Nahkkingad
+  - Nööriseelik ja keep: Lühikeste varrukatega villane pluus, Nööriseelik, Ümar villane keep, Nahkkingad
+- **Soengud:** mees: Pikad lahtised juuksed, Lühike narmendav, Sasitud, Lühike sasitud, Hobusesaba; naine: Pats, Prantsuse pats, Pikad lahtised juuksed, Sasitud nutsu, Patsinutsu
+- **Habemed:** Pikk habe vuntsidega, Pikk lõuahabe, Vuntsid (habe on umbes 60% meestest)
 - **Ametite lisad:** bronze_foundry: Nahkpõll
 
 ### Rauaaeg
 
-- **Mees:** Linane särk (`iron_linen_shirt`), Villased püksid (`iron_wool_trousers`), Villane kuub (`iron_wool_tunic`), Pastlad ja säärepaelad (`iron_pastlad`), Vöö ja nuga (`iron_belt_knife`). Valikud: üleriie: ilma / Mantel hoburaudsõlega
-- **Naine:** Pikk linane särk (`iron_linen_shift`), Villane vaipseelik (`iron_wool_skirt`), Pastlad ja säärepaelad (`iron_pastlad`), Kaelavõru ja rinnalehed (`iron_breast_ornaments`). Valikud: üleriie: ilma / Õlarätt (sõba); peakate: Pronksspiraalidega peapael / ilma
+- **Mees:**
+  - Kuub ja püksid: Linane särk, Villased püksid, Villane kuub, Pastlad ja säärepaelad, Vöö ja nuga
+  - Mantliga: Linane särk, Villased püksid, Villane kuub, Pastlad ja säärepaelad, Vöö ja nuga, Mantel hoburaudsõlega
+  - Ruuduline kuub: Linane särk, Kalasabakoes püksid, Ruuduline villane kuub, Pastlad ja säärepaelad, Vöö ja nuga
+  - Talveriided: Linane särk, Villased püksid, Villane kuub, Pastlad ja säärepaelad, Mantel hoburaudsõlega, Villane müts
+  - Pidulik: Linane särk, Kalasabakoes püksid, Villane kuub, Pastlad ja säärepaelad, Vöö ja nuga, Keerdkaelavõru
+- **Naine:**
+  - Vaipseelik: Pikk linane särk, Villane vaipseelik, Pastlad ja säärepaelad, Kaelavõru ja rinnalehed
+  - Sõbaga: Pikk linane särk, Villane vaipseelik, Õlarätt (sõba), Pastlad ja säärepaelad, Kaelavõru ja rinnalehed
+  - Peplos: Pikk linane särk, Villane peplos-kleit, Pastlad ja säärepaelad, Kaelavõru ja rinnalehed
+  - Triibuline seelik: Pikk linane särk, Triibuline villane seelik, Õlarätt (sõba), Pastlad ja säärepaelad
+  - Ruuduline seelik ja põll: Pikk linane särk, Ruuduline vaipseelik, Linane põll, Pastlad ja säärepaelad, Pronksspiraalidega peapael
+- **Soengud:** mees: Viikingi pats, Pikad lahtised juuksed, Lühike sasitud, Sasitud, Hobusesaba; naine: Pats, Prantsuse pats, Patsinutsu, Pikad lahtised juuksed, Sasitud nutsu
+- **Habemed:** Pikk habe vuntsidega, Vuntsid, Pikk lõuahabe (habe on umbes 60% meestest)
 - **Ametite lisad:** smith: Nahkpõll; smelter: Nahkpõll
 
 ### Keskaeg
 
-- **Mees:** Linane särk (`med_linen_shirt`), Villased sukkpüksid (`med_wool_hose`), Põlvini villane kuub (`med_wool_cote`), Pöördkingad (`med_turnshoes`), Vöö ja kukkur (`med_belt_pouch`). Valikud: peakate: ilma / Kapuuts õlakattega
-- **Naine:** Linane alussärk (`med_linen_chemise`), Pikk villane kleit (`med_wool_kirtle`), Pöördkingad (`med_turnshoes`). Valikud: peakate: Linane peakate / ilma; põll: Põll / ilma; üleriie: ilma / Villane mantel
+- **Mees:**
+  - Põlvini kuub: Linane särk, Villased sukkpüksid, Põlvini villane kuub, Pöördkingad, Vöö ja kukkur
+  - Kapuutsiga: Linane särk, Villased sukkpüksid, Põlvini villane kuub, Pöördkingad, Vöö ja kukkur, Kapuuts õlakattega
+  - Pealiskuub: Linane särk, Villased sukkpüksid, Põlvini villane kuub, Varrukateta pealiskuub, Pöördkingad
+  - Lühike kuub ja saapad: Linane särk, Villased sukkpüksid, Lühike villane kuub, Villane mantel, Nahksaapad, Vöö ja kukkur
+  - Pikk rüü: Linane särk, Pikk villane rüü, Vöö ja kukkur, Pöördkingad
+- **Naine:**
+  - Villane kleit: Linane alussärk, Pikk villane kleit, Pöördkingad
+  - Põll ja peakate: Linane alussärk, Pikk villane kleit, Põll, Linane peakate, Pöördkingad
+  - Pealiskleit: Linane alussärk, Pikk villane kleit, Varrukateta pealiskleit, Pöördkingad
+  - Mantliga: Linane alussärk, Pikk villane kleit, Villane mantel, Linane peakate, Pöördkingad
+  - Triibuline kleit: Linane alussärk, Triibuline villane kleit, Põll, Pöördkingad
+- **Soengud:** mees: Potisoeng, Lühike sasitud, Lühike, Sasitud, Sissekeeratud polkpea; naine: Pats, Patsinutsu, Sasitud nutsu, Prantsuse pats, Pikad lahtised juuksed
+- **Habemed:** Pikk lõuahabe, Pikk habe vuntsidega (habe on umbes 33% meestest)
 - **Ametite lisad:** farm: Õlgkübar; smith: Nahkpõll
 
 ### Renessanss
 
-- **Mees:** Krae ja kurrutatud kätistega särk (`ren_shirt`), Vamss (`ren_doublet`), Pluuderpüksid (`ren_breeches`), Villased sukad (`ren_stockings`), Nahkkingad (`ren_shoes`). Valikud: peakate: ilma / Barett
-- **Naine:** Linane särk (`ren_smock`), Liibuga kleit (`ren_bodice_gown`), Nahkkingad (`ren_shoes`). Valikud: peakate: Tanu / ilma; põll: Põll / ilma; üleriie: ilma / Õlarätt
+- **Mees:**
+  - Vamss ja barett: Krae ja kurrutatud kätistega särk, Vamss, Pluuderpüksid, Villased sukad, Nahkkingad, Barett
+  - Brokaatvamss: Krae ja kurrutatud kätistega särk, Brokaatvamss, Pluuderpüksid, Villased sukad, Nahkkingad
+  - Nahkvest: Krae ja kurrutatud kätistega särk, Vamss, Nahkvest, Pluuderpüksid, Villased sukad, Nahkkingad
+  - Pikk kuub: Krae ja kurrutatud kätistega särk, Vamss, Põlvini kuub, Pluuderpüksid, Villased sukad, Nahkkingad, Barett
+  - Tööriided: Krae ja kurrutatud kätistega särk, Nahkvest, Laiad püksid, Säärsaapad
+- **Naine:**
+  - Liibuga kleit ja tanu: Linane särk, Liibuga kleit, Põll, Tanu, Nahkkingad
+  - Brokaatkleit: Linane särk, Brokaatkleit, Nahkkingad
+  - Triibuline seelik: Linane särk, Liivik, Triibuline seelik, Põll, Nahkkingad
+  - Õlarätiga: Linane särk, Liibuga kleit, Õlarätt, Tanu, Nahkkingad
+  - Liivik ja seelik: Linane särk, Liivik, Pikk seelik, Õlarätt, Nahkkingad
+- **Soengud:** mees: Sissekeeratud polkpea, Potisoeng, Lühike, Väga lühike, Lühike sasitud; naine: Patsinutsu, Sasitud nutsu, Pats, Pikad lahtised juuksed, Sissekeeratud polkpea
+- **Habemed:** Pikk lõuahabe, Vuntsid, Pikk habe vuntsidega (habe on umbes 60% meestest)
 - **Ametite lisad:** farm: Õlgkübar; smith: Nahkpõll; printer: Nahkpõll
 
 ### Tööstusajastu
 
-- **Mees:** Puuvillane särk (`ind_cotton_shirt`), Villased püksid traksidega (`ind_trousers_braces`), Säärsaapad (`ind_boots`). Valikud: kuub: Vest / ilma; üleriie: ilma / Villane pintsak; peakate: Nokamüts / ilma
-- **Naine:** Pikkade varrukatega pluus (`ind_blouse`), Pikk seelik (`ind_long_skirt`), Säärsaapad (`ind_boots`). Valikud: peakate: Pearätt / ilma; põll: Põll / ilma; üleriie: ilma / Villane suurrätt
+- **Mees:**
+  - Traksidega: Puuvillane särk, Villased püksid traksidega, Säärsaapad, Nokamüts
+  - Vest ja pintsak: Puuvillane särk, Vest, Villased püksid traksidega, Villane pintsak, Säärsaapad
+  - Kampsun: Puuvillane särk, Kootud kampsun, Villased püksid traksidega, Säärsaapad, Nokamüts
+  - Mantel ja kõvakübar: Puuvillane särk, Vest, Pikk mantel, Villased püksid traksidega, Säärsaapad, Kõvakübar
+  - Tööpõll: Puuvillane särk, Villased püksid traksidega, Nahkpõll, Säärsaapad
+- **Naine:**
+  - Pearätt ja põll: Pikkade varrukatega pluus, Pikk seelik, Põll, Pearätt, Säärsaapad
+  - Triibuline rahvaseelik: Pikkade varrukatega pluus, Triibuline rahvaseelik, Põll, Pearätt, Säärsaapad
+  - Suurrätiga: Pikkade varrukatega pluus, Pikk seelik, Villane suurrätt, Säärsaapad
+  - Pikk kleit: Pikk kleit, Põll, Säärsaapad
+  - Ruuduline seelik ja jakk: Pikkade varrukatega pluus, Ruuduline seelik, Kootud jakk, Säärsaapad
+- **Soengud:** mees: Lühike, Lühike siledaks kammitud, Väga lühike, Sasitud, Lühike sasitud; naine: Sasitud nutsu, Patsinutsu, Hobusesaba, Pats, Prantsuse pats
+- **Habemed:** Vuntsid, Pikk habe vuntsidega (habe on umbes 60% meestest)
 - **Ametite lisad:** fisher: Õlirõivast vihmamantel; farm: Õlgkübar; steelworks: Nahkpõll
 
 ### Moodne ajastu
 
-- **Mees:** T-särk (`mod_tshirt`), Teksapüksid (`mod_jeans`), Spordijalatsid (`mod_sneakers`). Valikud: üleriie: ilma / Jope; peakate: ilma / Nokkmüts
-- **Naine:** Kingad (`mod_shoes`). Valikud: särk: T-särk / Pluus; alakeha: Teksapüksid / Põlvepikkune seelik; üleriie: ilma / Jope
+- **Mees:**
+  - T-särk ja teksad: T-särk, Teksapüksid, Spordijalatsid
+  - Jopega: T-särk, Teksapüksid, Jope, Spordijalatsid
+  - Kampsun: Kootud kampsun, Riidest püksid, Kingad
+  - Särk ja püksid: Nööpidega särk, Riidest püksid, Kingad
+  - Dressipluus: T-särk, Kapuutsiga dressipluus, Teksapüksid, Spordijalatsid, Nokkmüts
+- **Naine:**
+  - Pluus ja teksad: Pluus, Teksapüksid, Kingad
+  - T-särk ja seelik: T-särk, Põlvepikkune seelik, Spordijalatsid
+  - Kampsun: Kootud kampsun, Teksapüksid, Kingad
+  - Kleit: Põlvini kleit, Kingad
+  - Jopega: T-särk, Teksapüksid, Jope, Spordijalatsid
+- **Soengud:** mees: Lühike siledaks kammitud, Väga lühike, Lühike narmendav, Lühike, Sasitud; naine: Polkpea, Sirge polkpea tukaga, Hobusesaba, Poisipea, Pikad juuksed tukaga
+- **Habemed:** Vuntsid, Pikk lõuahabe (habe on umbes 33% meestest)
 - **Ametite lisad:** builder: Kiiver, Helkurvest; mine: Kiiver; autofactory: Tunked; refinery: Tunked, Kiiver
+
+## Väeliikide riietus ja varustus
+
+`units` seob iga väeliigi ajastu ja esemetega. Tiimivärviga esemed (vöörätt, käeside, kuub, varrukad) värvitakse mängija värviga. Soeng ja habe tulevad selle ajastu valikust. Relvad, kilbid ja hobune jäävad sõduri senisest mudelist (`SoldierGear`).
+
+| Väeliik | Ajastu | Riietus ja varustus |
+|---|---|---|
+| Avastaja (`scout`) | Kiviaeg | Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid), Karusnahkne kapuuts, Vägede värvi vööpael |
+| Linna kaitsjad (`militia`) | Kiviaeg | Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid), Vägede värvi vööpael |
+| Tornikaitsja (`stone_guard`) | Kiviaeg | Nahkne niudevöö, Paksust nahast rüü, Nahksäärised, Karusnahksed säärsaapad, Vägede värvi vööpael |
+| Kiviviskajad (`slinger`) | Kiviaeg | Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid), Vägede värvi vööpael |
+| Puuodamehed (`spearman`) | Kiviaeg | Nahkne niudevöö, Karusnahkne vest, Nahksäärised, Nahkkingad (mokassiinid), Karusnahkne õlakate, Vägede värvi vööpael |
+| Kivikirvemehed (`axeman`) | Kiviaeg | Nahkne niudevöö, Paksust nahast rüü, Nahksäärised, Karusnahksed säärsaapad, Vägede värvi vööpael |
+| Vibukütid (`archer`) | Kiviaeg | Nahkne niudevöö, Nahkne kuub, Nahksäärised, Nahkkingad (mokassiinid), Vägede värvi vööpael |
+| Pronksodamees (`bronze_spearman`) | Pronksiaeg | Vägede värvi kuub, Pronksist rinnaturvis, Villane põlvseelik, Nahkkingad, Pronkskiiver |
+| Pronkskirvemees (`bronze_axeman`) | Pronksiaeg | Vägede värvi kuub, Nahkrinnaturvis, Nahkkingad, Pronkskiiver |
+| Pronksiaja vibukütt (`bronze_archer`) | Pronksiaeg | Vägede värvi kuub, Nahkkingad, Nahkvöö pronkspandlaga, Villane vildikübar |
+| Sõjavanker (`chariot`) | Pronksiaeg | Vägede värvi kuub, Pronksist rinnaturvis, Nahkkingad, Pronkskiiver |
+| Varajane ratsavägi (vana üksus) (`bronze_cavalry`) | Rauaaeg | Vägede värvi kuub, Nahkrinnaturvis, Villased püksid, Pastlad ja säärepaelad, Pronkskiiver |
+| Raudmõõgamehed (`infantry`) | Rauaaeg | Linane särk, Vägede värvi kuub, Rõngassärk, Villased püksid, Pastlad ja säärepaelad, Spangenhelm |
+| Ratsavägi (`cavalry`) | Rauaaeg | Linane särk, Vägede värvi kuub, Rõngassärk, Villased püksid, Pastlad ja säärepaelad, Spangenhelm, Mantel hoburaudsõlega |
+| Rauaaja vibukütt (`iron_archer`) | Rauaaeg | Linane särk, Vägede värvi kuub, Villased püksid, Pastlad ja säärepaelad, Vöö ja nuga, Villane müts |
+| Heiteodamees (`javelinman`) | Rauaaeg | Linane särk, Vägede värvi kuub, Villased püksid, Pastlad ja säärepaelad, Nahkrinnaturvis |
+| Müürilõhkuja (`battering_ram`) | Rauaaeg | Linane särk, Vägede värvi kuub, Villased püksid, Pastlad ja säärepaelad |
+| Piiramistorn (`siege_tower`) | Rauaaeg | Linane särk, Vägede värvi kuub, Villased püksid, Pastlad ja säärepaelad |
+| Rüütel (`knight`) | Keskaeg | Linane särk, Pikk rõngasrüü, Vapikuub, Jalasoomus, Nahksaapad, Suurkiiver |
+| Raskeratsavägi (`heavy_cavalry`) | Keskaeg | Linane särk, Pikk rõngasrüü, Plaatrinnaturvis, Vapikuub, Jalasoomus, Nahksaapad, Suurkiiver |
+| Soomustatud jalaväelane (`man_at_arms`) | Keskaeg | Linane särk, Vatitikkimisega kuub, Rõngassärk, Vapikuub, Villased sukkpüksid, Nahksaapad, Rauast kübarkiiver |
+| Hellebardimees (`halberdier`) | Keskaeg | Linane särk, Vatitikkimisega kuub, Vapikuub, Villased sukkpüksid, Nahksaapad, Rauast kübarkiiver |
+| Ristvibumees (`crossbowman`) | Keskaeg | Linane särk, Vatitikkimisega kuub, Vapikuub, Villased sukkpüksid, Nahksaapad, Rauast kübarkiiver |
+| Katapult (`catapult`) | Keskaeg | Linane särk, Lühike villane kuub, Vägede värvi vööpael, Villased sukkpüksid, Nahksaapad |
+| Piigimees (`pikeman`) | Renessanss | Krae ja kurrutatud kätistega särk, Vägede värvi vamss, Plaatrinnaturvis, Pluuderpüksid, Villased sukad, Nahkkingad, Morion-kiiver |
+| Musketärid (`musketeer`) | Renessanss | Krae ja kurrutatud kätistega särk, Vägede värvi vamss, Pluuderpüksid, Villased sukad, Säärsaapad, Laia äärega viltkübar, Ristirihmad |
+| Arkebuusimees (`arquebusier`) | Renessanss | Krae ja kurrutatud kätistega särk, Vägede värvi vamss, Pluuderpüksid, Villased sukad, Nahkkingad, Morion-kiiver |
+| Kürassiir (`cuirassier`) | Renessanss | Krae ja kurrutatud kätistega särk, Vägede värvi vamss, Plaatrinnaturvis, Käesoomus, Pluuderpüksid, Säärsaapad, Morion-kiiver |
+| Välisuurtükk (`field_cannon`) | Renessanss | Krae ja kurrutatud kätistega särk, Vägede värvi vamss, Pluuderpüksid, Villased sukad, Nahkkingad, Laia äärega viltkübar |
+| Püssimehed (`rifleman`) | Tööstusajastu | Puuvillane särk, Vormikuub, Valged vormipüksid, Sõjaväesaapad, Šako, Ristirihmad |
+| Rivijalavägi (`line_infantry`) | Tööstusajastu | Puuvillane särk, Vormikuub, Valged vormipüksid, Sõjaväesaapad, Šako, Ristirihmad |
+| Ratsalaskur (`dragoon`) | Tööstusajastu | Puuvillane särk, Vormikuub, Valged vormipüksid, Sõjaväesaapad, Vormimüts |
+| Vintraudne suurtükk (`industrial_artillery`) | Tööstusajastu | Puuvillane särk, Vormikuub, Villased püksid traksidega, Sõjaväesaapad, Vormimüts |
+| Moodne jalavägi (`modern_infantry`) | Moodne ajastu | T-särk, Laigulise mustriga välivormi jope, Laigulise mustriga välivormi püksid, Sõjaväesaapad, Lahingukiiver, Kuulivest, Vägede värvi käepael |
+| Kuulipildujameeskond (`machinegun_team`) | Moodne ajastu | T-särk, Laigulise mustriga välivormi jope, Laigulise mustriga välivormi püksid, Sõjaväesaapad, Lahingukiiver, Kuulivest, Vägede värvi käepael |
+| Tankitõrjerühm (`rocket_team`) | Moodne ajastu | T-särk, Laigulise mustriga välivormi jope, Laigulise mustriga välivormi püksid, Sõjaväesaapad, Lahingukiiver, Kuulivest, Vägede värvi käepael |
+| Motoriseeritud jalavägi (`motorized`) | Moodne ajastu | T-särk, Laigulise mustriga välivormi jope, Laigulise mustriga välivormi püksid, Sõjaväesaapad, Lahingukiiver, Vägede värvi käepael |
