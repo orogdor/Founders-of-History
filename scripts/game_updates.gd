@@ -20,7 +20,7 @@ var installed_revision := 0
 
 func _enter_tree() -> void:
 	# Never mount downloaded files in the editor or change a developer checkout.
-	if OS.has_feature("editor") or OS.has_feature("download_launcher"): return
+	if OS.has_feature("editor") or OS.has_feature("download_launcher") or OS.has_feature("windows_download_launcher"): return
 	var config := ConfigFile.new()
 	if config.load(META) != OK or str(config.get_value("update", "base", "")) != BASE_VERSION: return
 	var rev := int(config.get_value("update", "revision", 0))
@@ -31,8 +31,8 @@ func _enter_tree() -> void:
 	if ProjectSettings.load_resource_pack(path, true): installed_revision = rev
 
 func _ready() -> void:
-	if OS.has_feature("download_launcher"):
-		launcher = LauncherUpdates.new()
+	if OS.has_feature("download_launcher") or OS.has_feature("windows_download_launcher"):
+		launcher = load("res://scripts/windows_launcher_updates.gd").new() if OS.has_feature("windows_download_launcher") else LauncherUpdates.new()
 		launcher.status_changed.connect(announce)
 		add_child(launcher)
 		return
