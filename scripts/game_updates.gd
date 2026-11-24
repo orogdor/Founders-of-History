@@ -8,6 +8,8 @@ const ASSET_PREFIX := "https://github.com/orogdor/Founders-of-History/releases/d
 const DIR := "user://founders_updates"
 const META := DIR + "/active.cfg"
 const MAX_BYTES := 1610612736
+const LauncherUpdates = preload("res://scripts/launcher_updates.gd")
+var launcher: Node
 var request: HTTPRequest
 var downloading := false
 var busy := false
@@ -18,7 +20,7 @@ var installed_revision := 0
 
 func _enter_tree() -> void:
 	# Never mount downloaded files in the editor or change a developer checkout.
-	if OS.has_feature("editor"): return
+	if OS.has_feature("editor") or OS.has_feature("download_launcher"): return
 	var config := ConfigFile.new()
 	if config.load(META) != OK or str(config.get_value("update", "base", "")) != BASE_VERSION: return
 	var rev := int(config.get_value("update", "revision", 0))
@@ -29,6 +31,11 @@ func _enter_tree() -> void:
 	if ProjectSettings.load_resource_pack(path, true): installed_revision = rev
 
 func _ready() -> void:
+	if OS.has_feature("download_launcher"):
+		launcher = LauncherUpdates.new()
+		launcher.status_changed.connect(announce)
+		add_child(launcher)
+		return
 	request = HTTPRequest.new()
 	request.timeout = 60.0
 	request.body_size_limit = MAX_BYTES
@@ -58,6 +65,9 @@ func announce(value: String) -> void:
 	status_changed.emit(value)
 
 func check() -> void:
+	if launcher != null:
+		launcher.check()
+		return
 	if OS.has_feature("editor"):
 		announce("Uuenduste kontroll töötab eksporditud mängus.")
 		return

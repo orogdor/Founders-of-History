@@ -10,6 +10,21 @@ Mängu sisuuenduste kanal saab alla laadida versioonile 0.1.0 sobiva Windowsi v�
 
 Mängu juhised ja senine tööjärg: `ALUSTA_SIIST.txt` ja `PORT_STATUS.md`.
 
+## Androidi käivitaja
+
+`Android Launcher` ekspordiseade pakib väikese käivitaja. Paigalda see sama
+allkirjaga Androidi testirakenduse peale, et jätkata seniste salvestustega.
+Esimesel käivitamisel laeb rakendus GitHubist mängu põhipaki. Järgmistel
+käivitustel kontrollib see uuendust ja vajadusel laeb lisapaki, mis sisaldab
+põhipakiga võrreldes muutunud faile. Viimati laaditud versiooni saab mängida
+võrguühenduseta.
+
+Iga `terrain-height-maps` harusse saadetud muudatus käivitab töövoo
+`Android launcher updates`. See avaldab andmepaki ja nihutab
+`android-launcher-channel` haru manifesti uuele versioonile. Uut APK-d on vaja,
+kui muutub käivitaja ise, kaasasolev Godoti mootor või Androidi paigalduspaketi
+seadistus.
+
 ## Väljalase ja Androidi allkirjastus
 
 Püsiva allkirjaga APK ja Windowsi pakkimise ning sisuuenduse avaldamise töövoog käivitub `godot-content-*` sildi lisamisel. Enne selle kasutamist tuleb hoidla Actionsi saladustesse lisada `GODOT_ANDROID_KEYSTORE_BASE64` (keystore'i fail base64-na), `GODOT_ANDROID_KEY_ALIAS` ja `GODOT_ANDROID_KEY_PASSWORD`. Keystore'i ja võtme parool peavad Godotis olema samad. Sama võti tuleb säilitada kõigi järgnevate APK-väljalasete jaoks. Töövoog katkestab enne avaldamist, kui need saladused puuduvad; prooviversioonide ajutine võti ei sobi pärisväljalasete uuendamiseks.
