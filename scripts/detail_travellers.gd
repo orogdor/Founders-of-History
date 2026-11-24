@@ -38,7 +38,7 @@ func eligible(entity: Dictionary) -> bool:
  return within_view(float(pose.x),float(pose.z))
 
 func within_view(x: float,z: float) -> bool:
- var focus:=Vector3.ZERO
+ var focus: Vector3=host.camera_target
  if is_instance_valid(host.fpv_walker) and host.fpv_walker.active:focus=host.fpv_walker.pos
  return absf(x-focus.x)<=330 and absf(z-focus.z)<=285
 
@@ -90,9 +90,8 @@ func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dic
 func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictionary={},heading:=0.0) -> void:
  var x:=float(pose.x);var z:=float(pose.z)
  if not within_view(x,z):return
- if is_instance_valid(host.fpv_walker) and host.fpv_walker.active:
-  var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
-  if neighbors!=null and not neighbors.can_enter(neighbors.coords_at(Vector2(x,z))):return
+ var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+ if neighbors!=null and not neighbors.can_enter(neighbors.coords_at(Vector2(x,z))):return
  var y:float=host.detail_rendered_height(x,z)
  if kind=="boat" and y> -0.05:return
  if kind!="boat" and y< -0.15:return

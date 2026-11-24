@@ -81,7 +81,7 @@ func cancel_placing() -> void:
 	placing=false;hint.visible=false
 
 func place_at(x: float,z: float) -> bool:
-	if blocked(x,z):host.update_status("Tegelast ei saa vette või hoonesse asetada.");return false
+	if blocked(x,z):host.update_status("Vali vaba koht avastatud alal.");return false
 	pos=Vector3(x,ground_height(x,z),z);tile=tile_at(x,z);placed=true;cancel_placing();yaw=0.54;pitch=-0.08;host.zoom=45.0;enter();return true
 
 func enter() -> void:
@@ -108,7 +108,7 @@ func exit_walking(recenter:=true) -> void:
 	host.camera_target=Vector3(pos.x,0,pos.z);host.zoom=minf(host.zoom,70.0)
 	var shift:=tile-current_tile()
 	if recenter and shift!=Vector2i.ZERO:
-		if host.transition_detail_tile(tile,shift):pos-=Vector3(shift.x*225.0,0,shift.y*195.0)
+		if host.transition_detail_tile(tile,shift,true):shift_origin(Vector3(shift.x*225.0,0,shift.y*195.0))
 		else:placed=false;host.camera_target=Vector3.ZERO
 	sync_model();host.update_camera()
 
@@ -220,7 +220,11 @@ func pier_height(x: float,z: float) -> Variant:
 
 func ground_height(x: float,z: float) -> float:
 	var height:float=host.detail_rendered_height(x,z);var pier: Variant=pier_height(x,z)
-	return maxf(height,float(pier)) if pier!=null else height
+	if pier!=null:height=maxf(height,float(pier))
+	return maxf(height,-0.78)
+
+func shift_origin(shift: Vector3) -> void:
+	pos-=shift
 
 func tile_at(x: float,z: float) -> Vector2i:
 	return current_tile()+Vector2i(floori((x+112.5)/225.0),floori((z+97.5)/195.0))
@@ -234,7 +238,6 @@ func blocked(x: float,z: float) -> bool:
 	if not host.reveal_all and not host.game.explored[0].has(str(at.x)+":"+str(at.y)):return true
 	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
 	if at!=center and (neighbors==null or not neighbors.can_enter(at)):return true
-	if host.detail_rendered_height(x,z)<-0.25 and pier_height(x,z)==null:return true
 	var contexts:=[]
 	for parent in host.game.get("cities",[]):
 		contexts.append(parent);contexts.append_array(parent.get("districts",{}).values())
@@ -259,6 +262,7 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	dt=minf(dt,0.1)
 	if input.length()>1:input=input.normalized()
 	var speed:=1.66*(5.6 if run else 2.4)
+	if pos.y< -0.45:speed*=0.54
 	var forward:=Vector3(-sin(yaw),0,-cos(yaw));var side:=Vector3(cos(yaw),0,-sin(yaw))
 	var want:=forward*input.y*speed+side*input.x*speed
 	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
@@ -276,6 +280,9 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	if pos.y<=ground:pos.y=ground;vertical_speed=0;airborne=false
 	if moving and not airborne:bob+=dt*(13.0 if run else 8.5)
 	tile=tile_at(pos.x,pos.z)
+	var offset:=tile-current_tile()
+	if maxi(absi(offset.x),absi(offset.y))>=3 and neighbors!=null and neighbors.worker==null:
+		host.transition_detail_tile(tile,offset,true)
 	apply_camera()
 
 func update(dt: float) -> void:

@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 #include "res://scripts/surface_relief.gdshaderinc"
+#include "res://scripts/detail_map_fog.gdshaderinc"
 
 uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -19,6 +20,7 @@ uniform vec4 sand_color : source_color = vec4(0.698,0.631,0.486,1.0);
 uniform vec4 wet_sand_color : source_color = vec4(0.561,0.510,0.4,1.0);
 instance uniform vec2 detail_uv_offset = vec2(0.0);
 instance uniform bool blend_neighbours = false;
+instance uniform vec4 undiscovered_edges = vec4(0.0);
 instance uniform vec4 ground_w : source_color = vec4(0.0);
 instance uniform vec4 ground_e : source_color = vec4(0.0);
 instance uniform vec4 ground_n : source_color = vec4(0.0);
@@ -115,4 +117,13 @@ void fragment(){
   surface=mix(surface,shore,sand);
  }
  ALBEDO=surface;
+ if(dot(undiscovered_edges,vec4(1.0))>0.0){
+  float mist=detail_cloud_edge(tile_uv,shifted_uv,undiscovered_edges);
+  if(mist>0.0){
+   vec2 projection=detail_cloud_projection(shifted_uv,mat3(INV_VIEW_MATRIX)*VERTEX,CAMERA_POSITION_WORLD.y);
+   ALBEDO*=1.0-mist;
+   EMISSION=detail_cloud_color(projection)*mist;
+   SPECULAR*=1.0-mist;
+  }
+ }
 }

@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, specular_disabled;
 
 #include "res://scripts/surface_relief.gdshaderinc"
+#include "res://scripts/detail_map_fog.gdshaderinc"
 
 uniform bool overview = false;
 uniform bool surface_textures_ready = false;
@@ -13,6 +14,7 @@ uniform vec4 base_color : source_color = vec4(0.4,0.5,0.3,1.0);
 uniform float forest_factor = 0.0;
 instance uniform vec2 detail_uv_offset = vec2(0.0);
 instance uniform bool blend_neighbours = false;
+instance uniform vec4 undiscovered_edges = vec4(0.0);
 instance uniform vec4 ground_w : source_color = vec4(0.0);
 instance uniform vec4 ground_e : source_color = vec4(0.0);
 instance uniform vec4 ground_n : source_color = vec4(0.0);
@@ -108,5 +110,13 @@ void fragment() {
 	col = mix(col,vec3(0.25,0.24,0.22),rock*0.52);
 	col = mix(col,overview ? vec3(0.58,0.51,0.37) : beach,sand*(overview ? 0.72 : 0.92));
 	ALBEDO = mix(col,vec3(0.84,0.86,0.90),snow);
+	if (!overview && dot(undiscovered_edges,vec4(1.0)) > 0.0) {
+		float mist = detail_cloud_edge(tile_pos,ground_pos,undiscovered_edges);
+		if (mist > 0.0) {
+			vec2 projection = detail_cloud_projection(ground_pos,mat3(INV_VIEW_MATRIX)*VERTEX,CAMERA_POSITION_WORLD.y);
+			ALBEDO *= 1.0-mist;
+			EMISSION = detail_cloud_color(projection)*mist;
+		}
+	}
 	ROUGHNESS = 1.0;
 }

@@ -29,7 +29,8 @@ func run() -> void:
 	game.open_selected_tile()
 	var detail: Node3D=game.detail_root
 	var neighbors:=detail.get_node("NeighborTiles")
-	assert(neighbors.tiles.is_empty() and detail.get_node("DetailMapFog").visible)
+	assert(neighbors.tiles.is_empty() and neighbors.detail_fog.visible)
+	assert(detail.terrain_surface.get_instance_shader_parameter("undiscovered_edges")==Vector4.ONE)
 	assert(not neighbors.can_enter(origin+Vector2i.RIGHT))
 	await capture()
 
@@ -48,8 +49,30 @@ func run() -> void:
 	assert(game.detail_mesh_cache.keys().any(func(entry):return entry.begins_with(key(second)+":")))
 	game.dragging=false
 	game.follow_detail_camera()
-	assert(game.detail_root.tree_cell==first and is_equal_approx(game.camera_target.x,-72.0))
-	print("DETAIL_CAMERA_COVERAGE_OK mounted=5 cached=6 loaded_tiles=2")
+	assert(game.detail_root==detail and is_equal_approx(game.camera_target.x,153.0))
+	assert(detail.terrain_surface.get_instance_shader_parameter("undiscovered_edges").y==0.0)
+	var nearby: WeakRef=weakref(neighbors.tiles[first])
+	for column in range(3,10):game.game.explored[0][key(origin+Vector2i(column,0))]=true
+	game.game.visionRevision+=1
+	for column in range(2,10):
+		var at:=origin+Vector2i(column,0)
+		game.camera_target=neighbors.tile_offset(at)
+		game.update_camera()
+		for frame in 240:
+			await process_frame
+			if neighbors.can_enter(at) and absi(neighbors.anchor.x-at.x)<3:break
+		assert(neighbors.can_enter(at),"The camera could not load known tile %s" % str(at))
+		assert(game.detail_root.get_node("NeighborTiles")==neighbors)
+		assert(neighbors.coords_at(Vector2(game.camera_target.x,game.camera_target.z))==at)
+	for frame in 60:await process_frame
+	assert(not is_instance_valid(detail) and nearby.get_ref()==null)
+	assert(not game.detail_mesh_cache.keys().any(func(entry):return entry.begins_with(key(first)+":")))
+	var edge:=origin+Vector2i(9,0)
+	game.camera_target=neighbors.tile_offset(edge+Vector2i.RIGHT)
+	game.update_camera();game.follow_detail_camera()
+	assert(neighbors.coords_at(Vector2(game.camera_target.x,game.camera_target.z))==edge)
+	assert(not neighbors.can_enter(edge+Vector2i.RIGHT))
+	print("DETAIL_CAMERA_COVERAGE_OK mounted=5 cached=6 traveled=9 released_previous=true")
 	game.queue_free();launcher.queue_free();quit()
 
 func key(at: Vector2i) -> String:

@@ -70,7 +70,9 @@ static func make_material(color: Color,forest: float) -> ShaderMaterial:
 	if Mobile.active:material.set_shader_parameter("surface_textures_ready",true)
 	material.set_shader_parameter("ground_height_maps",textures["ground_height_maps"])
 	material.set_shader_parameter("forest_factor",forest);material.set_shader_parameter("base_color",color)
-	materials[key]=material;return material
+	materials[key]=material
+	if materials.size()>128:materials.erase(materials.keys()[0])
+	return material
 
 static func attach(instance: MeshInstance3D,color: Color,forest: float,tile: Vector2i) -> void:
 	instance.set_instance_shader_parameter("detail_uv_offset",Vector2(tile)*Vector2(225.0,195.0))

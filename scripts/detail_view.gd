@@ -29,6 +29,7 @@ const EconomyData=preload("res://data/economy.json")
 const EconomyRulesScript=preload("res://scripts/economy_rules.gd")
 var heights: Array = []
 var visual_heights:=PackedVector4Array()
+var terrain_surface: MeshInstance3D
 var resources: Array = []
 var world_data: Dictionary = {}
 var person: Node3D
@@ -105,6 +106,7 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 	tree_mountain=bool(cells[r*Terrain.Grid.COLS+c].get("mountain",false));tree_seed=seed
 	resources = world_data.resources
 	var instance := MeshInstance3D.new()
+	terrain_surface=instance
 	var cache_host:=get_parent()
 	if world_heights.size()==cells.size():
 		visual_heights=cache_host.detail_visual_for(c,r) if cache_host!=null and cache_host.has_method("detail_visual_for") else VisualRiver.color_heights(cells,world_heights,c,r,seed,river_graph)

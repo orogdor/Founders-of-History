@@ -268,6 +268,7 @@ var house_designer_layer: CanvasLayer
 var fpv_walker: Node
 var detail_mode := false
 var detail_inspection := false
+var retained_detail_stream: Node3D
 var world_camera_target := Vector3.ZERO
 var world_zoom := 31.1
 var detail_pick_heights: Dictionary={}
@@ -1725,6 +1726,7 @@ func detail_rendered_height(x: float,z: float) -> float:
 		return DetailTerrainScript.visual_rendered_height(surface.get_meta("heights"),surface.get_meta("visual_heights"),local.x,local.y)
 	var key:=str(tile.x)+":"+str(tile.y)
 	if not detail_pick_heights.has(key):detail_pick_heights[key]=DetailTerrainScript.tile_heights(grid,tile.x,tile.y)
+	if detail_pick_heights.size()>72:detail_pick_heights.erase(detail_pick_heights.keys()[0])
 	return DetailTerrainScript.rendered_height(detail_pick_heights[key],local.x,local.y)
 
 func clear_building_preview() -> void:
@@ -2526,16 +2528,16 @@ static func prepare_geography(world_heights: PackedFloat32Array, seed_value: int
 	return cells
 
 
-func open_selected_tile() -> void:
+func open_selected_tile(inspection_only:=false) -> void:
 	if detail_mode or selected.x<0 or selected.y<0:return
 	var key:=str(selected.x)+":"+str(selected.y)
 	if not reveal_all and not game.explored[0].has(key):update_status("Avasta ruut enne selle avamist.");return
-	if selected==player:toggle_detail();return
-	for i in game.cities.size():
-		var city: Dictionary=game.cities[i]
-		if int(city.team)==0 and int(city.c)==selected.x and int(city.r)==selected.y:
-			for option in city_select.item_count:
-				if int(city_select.get_item_metadata(option))==int(city.id):switch_city(option);toggle_detail();return
+	if not inspection_only:
+		if selected==player:toggle_detail();return
+		for city in game.cities:
+			if int(city.team)==0 and int(city.c)==selected.x and int(city.r)==selected.y:
+				for option in city_select.item_count:
+					if int(city_select.get_item_metadata(option))==int(city.id):switch_city(option);toggle_detail();return
 	world_camera_target=camera_target;world_zoom=zoom
 	detail_root=Node3D.new();detail_root.set_script(DetailView);add_child(detail_root)
 	var index:=selected.y*Grid.COLS+selected.x
@@ -2543,7 +2545,7 @@ func open_selected_tile() -> void:
 	if not game.has("tileWorlds"):game.tileWorlds={}
 	var tile_world: Dictionary={};var observed_city: Dictionary={};var observed_village: Dictionary={}
 	detail_district={}
-	if city_created and not settler_mode:
+	if not inspection_only and city_created and not settler_mode:
 		refresh_city_territory()
 		var parent:Dictionary=game.cities[active_city_index]
 		var owner:Variant=territory_allocation.get("territory",{}).get(key)
@@ -2558,8 +2560,10 @@ func open_selected_tile() -> void:
 			break
 	if not observed_city.is_empty():tile_world=observed_city.world
 	else:
-		if not game.tileWorlds.has(key):game.tileWorlds[key]=DetailWorldScript.create(grid,city_cell_data({"c":selected.x,"r":selected.y}),visual_biome(index),int(game.seed))
-		tile_world=game.tileWorlds[key]
+		tile_world=game.tileWorlds.get(key,{})
+		if tile_world.is_empty():
+			tile_world=DetailWorldScript.create(grid,city_cell_data({"c":selected.x,"r":selected.y},inspection_only),visual_biome(index),int(game.seed))
+			if not inspection_only:game.tileWorlds[key]=tile_world
 	DetailWorldScript.ensure_sea_fish(tile_world,grid[index],int(game.seed))
 	if not observed_village.is_empty():tile_world=tile_world.duplicate(true)
 	detail_root.build(grid,selected.x,selected.y,terrain_color(index),visual_biome(index),int(game.seed),forest_core,tile_world,float(heat[index]),float(moisture[index]),world_height_samples,world_river_graph)
@@ -2645,11 +2649,11 @@ func toggle_detail() -> void:
 		detail_button.text = "Tagasi maailmakaardile"
 		update_status("Detailkaart avatud.")
 	else:
-		if is_instance_valid(fpv_walker):fpv_walker.on_detail_closed()
+		if is_instance_valid(fpv_walker) and retained_detail_stream==null:fpv_walker.on_detail_closed()
 		field_drag_start=null;field_preview=null;build_placement_mode=false;wall_stroke=[];clear_wall_preview()
 		selected_building_index=-1
 		update_selected_building()
-		detail_root.queue_free()
+		detail_root.hide();detail_root.queue_free()
 		detail_root = null
 		detail_district={}
 		if selected_entity=="detail_unit":selected_entity="army" if selected_army()!=null else "city"
@@ -2759,8 +2763,13 @@ func finish_city_visuals(city: Dictionary,from_migration:=false) -> void:
 
 
 func attach_detail_neighbors(center: Vector2i) -> void:
-	var neighbors:=Node3D.new();neighbors.name="NeighborTiles";neighbors.set_script(DetailNeighbors)
-	detail_root.add_child(neighbors);neighbors.setup(self,center)
+	if retained_detail_stream!=null:
+		retained_detail_stream.recenter(center)
+		retained_detail_stream.reparent(detail_root,false)
+		retained_detail_stream=null
+	else:
+		var neighbors:=DetailNeighbors.new();neighbors.name="NeighborTiles"
+		detail_root.add_child(neighbors);neighbors.setup(self,center)
 	var roads:=Node3D.new();roads.name="DetailRoads";roads.set_script(DetailRoads);roads.host=self;roads.center=center
 	detail_root.add_child(roads)
 	var trails:=Node3D.new();trails.name="DetailTrails";trails.set_script(DetailTrails);trails.host=self;trails.center=center
@@ -2768,21 +2777,30 @@ func attach_detail_neighbors(center: Vector2i) -> void:
 
 	var travellers:=Node3D.new();travellers.name="DetailTravellers";travellers.set_script(preload("res://scripts/detail_travellers.gd"));detail_root.add_child(travellers);travellers.setup(self,center)
 
-func transition_detail_tile(next: Vector2i,delta: Vector2i) -> bool:
+func transition_detail_tile(next: Vector2i,delta: Vector2i,roaming:=false) -> bool:
 	if not detail_mode or battle_view!=null or not is_instance_valid(detail_root):return false
 	if next.x<0 or next.x>=Grid.COLS or next.y<0 or next.y>=Grid.ROWS:return false
 	if not reveal_all and not game.explored[0].has(str(next.x)+":"+str(next.y)):return false
-	var old_center: Vector2i=selected if detail_inspection else player
+	var old_center: Vector2i=detail_root.tree_cell
 	var previous_target:=camera_target;var previous_zoom:=zoom
 	var saved_world_target:=world_camera_target;var saved_world_zoom:=world_zoom
-	toggle_detail();selected=next;open_selected_tile()
+	var walking: bool=is_instance_valid(fpv_walker) and fpv_walker.active
+	var inspection_only:=walking or (roaming and next!=player)
+	retained_detail_stream=detail_root.get_node_or_null("NeighborTiles")
+	if retained_detail_stream!=null:
+		retained_detail_stream.keep_previous_center(detail_root,next)
+		retained_detail_stream.reparent(self,false)
+	toggle_detail();selected=next;open_selected_tile(inspection_only)
 	if not detail_mode:
-		selected=old_center;open_selected_tile()
+		selected=old_center;open_selected_tile(walking)
 		if detail_mode:camera_target=previous_target;zoom=previous_zoom;update_camera()
+		if retained_detail_stream!=null:retained_detail_stream.queue_free();retained_detail_stream=null
 		world_camera_target=saved_world_target;world_zoom=saved_world_zoom
 		return false
 	world_camera_target=saved_world_target;world_zoom=saved_world_zoom
-	camera_target=previous_target-Vector3(delta.x*225.0,0,delta.y*195.0)
+	var shift:=Vector3(delta.x*225.0,0,delta.y*195.0)
+	camera_target=previous_target-shift
+	if walking:fpv_walker.shift_origin(shift)
 	zoom=previous_zoom;update_camera()
 	return true
 
@@ -2793,22 +2811,22 @@ func follow_detail_camera() -> void:
 	var point:=Vector2(camera_target.x,camera_target.z)
 	var next: Vector2i=neighbors.coords_at(point)
 	if not neighbors.accessible(next):
-		var center: Vector2i=neighbors.map_center-neighbors.anchor
-		camera_target.x=clampf(camera_target.x,center.x*225.0-112.25,center.x*225.0+112.25)
-		camera_target.z=clampf(camera_target.z,center.y*195.0-97.25,center.y*195.0+97.25)
+		var last: Vector2i=neighbors.map_center if neighbors.accessible(neighbors.map_center) else neighbors.anchor
+		var center: Vector3=neighbors.tile_offset(last)
+		if neighbors.accessible(Vector2i(next.x,last.y)):
+			camera_target.z=clampf(camera_target.z,center.z-97.25,center.z+97.25)
+		elif neighbors.accessible(Vector2i(last.x,next.y)):
+			camera_target.x=clampf(camera_target.x,center.x-112.25,center.x+112.25)
+		else:
+			camera_target.x=clampf(camera_target.x,center.x-112.25,center.x+112.25)
+			camera_target.z=clampf(camera_target.z,center.z-97.25,center.z+97.25)
 		point=Vector2(camera_target.x,camera_target.z)
 		next=neighbors.coords_at(point)
 		update_camera()
 	neighbors.update_map_view(camera,point)
 	var delta: Vector2i=next-neighbors.anchor
-	if delta==Vector2i.ZERO or dragging or map_touch.pinching or not neighbors.can_enter(next):return
-	if Input.get_vector("ui_left","ui_right","ui_up","ui_down")!=Vector2.ZERO:return
-	for key in [KEY_W,KEY_A,KEY_S,KEY_D]:
-		if Input.is_key_pressed(key):return
-	if not transition_detail_tile(next,delta):
-		camera_target.x=clampf(camera_target.x,-112.25,112.25)
-		camera_target.z=clampf(camera_target.z,-97.25,97.25)
-		update_camera()
+	if maxi(absi(delta.x),absi(delta.y))>=3 and neighbors.can_enter(next) and neighbors.worker==null:
+		transition_detail_tile(next,delta,true)
 
 # Find the live view of a visible neighbouring city without changing selection.
 func visible_city_building_stamp(city: Dictionary) -> int:
@@ -3127,6 +3145,18 @@ func clear_detail_landscape_cache() -> void:
 	for item in detail_landscape_cache.values():
 		if is_instance_valid(item.root):item.root.free()
 	detail_landscape_cache.clear()
+
+func evict_detail_tile(at: Vector2i) -> void:
+	var prefix:="%d:%d" % [at.x,at.y]
+	detail_pick_heights.erase(prefix)
+	for cache in [detail_visual_cache,detail_mesh_cache,detail_ocean_cache]:
+		for key in cache.keys():
+			if key.begins_with(prefix+":"):cache.erase(key)
+	for key in detail_landscape_cache.keys():
+		if not key.begins_with(prefix+":"):continue
+		var entry: Dictionary=detail_landscape_cache[key]
+		if is_instance_valid(entry.root):entry.root.free()
+		detail_landscape_cache.erase(key)
 
 func detail_landscape_for(parent: Node3D,c: int,r: int,heights: Array,visual: PackedVector4Array) -> Array:
 	var key: String="%d:%d:%d:%d" % [c,r,int(game.get("crossingRevision",0)),int(game.get("terrainRevision",0))]
@@ -3688,10 +3718,13 @@ func is_coast(c: int,r: int) -> bool:
 		if x>=0 and x<Grid.COLS and z>=0 and z<Grid.ROWS and not grid[z*Grid.COLS+x].land:return true
 	return false
 
-func city_cell_data(city: Dictionary) -> Dictionary:
+func city_cell_data(city: Dictionary,preview:=false) -> Dictionary:
 	var c: int=city.c;var r: int=city.r
 	var cell: Dictionary=grid[r*Grid.COLS+c]
 	if not cell.land or cell.get("webGeneratedV331",false):return cell
+	if preview:
+		cell=cell.duplicate()
+		cell.deposits=cell.deposits.duplicate()
 	var biome:=visual_biome(r*Grid.COLS+c)
 	var n:=Geography.noise(c+181,r+43,int(game.seed))
 	var start:=false
