@@ -390,12 +390,8 @@ func refresh_web_view() -> void:
  view_tools.visible=preview.visible and not preview.walking
  view_caption.text=("3D · KATUSEGA" if preview.roof_visible else "3D · KATUSETA") if preview.visible else "PEALTVAADE"
 
-func editor_panel_style() -> StyleBoxTexture:
- var style:=StyleBoxTexture.new();style.texture=load("res://assets/house_designer/editor-panel-art.webp")
- style.texture_margin_left=style.texture.get_width()*0.06;style.texture_margin_right=style.texture_margin_left
- style.texture_margin_top=style.texture.get_height()*0.06;style.texture_margin_bottom=style.texture_margin_top
- style.content_margin_left=16;style.content_margin_right=16;style.content_margin_top=16;style.content_margin_bottom=16
- return style
+func editor_panel_style() -> StyleBoxFlat:
+ return InterfaceTheme.panel(16)
 
 func make_button(parent: Node,text: String,action: Callable) -> Button:
  var button:=Button.new();button.text=text;button.custom_minimum_size.y=34;style_web_button(button);button.pressed.connect(action);parent.add_child(button);return button

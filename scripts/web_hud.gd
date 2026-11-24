@@ -171,7 +171,7 @@ func build_hud() -> void:
 	text_item("world_title","Maailmakaart",26)
 	text_item("clock","08:00",16)
 	var version:=text_item("game_version",BuildLabel.short_text(get_tree()),20)
-	version.name="GameVersion";version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+	version.name="GameVersion";version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.clip_text=true
 	version.add_theme_color_override("font_outline_color",Color("101820"));version.add_theme_constant_override("outline_size",4)
 	var hint:=text_item("status_line","",15)
 	hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -240,6 +240,8 @@ func layout() -> void:
 	if elements.is_empty():return
 	var viewport := get_viewport_rect().size
 	ui_scale=minf(viewport.x/1672.0,viewport.y/941.0)*user_ui_scale
+	for label in labels.values():
+		label.add_theme_font_size_override("font_size",maxi(9,roundi(float(label.get_meta("base_font_size"))*ui_scale)))
 	var bottom:=viewport.y/ui_scale
 	var right:=viewport.x/ui_scale
 	place("header",0,-13,right,78)
@@ -295,8 +297,6 @@ func layout() -> void:
 	place("action_1",right-323,bottom-343,77,77)
 	place("action_2",right-259,bottom-383,77,77)
 	place("action_3",right-363,bottom-200,77,77)
-	for label in labels.values():
-		label.add_theme_font_size_override("font_size",maxi(9,roundi(float(label.get_meta("base_font_size"))*ui_scale)))
 	if dock_menu!=null:dock_menu.set_geometry(Vector2(left,bottom-56-card_width*1.5)*ui_scale,Vector2(available,card_width*1.5)*ui_scale,Vector2(card_width,card_width*1.5)*ui_scale)
 	if stores_panel!=null and stores_panel.visible:position_stores()
 	if tile_panel!=null:

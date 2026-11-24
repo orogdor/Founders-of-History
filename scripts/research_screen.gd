@@ -110,6 +110,12 @@ func layout() -> void:
 	var queue_top:=dimensions.y-127.0*factor
 	var map_height:=maxf(70.0,queue_top-map_top)
 	var inspector_x:=left+map_width+20.0*factor
+	var picture_top:=158.0*factor
+	var action_top:=queue_top-(82.0 if elements.queue.visible else 40.0)*factor
+	var picture_height:=clampf(action_top-picture_top-95.0*factor,32.0*factor,170.0*factor)
+	var title_top:=picture_top+picture_height+8.0*factor
+	var text_top:=title_top+30.0*factor
+	detail_title.add_theme_font_size_override("font_size",maxi(12,roundi(23.0*factor)))
 	var coords: Dictionary={
 		"frame":[0,0,dimensions.x,dimensions.y],"eyebrow":[left,28*factor,map_width,16*factor],
 		"heading":[left,46*factor,map_width,42*factor],"close":[dimensions.x-53*factor,20*factor,38*factor,38*factor],
@@ -118,9 +124,9 @@ func layout() -> void:
 		"minus":[left+map_width-130*factor,153*factor,36*factor,30*factor],"scale_label":[left+map_width-91*factor,153*factor,48*factor,30*factor],"plus":[left+map_width-38*factor,153*factor,36*factor,30*factor],
 		"map_back":[left,map_top,map_width,map_height],"scroll":[left,map_top,map_width,map_height],
 		"divider":[inspector_x,153*factor,1*factor,maxf(1,queue_top-153*factor)],
-		"detail_picture":[inspector_x+18*factor,158*factor,inspector_width-18*factor,170*factor],
-		"detail_title":[inspector_x+18*factor,345*factor,inspector_width-18*factor,31*factor],
-		"detail":[inspector_x+18*factor,380*factor,inspector_width-18*factor,maxf(30,queue_top-(465 if elements.queue.visible else 422)*factor)],
+		"detail_picture":[inspector_x+18*factor,picture_top,inspector_width-18*factor,picture_height],
+		"detail_title":[inspector_x+18*factor,title_top,inspector_width-18*factor,27*factor],
+		"detail":[inspector_x+18*factor,text_top,inspector_width-18*factor,maxf(0.0,action_top-text_top-6.0*factor)],
 		"start":[inspector_x+18*factor,queue_top-40*factor,inspector_width-18*factor,38*factor],
 		"queue":[inspector_x+18*factor,queue_top-82*factor,inspector_width-18*factor,38*factor],
 		"queue_line":[left,queue_top+15*factor,dimensions.x-left*2,1*factor],"queue_label":[left,queue_top,0,0]}
