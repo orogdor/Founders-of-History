@@ -1,8 +1,7 @@
 extends Node3D
 
-const Terrain=preload("res://scripts/detail_terrain.gd")
+const RoadSurface=preload("res://scripts/detail_road_surface.gd")
 const WIDTHS:=[0.0,0.78,0.9,1.05,1.575]
-const COLORS:=["","b09a73","bea982","9e9585","8f9291"]
 const DIRECTIONS:=[Vector2i(1,0),Vector2i(0,1),Vector2i(1,1),Vector2i(-1,1)]
 var host: Node
 var center:=Vector2i.ZERO
@@ -46,6 +45,7 @@ func rebuild(nav: RefCounted) -> void:
 	spots.sort_custom(func(a,b):return float(a.strength)>float(b.strength))
 	if spots.size()>4096:spots.resize(4096)
 	var ranks: Dictionary={};var surfaces: Dictionary={};var counts: Dictionary={}
+	var height_at := Callable(host.detail_root,"display_height")
 	for spot in spots:ranks[int(spot.index)]=int(spot.level)
 	for spot in spots:
 		var index:=int(spot.index);var rank:=int(spot.level);var pos: Dictionary=nav.point(index)
@@ -60,7 +60,11 @@ func rebuild(nav: RefCounted) -> void:
 			counts[rank]=int(counts.get(rank,0))+30
 			for i in 10:
 				var a:=TAU*i/10.0;var b:=TAU*(i+1)/10.0
-				for p in [center_point,center_point+Vector2(cos(a),sin(a))*radius,center_point+Vector2(cos(b),sin(b))*radius]:surface.add_vertex(Vector3(p.x,y+0.018,p.y))
+				var first := Vector2(cos(a),sin(a))
+				var second := Vector2(cos(b),sin(b))
+				RoadSurface.add_vertex(surface,center_point,y+0.018,Vector2.ZERO)
+				RoadSurface.add_vertex(surface,center_point+first*radius,y+0.018,first)
+				RoadSurface.add_vertex(surface,center_point+second*radius,y+0.018,second)
 		for direction in DIRECTIONS:
 			var other: int=nav.index(pos.x+direction.x,pos.z+direction.y)
 			if not ranks.has(other):continue
@@ -72,10 +76,7 @@ func rebuild(nav: RefCounted) -> void:
 			var end_point:=Vector2(float(end.x),float(end.z));var line:=end_point-center_point
 			var normal:=Vector2(-line.y,line.x).normalized()*1.19*float(WIDTHS[use_level])*0.65
 			counts[use_level]=int(counts.get(use_level,0))+6
-			for p in [center_point-normal,center_point+normal,end_point+normal,center_point-normal,end_point+normal,end_point-normal]:
-				target.add_vertex(Vector3(p.x,host.detail_root.display_height(p.x,p.y)+0.02,p.y))
+			RoadSurface.add_strip(target,center_point,end_point,normal,normal,height_at,0.02,1)
 	for rank in surfaces:
 		if int(counts.get(rank,0))==0:continue
-		var node:=MeshInstance3D.new();node.mesh=surfaces[rank].commit()
-		var mat:=StandardMaterial3D.new();mat.albedo_color=Color(COLORS[rank]);mat.cull_mode=BaseMaterial3D.CULL_DISABLED;mat.roughness=1.0
-		node.material_override=mat;add_child(node)
+		add_child(RoadSurface.make_mesh(surfaces[rank],center,rank,true))

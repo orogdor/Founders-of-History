@@ -13,11 +13,13 @@ static var materials: Dictionary={}
 static func request_assets() -> void:
 	if requested:return
 	requested=true
+	var paths := {"ground_height_maps":"res://assets/ground/ground-height.webp"}
 	for kind in KINDS:
 		for channel in CHANNELS:
-			var key: String=kind+"_"+channel
-			var path: String="res://assets/ground/"+kind+"-"+channel+".webp"
-			requests[key]={"path":path,"error":ResourceLoader.load_threaded_request(path,"Texture2D",false)}
+			paths[kind+"_"+channel]="res://assets/ground/"+kind+"-"+channel+".webp"
+	for key in paths:
+		var path: String=paths[key]
+		requests[key]={"path":path,"error":ResourceLoader.load_threaded_request(path,"Texture2D",false)}
 
 static func poll() -> void:
 	request_assets()
@@ -39,7 +41,7 @@ static func poll() -> void:
 			var fallback: Texture2D=load(path)
 			if fallback!=null:textures[key]=fallback
 			requests.erase(key)
-	if not requests.is_empty() or textures.size()!=KINDS.size()*CHANNELS.size():return
+	if not requests.is_empty() or textures.size()!=KINDS.size()*CHANNELS.size()+1:return
 	var applied:=0
 	while not waiting.is_empty() and applied<4:
 		var entry: Dictionary=waiting.pop_front();var instance: Variant=entry.node.get_ref()
@@ -52,12 +54,14 @@ static func make_material(color: Color,forest: float) -> ShaderMaterial:
 	var material:=ShaderMaterial.new();material.shader=SHADER
 	for kind in KINDS:
 		for channel in CHANNELS:material.set_shader_parameter(kind+"_"+channel,textures[kind+"_"+channel])
+	material.set_shader_parameter("ground_height_maps",textures["ground_height_maps"])
 	material.set_shader_parameter("forest_factor",forest);material.set_shader_parameter("base_color",color)
 	materials[key]=material;return material
 
-static func attach(instance: MeshInstance3D,color: Color,forest: float) -> void:
+static func attach(instance: MeshInstance3D,color: Color,forest: float,tile: Vector2i) -> void:
+	instance.set_instance_shader_parameter("detail_uv_offset",Vector2(tile)*Vector2(225.0,195.0))
 	request_assets()
-	if requests.is_empty() and textures.size()==KINDS.size()*CHANNELS.size():
+	if requests.is_empty() and textures.size()==KINDS.size()*CHANNELS.size()+1:
 		instance.material_override=make_material(color,forest);return
 	var fallback:=StandardMaterial3D.new();fallback.albedo_color=color;fallback.roughness=1.0;fallback.cull_mode=BaseMaterial3D.CULL_DISABLED
 	instance.material_override=fallback

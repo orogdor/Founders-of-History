@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
+#include "res://scripts/surface_relief.gdshaderinc"
+
 uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D forest_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -10,6 +12,7 @@ uniform sampler2D forest_normal : hint_normal, filter_linear_mipmap_anisotropic,
 uniform sampler2D grass_rough : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D soil_rough : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D forest_rough : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D ground_height_maps : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float forest_factor = 0.0;
 uniform vec4 base_color : source_color = vec4(0.4,0.5,0.3,1.0);
 uniform vec4 sand_color : source_color = vec4(0.698,0.631,0.486,1.0);
@@ -34,9 +37,17 @@ void vertex(){ground_height=UV2.x;beach_wobble=UV2.y;tile_uv=UV;shifted_uv=UV+de
 float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h(i),h(i+vec2(1.0,0.0)),f.x),mix(h(i+vec2(0.0,1.0)),h(i+vec2(1.0,1.0)),f.x),f.y);}
 float fractal(vec2 p){return n(p)*0.55+n(p*2.07+17.3)*0.30+n(p*4.31+41.9)*0.15;}
-vec4 sample_ground(sampler2D image,vec2 uv){float b=smoothstep(0.2,0.8,n(uv*0.11+vec2(71.0,13.0)));return mix(texture(image,uv,1.5),texture(image,uv*0.73+vec2(0.37,0.61),1.5),b);}
+vec4 sample_ground(sampler2D image, vec2 uv, vec2 dx, vec2 dy, float scale_blend) {
+	return mix(textureGrad(image, uv, dx, dy),
+		textureGrad(image, uv * 0.73 + vec2(0.37, 0.61), dx * 0.73, dy * 0.73),
+		scale_blend);
+}
+
 void fragment(){
  vec2 q=shifted_uv;
+ vec2 uv=q*0.5;
+ vec2 dx=dFdx(uv)*1.35,dy=dFdy(uv)*1.35;
+ float distance_to_camera=length(VERTEX);
  vec4 local_ground=vec4(base_color.rgb,forest_factor);
  if(blend_neighbours){
   float x=clamp(abs(tile_uv.x)/225.0,0.0,0.5),z=clamp(abs(tile_uv.y)/195.0,0.0,0.5);
@@ -45,17 +56,7 @@ void fragment(){
   vec4 diagonal=tile_uv.x<0.0?(tile_uv.y<0.0?ground_nw:ground_sw):(tile_uv.y<0.0?ground_ne:ground_se);
   local_ground=mix(mix(local_ground,horizontal,x),mix(vertical,diagonal,x),z);
  }
- float dirt=smoothstep(0.57,0.82,fractal(q*0.09+vec2(13.0,29.0)));
- float forest=local_ground.a*(0.68+0.25*n(q*0.13));
- vec3 w=vec3((1.0-dirt)*(1.0-forest),dirt*(1.0-forest),forest);
- vec2 uv=q*0.5;
- vec3 g=sample_ground(grass_color,uv).rgb,s=sample_ground(soil_color,uv).rgb,f=sample_ground(forest_color,uv).rgb;
- vec3 lum=vec3(dot(g,vec3(0.30,0.59,0.11))*1.7,dot(s,vec3(0.30,0.59,0.11))*1.25,dot(f,vec3(0.30,0.59,0.11))*1.35)*0.55+w;
- float top=max(lum.x,max(lum.y,lum.z))-0.22;
- vec3 weights=max(lum-vec3(top),vec3(0.0))*step(vec3(0.001),w);
- weights/=max(weights.x+weights.y+weights.z,0.0001);
- vec3 photo=(g*weights.x+s*weights.y+f*weights.z)*(0.90+0.13*fractal(q*0.018));
- float photo_strength=0.88*(1.0-smoothstep(100.0,300.0,length(VERTEX)))*smoothstep(0.4,1.6,ground_height);
+ float photo_strength=0.88*(1.0-smoothstep(100.0,300.0,distance_to_camera))*smoothstep(0.4,1.6,ground_height);
  // The source keeps procedural meadow and soil variation after the close-up
  // photographs have faded; a uniform fallback makes the whole tile flat green.
  float meadow=fractal(q*0.034+vec2(8.0,8.0));
@@ -72,13 +73,42 @@ void fragment(){
  float soil_patch=smoothstep(0.64,0.82,fractal(q*0.048+vec2(11.0))+(n(q*0.6)-0.5)*0.12);
  vec3 soil_tint=mix(distant,vec3(0.40,0.32,0.22),0.75)*(0.85+n(q*2.3)*0.28);
  distant=mix(distant,soil_tint,soil_patch*(0.45+0.20*local_ground.a));
- vec3 surface=mix(distant,photo,photo_strength);
+ vec3 surface=distant;
+ ROUGHNESS=0.94;
+ NORMAL_MAP=vec3(0.5,0.5,1.0);
+ NORMAL_MAP_DEPTH=0.0;
+ if(photo_strength>0.0){
+  vec3 world_up=normalize(mat3(VIEW_MATRIX)*vec3(0.0,1.0,0.0));
+  float slope=1.0-clamp(dot(NORMAL,world_up),0.0,1.0);
+  float dirt=smoothstep(0.50,0.75,fractal(q*0.09+vec2(13.0,29.0))+smoothstep(0.03,0.21,slope)*0.13);
+  float forest=local_ground.a*(0.68+0.25*n(q*0.13));
+  vec3 coverage=vec3((1.0-dirt)*(1.0-forest),dirt*(1.0-forest),forest);
+  float scale_blend=smoothstep(0.2,0.8,n(uv*0.11+vec2(71.0,13.0)));
+  vec3 heights=sample_ground(ground_height_maps,uv,dx,dy,scale_blend).rgb;
+  vec3 levels=coverage+heights*0.42;
+  float top=max(levels.x,max(levels.y,levels.z))-0.28;
+  vec3 weights=max(levels-vec3(top),vec3(0.0))*coverage;
+  weights/=max(dot(weights,vec3(1.0)),0.0001);
+  float height=dot(heights,weights);
+  float relief=(1.0-smoothstep(16.0,52.0,distance_to_camera))*photo_strength;
+  vec2 shifted=uv-relief_direction(VIEW,TANGENT,BINORMAL,NORMAL)*(1.0-height)*0.027*relief;
+  vec3 grass=sample_ground(grass_color,shifted,dx,dy,scale_blend).rgb;
+  vec3 soil=sample_ground(soil_color,shifted,dx,dy,scale_blend).rgb;
+  vec3 litter=sample_ground(forest_color,shifted,dx,dy,scale_blend).rgb;
+  vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.90+0.13*fractal(q*0.018));
+  photo*=mix(1.0,0.84+0.23*height,relief);
+  surface=mix(distant,photo,photo_strength);
+  NORMAL_MAP=sample_ground(grass_normal,shifted,dx,dy,scale_blend).xyz*weights.x
+            +sample_ground(soil_normal,shifted,dx,dy,scale_blend).xyz*weights.y
+            +sample_ground(forest_normal,shifted,dx,dy,scale_blend).xyz*weights.z;
+  NORMAL_MAP_DEPTH=0.54*photo_strength;
+  vec3 roughness=vec3(sample_ground(grass_rough,shifted,dx,dy,scale_blend).r,
+                      sample_ground(soil_rough,shifted,dx,dy,scale_blend).r,
+                      sample_ground(forest_rough,shifted,dx,dy,scale_blend).r);
+  ROUGHNESS=mix(0.94,clamp(dot(roughness,weights),0.65,1.0),photo_strength);
+ }
  float sand=1.0-smoothstep(0.4+beach_wobble,1.15+beach_wobble,ground_height);
  surface=mix(surface,sand_color.rgb*0.65,sand);
  surface=mix(surface,wet_sand_color.rgb*0.55,(1.0-smoothstep(-0.05,0.35,ground_height))*0.55);
  ALBEDO=surface;
- vec3 normal_map=sample_ground(grass_normal,uv).xyz*weights.x+sample_ground(soil_normal,uv).xyz*weights.y+sample_ground(forest_normal,uv).xyz*weights.z;
- NORMAL_MAP=normal_map;
- NORMAL_MAP_DEPTH=0.32*photo_strength;
- ROUGHNESS=clamp(sample_ground(grass_rough,uv).r*weights.x+sample_ground(soil_rough,uv).r*weights.y+sample_ground(forest_rough,uv).r*weights.z,0.65,1.0);
 }

@@ -76,8 +76,7 @@ func build_ground_tile(dc: int,dr: int) -> void:
  var visual: PackedVector4Array=host.detail_visual_for(c,r);visual_tiles[key]=visual
  var color: Color=host.terrain_color(r*Grid.COLS+c)
  var instance:=MeshInstance3D.new();instance.mesh=host.detail_mesh_for(c,r,heights,visual);instance.position=Vector3(dc*225,0,dr*195)
- instance.set_instance_shader_parameter("detail_uv_offset",Vector2(dc*225,dr*195))
- GroundMaterial.attach(instance,color,1.0 if host.visual_biome(r*Grid.COLS+c) in ["forest","taiga","jungle"] else 0.0);add_child(instance)
+ GroundMaterial.attach(instance,color,1.0 if host.visual_biome(r*Grid.COLS+c) in ["forest","taiga","jungle"] else 0.0,Vector2i(c,r));add_child(instance)
  var water:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(225,195);water.mesh=plane
  water.position=instance.position;water.material_override=host.detail_ocean_for(c,r,heights,visual);add_child(water)
  var landscape:=Node3D.new();landscape.position=Vector3(dc*225,0,dr*195);add_child(landscape)

@@ -30,10 +30,9 @@ func setup(host: Node,center: Vector2i) -> void:
 			var color_heights: PackedVector4Array=host.detail_visual_for(c,r)
 			tile.set_meta("visual_heights",color_heights)
 			var ground:=MeshInstance3D.new();ground.mesh=host.detail_mesh_for(c,r,heights,color_heights)
-			ground.set_instance_shader_parameter("detail_uv_offset",Vector2(dc*225,dr*195))
 			var ground_color: Color=host.terrain_color(index)
 			var ground_forest:=1.0 if host.is_forest_core(index) else 0.0
-			GroundMaterial.attach(ground,ground_color,ground_forest)
+			GroundMaterial.attach(ground,ground_color,ground_forest,Vector2i(c,r))
 			var adjacent={"ground_w":Vector2i(-1,0),"ground_e":Vector2i(1,0),"ground_n":Vector2i(0,-1),"ground_s":Vector2i(0,1),"ground_nw":Vector2i(-1,-1),"ground_ne":Vector2i(1,-1),"ground_sw":Vector2i(-1,1),"ground_se":Vector2i(1,1)}
 			for key in adjacent:
 				var pos: Vector2i=Vector2i(c,r)+adjacent[key];var tint:=ground_color;var forest:=ground_forest
