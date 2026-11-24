@@ -29,6 +29,7 @@ jobs:
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_walk_stream.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_camera_coverage.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_surface_appearance.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/detail_relief.gd
       - name: Publish game data and advance the Android channel
         env:
           GH_TOKEN: ${{ github.token }}
