@@ -41,7 +41,12 @@ jobs:
           patch=null
           if gh release view "$base_tag" --json tagName >/dev/null 2>&1; then
             gh release download "$base_tag" --pattern android-base.pck --dir "$bundle"
-            "$godot_bin" --headless --path . --export-patch Android "$bundle/android-patch.pck" --patches "$bundle/android-base.pck"
+            git fetch --depth=1 origin "refs/tags/$base_tag"
+            if git diff --quiet FETCH_HEAD "$GITHUB_SHA" -- assets; then
+              "$godot_bin" --headless --path . --export-pack "Android Game Update" "$bundle/android-patch.pck"
+            else
+              "$godot_bin" --headless --path . --export-patch Android "$bundle/android-patch.pck" --patches "$bundle/android-base.pck"
+            fi
             test -s "$bundle/android-patch.pck"
             gh release create "$update_tag" "$bundle/android-patch.pck" --target "$GITHUB_SHA" --prerelease --latest=false --title "Android update $GITHUB_RUN_NUMBER" --notes "Android launcher content for $GITHUB_SHA."
             patch=$(jq -n --arg url "$release_root/$update_tag/android-patch.pck" --arg sha "$(sha256sum "$bundle/android-patch.pck" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$bundle/android-patch.pck")" '{url:$url,sha256:$sha,size:$size}')

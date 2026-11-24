@@ -15,9 +15,10 @@ Mängu juhised ja senine tööjärg: `ALUSTA_SIIST.txt` ja `PORT_STATUS.md`.
 `Android Launcher` ekspordiseade pakib väikese käivitaja. Paigalda see sama
 allkirjaga Androidi testirakenduse peale, et jätkata seniste salvestustega.
 Esimesel käivitamisel laeb rakendus GitHubist mängu põhipaki. Järgmistel
-käivitustel kontrollib see uuendust ja vajadusel laeb lisapaki, mis sisaldab
-põhipakiga võrreldes muutunud faile. Viimati laaditud versiooni saab mängida
-võrguühenduseta.
+käivitustel kontrollib see uuendust ja vajadusel laeb lisapaki. Kui graafikavarad
+on samad, sisaldab lisapakk ainult stseene, skripte ja mänguandmeid. Muutunud
+graafikavarade korral kasutatakse Godoti põhipakiga võrreldavat paranduspakkimist.
+Viimati laaditud versiooni saab mängida võrguühenduseta.
 
 Iga `terrain-height-maps` harusse saadetud muudatus käivitab töövoo
 `Android launcher updates`. See avaldab andmepaki ja nihutab
