@@ -68,232 +68,213 @@
   }
  },
  "items": {
-  "hair_m_buzz": {
-   "name": "Siilisoeng",
+  "mh_short01": {
+   "name": "Lühike",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_crop": {
-   "name": "Lühike lõikus",
+  "mh_short02": {
+   "name": "Lühike siledaks kammitud",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_sidepart": {
-   "name": "Külgkammiga lühike",
+  "mh_short03": {
+   "name": "Lühike sasitud",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_slicked": {
-   "name": "Tahapoole kammitud",
+  "mh_short04": {
+   "name": "Väga lühike",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_bowl": {
+  "mh_bob01": {
+   "name": "Polkpea",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_braid": {
+   "name": "Pats",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_long": {
+   "name": "Pikad lahtised juuksed",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_ponytail": {
+   "name": "Hobusesaba",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": false
+  },
+  "mh_bob_blunt_bangs": {
+   "name": "Sirge polkpea tukaga",
+   "slot": "hair",
+   "hides": [],
+   "tints": [],
+   "mat": "hair",
+   "hair_color": true,
+   "bulky": true
+  },
+  "mh_bob_page": {
    "name": "Potisoeng",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": true
   },
-  "hair_m_bob": {
-   "name": "Lõuani polkpea",
+  "mh_bob_curled": {
+   "name": "Sissekeeratud polkpea",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": true
   },
-  "hair_m_shoulder": {
-   "name": "Õlgadeni juuksed",
+  "mh_messy": {
+   "name": "Sasitud",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_wild": {
-   "name": "Pikk sasitud",
+  "mh_pixie": {
+   "name": "Poisipea",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_ponytail": {
-   "name": "Kuklas hobusesaba",
+  "mh_bun_messy": {
+   "name": "Sasitud nutsu",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_braid": {
-   "name": "Pats seljal",
+  "mh_bun_braid": {
+   "name": "Patsinutsu",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_suebian": {
-   "name": "Suebi sõlm",
+  "mh_shaggy": {
+   "name": "Pikk narmendav",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": true
   },
-  "hair_m_topknot": {
-   "name": "Pealae nuts",
+  "mh_short_messy": {
+   "name": "Lühike narmendav",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_m_curly": {
-   "name": "Lokkis lühike",
+  "mh_long_bangs": {
+   "name": "Pikad juuksed tukaga",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": true
   },
-  "hair_w_long": {
-   "name": "Pikad lahtised",
+  "mh_curly_long": {
+   "name": "Pikad lokid",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": true
   },
-  "hair_w_braids2": {
-   "name": "Kaks patsi ees",
+  "mh_braid_french": {
+   "name": "Prantsuse pats",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_w_braid": {
-   "name": "Pats seljal",
+  "mh_viking": {
+   "name": "Viikingi pats",
    "slot": "hair",
    "hides": [],
    "tints": [],
    "mat": "hair",
-   "hair_color": true
+   "hair_color": true,
+   "bulky": false
   },
-  "hair_w_bun_low": {
-   "name": "Kuklanuts",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_bun_high": {
-   "name": "Kõrge nuts",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_ponytail": {
-   "name": "Kõrge hobusesaba",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_crown": {
-   "name": "Pärjapats",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_bob": {
-   "name": "Polkpea tukaga",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_pixie": {
-   "name": "Lühike poisipea",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_curly": {
-   "name": "Lokkis õlgadeni",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "hair_w_shoulder": {
-   "name": "Õlgadeni juuksed",
-   "slot": "hair",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "beard_short": {
-   "name": "Lühike habe",
+  "mh_beard_long": {
+   "name": "Pikk habe vuntsidega",
    "slot": "beard",
    "hides": [],
    "tints": [],
    "mat": "hair",
    "hair_color": true
   },
-  "beard_full": {
-   "name": "Täishabe",
+  "mh_beard_goatee": {
+   "name": "Pikk lõuahabe",
    "slot": "beard",
    "hides": [],
    "tints": [],
    "mat": "hair",
    "hair_color": true
   },
-  "beard_long": {
-   "name": "Pikk habe",
-   "slot": "beard",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "beard_moustache": {
+  "mh_moustache": {
    "name": "Vuntsid",
-   "slot": "beard",
-   "hides": [],
-   "tints": [],
-   "mat": "hair",
-   "hair_color": true
-  },
-  "beard_goatee": {
-   "name": "Kitsehabe",
    "slot": "beard",
    "hides": [],
    "tints": [],
@@ -352,8 +333,7 @@
    "name": "Karusnahksed säärsaapad",
    "slot": "feet",
    "hides": [
-    "feet",
-    "shins"
+    "feet"
    ],
    "tints": [
     "6e5640"
@@ -1041,8 +1021,7 @@
    "name": "Nahksaapad",
    "slot": "feet",
    "hides": [
-    "feet",
-    "shins"
+    "feet"
    ],
    "tints": [
     "6b4a2f",
@@ -1300,8 +1279,7 @@
    "name": "Säärsaapad",
    "slot": "feet",
    "hides": [
-    "feet",
-    "shins"
+    "feet"
    ],
    "tints": [
     "6b4a2f",
@@ -2253,8 +2231,7 @@
    "name": "Sõjaväesaapad",
    "slot": "feet",
    "hides": [
-    "feet",
-    "shins"
+    "feet"
    ],
    "tints": [
     "2e2925"
@@ -2422,25 +2399,25 @@
    ],
    "hair": {
     "man": [
-     "hair_m_wild",
-     "hair_m_shoulder",
-     "hair_m_braid",
-     "hair_m_ponytail",
-     "hair_m_crop"
+     "mh_shaggy",
+     "mh_long",
+     "mh_messy",
+     "mh_short_messy",
+     "mh_short03"
     ],
     "woman": [
-     "hair_w_long",
-     "hair_w_braids2",
-     "hair_w_braid",
-     "hair_w_bun_low",
-     "hair_w_curly"
+     "mh_long",
+     "mh_shaggy",
+     "mh_braid",
+     "mh_curly_long",
+     "mh_braid_french"
     ]
    },
    "beards": [
-    "beard_long",
-    "beard_full",
+    "mh_beard_long",
+    "mh_beard_long",
     "",
-    "beard_short",
+    "mh_beard_goatee",
     ""
    ],
    "jobs": {
@@ -2568,24 +2545,24 @@
    ],
    "hair": {
     "man": [
-     "hair_m_shoulder",
-     "hair_m_ponytail",
-     "hair_m_crop",
-     "hair_m_braid",
-     "hair_m_wild"
+     "mh_long",
+     "mh_short_messy",
+     "mh_messy",
+     "mh_short03",
+     "mh_ponytail"
     ],
     "woman": [
-     "hair_w_bun_high",
-     "hair_w_bun_low",
-     "hair_w_long",
-     "hair_w_ponytail",
-     "hair_w_braids2"
+     "mh_braid",
+     "mh_braid_french",
+     "mh_long",
+     "mh_bun_messy",
+     "mh_bun_braid"
     ]
    },
    "beards": [
-    "beard_full",
-    "beard_short",
-    "beard_long",
+    "mh_beard_long",
+    "mh_beard_goatee",
+    "mh_moustache",
     "",
     ""
    ],
@@ -2736,26 +2713,26 @@
    ],
    "hair": {
     "man": [
-     "hair_m_suebian",
-     "hair_m_shoulder",
-     "hair_m_crop",
-     "hair_m_ponytail",
-     "hair_m_bowl"
+     "mh_viking",
+     "mh_long",
+     "mh_short03",
+     "mh_messy",
+     "mh_ponytail"
     ],
     "woman": [
-     "hair_w_braid",
-     "hair_w_braids2",
-     "hair_w_bun_low",
-     "hair_w_crown",
-     "hair_w_long"
+     "mh_braid",
+     "mh_braid_french",
+     "mh_bun_braid",
+     "mh_long",
+     "mh_bun_messy"
     ]
    },
    "beards": [
-    "beard_full",
+    "mh_beard_long",
     "",
-    "beard_moustache",
+    "mh_moustache",
     "",
-    "beard_long"
+    "mh_beard_goatee"
    ],
    "jobs": {
     "smith": {
@@ -2904,25 +2881,25 @@
    ],
    "hair": {
     "man": [
-     "hair_m_bowl",
-     "hair_m_crop",
-     "hair_m_bob",
-     "hair_m_shoulder",
-     "hair_m_buzz"
+     "mh_bob_page",
+     "mh_short03",
+     "mh_short01",
+     "mh_messy",
+     "mh_bob_curled"
     ],
     "woman": [
-     "hair_w_braids2",
-     "hair_w_braid",
-     "hair_w_crown",
-     "hair_w_bun_low",
-     "hair_w_long"
+     "mh_braid",
+     "mh_bun_braid",
+     "mh_bun_messy",
+     "mh_braid_french",
+     "mh_long"
     ]
    },
    "beards": [
     "",
     "",
-    "beard_short",
-    "beard_full",
+    "mh_beard_goatee",
+    "mh_beard_long",
     "",
     ""
    ],
@@ -3076,26 +3053,26 @@
    ],
    "hair": {
     "man": [
-     "hair_m_bob",
-     "hair_m_crop",
-     "hair_m_sidepart",
-     "hair_m_shoulder",
-     "hair_m_buzz"
+     "mh_bob_curled",
+     "mh_bob_page",
+     "mh_short01",
+     "mh_short04",
+     "mh_short03"
     ],
     "woman": [
-     "hair_w_bun_low",
-     "hair_w_crown",
-     "hair_w_braid",
-     "hair_w_bun_high",
-     "hair_w_braids2"
+     "mh_bun_braid",
+     "mh_bun_messy",
+     "mh_braid",
+     "mh_long",
+     "mh_bob_curled"
     ]
    },
    "beards": [
-    "beard_goatee",
+    "mh_beard_goatee",
     "",
-    "beard_moustache",
+    "mh_moustache",
     "",
-    "beard_full"
+    "mh_beard_long"
    ],
    "jobs": {
     "farm": {
@@ -3243,25 +3220,25 @@
    ],
    "hair": {
     "man": [
-     "hair_m_slicked",
-     "hair_m_sidepart",
-     "hair_m_crop",
-     "hair_m_buzz",
-     "hair_m_curly"
+     "mh_short01",
+     "mh_short02",
+     "mh_short04",
+     "mh_messy",
+     "mh_short03"
     ],
     "woman": [
-     "hair_w_bun_low",
-     "hair_w_bun_high",
-     "hair_w_braid",
-     "hair_w_crown",
-     "hair_w_ponytail"
+     "mh_bun_messy",
+     "mh_bun_braid",
+     "mh_ponytail",
+     "mh_braid",
+     "mh_braid_french"
     ]
    },
    "beards": [
-    "beard_moustache",
-    "beard_full",
+    "mh_moustache",
+    "mh_beard_long",
     "",
-    "beard_short",
+    "mh_moustache",
     ""
    ],
    "jobs": {
@@ -3397,25 +3374,25 @@
    ],
    "hair": {
     "man": [
-     "hair_m_sidepart",
-     "hair_m_buzz",
-     "hair_m_crop",
-     "hair_m_slicked",
-     "hair_m_topknot"
+     "mh_short02",
+     "mh_short04",
+     "mh_short_messy",
+     "mh_short01",
+     "mh_messy"
     ],
     "woman": [
-     "hair_w_ponytail",
-     "hair_w_bob",
-     "hair_w_pixie",
-     "hair_w_long",
-     "hair_w_curly"
+     "mh_bob01",
+     "mh_bob_blunt_bangs",
+     "mh_ponytail",
+     "mh_pixie",
+     "mh_long_bangs"
     ]
    },
    "beards": [
     "",
     "",
-    "beard_short",
-    "beard_full",
+    "mh_moustache",
+    "mh_beard_goatee",
     "",
     ""
    ],

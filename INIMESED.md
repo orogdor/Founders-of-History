@@ -6,7 +6,7 @@ Süsteem asub failides `scripts/human_factory.gd` (kehad, riided, tööriistad),
 
 - Kehad: `assets/people/bodies/man.glb`, `woman.glb`, `boy.glb`, `girl.glb`
 - Riided: `assets/people/clothes/<eseme_id>/<keha>.glb`, näiteks `clothes/iron_wool_tunic/woman.glb`
-- Soengud, habemed ja peakatted on samuti riided: `clothes/hair_w_braids2/woman.glb`, `clothes/beard_full/man.glb`
+- Soengud, habemed ja peakatted on samuti riided: `clothes/mh_braid/woman.glb`, `clothes/mh_beard_long/man.glb`
 - Sõdurite relvad, kilbid ja hobused: `assets/soldiers/split/<väeliik>.glb` (vt „Sõdurid”)
 - Tööriistad: `assets/people/equipment/<nimi>.glb` (nimed on JSON-i `tools` all, nt `bronze_axe`)
 
@@ -97,9 +97,9 @@ Ilma graafikata (`--headless`) testid kontrollivad sama, kuid pilte ei salvesta.
 
 Rõivad ei kleepu kehale: `tools/mpfb_bodies.py` (`drape`) täidab abivõrgu nõgusad kohad (rinna vahe, selja nõgusus, kõhulihaste vaod, jalgevahe) kuni 2,5 cm ulatuses ja kõik kihid tehakse sellelt samalt pinnalt, nii et kihid (särk, kuub, vöö, põll) ei lõika üksteisest läbi. Riiete servad (kaelus, varrukaotsad, alläär) silutakse piki serva, et need ei oleks sakilised. Püksisääred on lahedamad kui säärised ja sukad, saapasäärte all kitsamad. Heledatel kangastel pole suuri laike. Inimestel on veidi erinev nahatoon (`HumanFactory.tint_skin`).
 
-## Soengud ja habemed
+## Soengud, habemed, kulmud ja ripsmed
 
-Soengud tehakse skriptiga `tools/hair.py` pea kuju järgi: peanahk kindla juustejoonega (laup, oimud, kukal), pikad juuksed paksusega kihina, mille otsad on salkudena läbipaistvad (`hairlock` tekstuur alfaga), patsid kolmest keerduvast salgust, hobusesabad, nutsud ning pärjapats. Lokkis soengutel on pinnal lokid; polkpea otsad keeravad sisse. Habemed (lühike, täis-, pikk, vuntsid, kitsehabe) tehakse näo piirkondadest ja huuled jäetakse vabaks. Juuste värv on inimesel ühine (soeng + habe), värvid on JSON-i `hair_colors` all.
+Soengud on päris juuksekaartidega MakeHumani varad (CC0): MakeHumani süsteemi soengud, kogukonna CC0 soengupakk ja viikingi komplekt (soeng, habe, vuntsid). `tools/mh_hair.py` sobitab need iga keha külge mhclo failiga (nagu silmad), muudab tekstuuri halliks (alfa jääb, et juuksesalgud oleksid läbipaistvad) ja mäng värvib selle juuksevärviga. Habe ja soeng on sama värvi. Kehadel on ka päris kulmud ja ripsmed (eraldi võrgud keha failis); nahale maalitud kulm on nõrk alustoon. Mütsid ja kiivrid peidavad juuksed. Allikad: `assets/people/ALLIKAD.md`.
 
 ## Sõdurid
 
@@ -110,7 +110,7 @@ Soengud tehakse skriptiga `tools/hair.py` pea kuju järgi: peanahk kindla juuste
 
 ## Ajastute riidekomplektid, soengud ja habemed
 
-Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemete valik (tühi kirje tähendab habemeta meest, nii et habe on ainult osal meestel). Valik tehakse inimese seemne järgi püsivalt. Poiss kannab mehe ja tüdruk naise riietust, aga ilma `drop` kohtadeta (ehted, vöö, põll jne).
+Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemete valik (tühi kirje tähendab habemeta meest, nii et habe on ainult osal meestest). Valik tehakse inimese seemne järgi püsivalt. Poiss kannab mehe ja tüdruk naise riietust, aga ilma `drop` kohtadeta (ehted, vöö, põll jne).
 
 ### Kiviaeg
 
@@ -126,8 +126,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Seelik ja vest: Pikk nahkseelik, Karusnahkne vest, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
   - Karusnahaga: Pikk nahkkleit, Karusnahksed säärsaapad, Karusnahkne õlakate
   - Niinseelik: Niinest seelik, Nahkne pluus, Nahksäärised, Nahkkingad (mokassiinid), Merevaigust ja hambaripatsitega kaelakee
-- **Soengud:** mees: Pikk sasitud, Õlgadeni juuksed, Pats seljal, Kuklas hobusesaba, Lühike lõikus; naine: Pikad lahtised, Kaks patsi ees, Pats seljal, Kuklanuts, Lokkis õlgadeni
-- **Habemed:** Pikk habe, Täishabe, Lühike habe (habe on umbes 60% meestest)
+- **Soengud:** mees: Pikk narmendav, Pikad lahtised juuksed, Sasitud, Lühike narmendav, Lühike sasitud; naine: Pikad lahtised juuksed, Pikk narmendav, Pats, Pikad lokid, Prantsuse pats
+- **Habemed:** Pikk habe vuntsidega, Pikk lõuahabe (habe on umbes 60% meestest)
 - **Ametite lisad:** hunter: Karusnahkne kapuuts, Karusnahkne keep
 
 ### Pronksiaeg
@@ -144,8 +144,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Õlarätiga: Lühikeste varrukatega villane pluus, Pikk villane seelik, Villane õlarätt, Nahkkingad, Juuksevõrk
   - Villane kleit: Pikk villane kleit, Pronksist vööketas, Ümar villane keep, Nahkkingad
   - Nööriseelik ja keep: Lühikeste varrukatega villane pluus, Nööriseelik, Ümar villane keep, Nahkkingad
-- **Soengud:** mees: Õlgadeni juuksed, Kuklas hobusesaba, Lühike lõikus, Pats seljal, Pikk sasitud; naine: Kõrge nuts, Kuklanuts, Pikad lahtised, Kõrge hobusesaba, Kaks patsi ees
-- **Habemed:** Täishabe, Lühike habe, Pikk habe (habe on umbes 60% meestest)
+- **Soengud:** mees: Pikad lahtised juuksed, Lühike narmendav, Sasitud, Lühike sasitud, Hobusesaba; naine: Pats, Prantsuse pats, Pikad lahtised juuksed, Sasitud nutsu, Patsinutsu
+- **Habemed:** Pikk habe vuntsidega, Pikk lõuahabe, Vuntsid (habe on umbes 60% meestest)
 - **Ametite lisad:** bronze_foundry: Nahkpõll
 
 ### Rauaaeg
@@ -162,8 +162,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Peplos: Pikk linane särk, Villane peplos-kleit, Pastlad ja säärepaelad, Kaelavõru ja rinnalehed
   - Triibuline seelik: Pikk linane särk, Triibuline villane seelik, Õlarätt (sõba), Pastlad ja säärepaelad
   - Ruuduline seelik ja põll: Pikk linane särk, Ruuduline vaipseelik, Linane põll, Pastlad ja säärepaelad, Pronksspiraalidega peapael
-- **Soengud:** mees: Suebi sõlm, Õlgadeni juuksed, Lühike lõikus, Kuklas hobusesaba, Potisoeng; naine: Pats seljal, Kaks patsi ees, Kuklanuts, Pärjapats, Pikad lahtised
-- **Habemed:** Täishabe, Vuntsid, Pikk habe (habe on umbes 60% meestest)
+- **Soengud:** mees: Viikingi pats, Pikad lahtised juuksed, Lühike sasitud, Sasitud, Hobusesaba; naine: Pats, Prantsuse pats, Patsinutsu, Pikad lahtised juuksed, Sasitud nutsu
+- **Habemed:** Pikk habe vuntsidega, Vuntsid, Pikk lõuahabe (habe on umbes 60% meestest)
 - **Ametite lisad:** smith: Nahkpõll; smelter: Nahkpõll
 
 ### Keskaeg
@@ -180,8 +180,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Pealiskleit: Linane alussärk, Pikk villane kleit, Varrukateta pealiskleit, Pöördkingad
   - Mantliga: Linane alussärk, Pikk villane kleit, Villane mantel, Linane peakate, Pöördkingad
   - Triibuline kleit: Linane alussärk, Triibuline villane kleit, Põll, Pöördkingad
-- **Soengud:** mees: Potisoeng, Lühike lõikus, Lõuani polkpea, Õlgadeni juuksed, Siilisoeng; naine: Kaks patsi ees, Pats seljal, Pärjapats, Kuklanuts, Pikad lahtised
-- **Habemed:** Lühike habe, Täishabe (habe on umbes 33% meestest)
+- **Soengud:** mees: Potisoeng, Lühike sasitud, Lühike, Sasitud, Sissekeeratud polkpea; naine: Pats, Patsinutsu, Sasitud nutsu, Prantsuse pats, Pikad lahtised juuksed
+- **Habemed:** Pikk lõuahabe, Pikk habe vuntsidega (habe on umbes 33% meestest)
 - **Ametite lisad:** farm: Õlgkübar; smith: Nahkpõll
 
 ### Renessanss
@@ -198,8 +198,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Triibuline seelik: Linane särk, Liivik, Triibuline seelik, Põll, Nahkkingad
   - Õlarätiga: Linane särk, Liibuga kleit, Õlarätt, Tanu, Nahkkingad
   - Liivik ja seelik: Linane särk, Liivik, Pikk seelik, Õlarätt, Nahkkingad
-- **Soengud:** mees: Lõuani polkpea, Lühike lõikus, Külgkammiga lühike, Õlgadeni juuksed, Siilisoeng; naine: Kuklanuts, Pärjapats, Pats seljal, Kõrge nuts, Kaks patsi ees
-- **Habemed:** Kitsehabe, Vuntsid, Täishabe (habe on umbes 60% meestest)
+- **Soengud:** mees: Sissekeeratud polkpea, Potisoeng, Lühike, Väga lühike, Lühike sasitud; naine: Patsinutsu, Sasitud nutsu, Pats, Pikad lahtised juuksed, Sissekeeratud polkpea
+- **Habemed:** Pikk lõuahabe, Vuntsid, Pikk habe vuntsidega (habe on umbes 60% meestest)
 - **Ametite lisad:** farm: Õlgkübar; smith: Nahkpõll; printer: Nahkpõll
 
 ### Tööstusajastu
@@ -216,8 +216,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Suurrätiga: Pikkade varrukatega pluus, Pikk seelik, Villane suurrätt, Säärsaapad
   - Pikk kleit: Pikk kleit, Põll, Säärsaapad
   - Ruuduline seelik ja jakk: Pikkade varrukatega pluus, Ruuduline seelik, Kootud jakk, Säärsaapad
-- **Soengud:** mees: Tahapoole kammitud, Külgkammiga lühike, Lühike lõikus, Siilisoeng, Lokkis lühike; naine: Kuklanuts, Kõrge nuts, Pats seljal, Pärjapats, Kõrge hobusesaba
-- **Habemed:** Vuntsid, Täishabe, Lühike habe (habe on umbes 60% meestest)
+- **Soengud:** mees: Lühike, Lühike siledaks kammitud, Väga lühike, Sasitud, Lühike sasitud; naine: Sasitud nutsu, Patsinutsu, Hobusesaba, Pats, Prantsuse pats
+- **Habemed:** Vuntsid, Pikk habe vuntsidega (habe on umbes 60% meestest)
 - **Ametite lisad:** fisher: Õlirõivast vihmamantel; farm: Õlgkübar; steelworks: Nahkpõll
 
 ### Moodne ajastu
@@ -234,8 +234,8 @@ Igal ajastul on 5 riietust mehele ja 5 naisele, 5 soengut kummalegi ning habemet
   - Kampsun: Kootud kampsun, Teksapüksid, Kingad
   - Kleit: Põlvini kleit, Kingad
   - Jopega: T-särk, Teksapüksid, Jope, Spordijalatsid
-- **Soengud:** mees: Külgkammiga lühike, Siilisoeng, Lühike lõikus, Tahapoole kammitud, Pealae nuts; naine: Kõrge hobusesaba, Polkpea tukaga, Lühike poisipea, Pikad lahtised, Lokkis õlgadeni
-- **Habemed:** Lühike habe, Täishabe (habe on umbes 33% meestest)
+- **Soengud:** mees: Lühike siledaks kammitud, Väga lühike, Lühike narmendav, Lühike, Sasitud; naine: Polkpea, Sirge polkpea tukaga, Hobusesaba, Poisipea, Pikad juuksed tukaga
+- **Habemed:** Vuntsid, Pikk lõuahabe (habe on umbes 33% meestest)
 - **Ametite lisad:** builder: Kiiver, Helkurvest; mine: Kiiver; autofactory: Tunked; refinery: Tunked, Kiiver
 
 ## Väeliikide riietus ja varustus

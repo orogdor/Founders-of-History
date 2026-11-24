@@ -9,10 +9,13 @@ func _initialize() -> void:
 func run() -> void:
 	var items: Dictionary=Humans.config().items
 	var looks: Array=[]
+	var men: Dictionary={}
+	for e in Humans.config().eras:
+		for id in e.hair.man:men[id]=true
 	for id in items:
-		if str(items[id].slot)=="hair":looks.append(["man" if str(id).begins_with("hair_m_") else "woman",[id],str(items[id].name)])
+		if str(items[id].slot)=="hair":looks.append(["man" if men.has(id) else "woman",[id],str(items[id].name)])
 	for id in items:
-		if str(items[id].slot)=="beard":looks.append(["man",["hair_m_crop",id],str(items[id].name)])
+		if str(items[id].slot)=="beard":looks.append(["man",["mh_short02",id],str(items[id].name)])
 	var env:=WorldEnvironment.new();var e:=Environment.new();var sky:=Sky.new();var sm:=ProceduralSkyMaterial.new();sky.sky_material=sm;e.background_mode=Environment.BG_SKY;e.sky=sky
 	e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color("aeb8c4");e.ambient_light_energy=0.6;e.tonemap_mode=Environment.TONE_MAPPER_ACES;e.tonemap_exposure=0.85;env.environment=e;root.add_child(env)
 	var sun:=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-35,35,0);sun.light_color=Color("fff1dc");sun.shadow_enabled=true;root.add_child(sun)

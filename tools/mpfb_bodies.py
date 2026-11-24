@@ -195,7 +195,7 @@ def soft_skirt_weights(J, W):
     for side in ("_l", "_r"):
         th, ca = BONE_INDEX["thigh" + side], BONE_INDEX["calf" + side]
         m = dense[:, ca] * 0.5; dense[:, ca] -= m; dense[:, th] += m
-        m = dense[:, th] * 0.45; dense[:, th] -= m; dense[:, pel] += m
+        m = dense[:, th] * 0.2; dense[:, th] -= m; dense[:, pel] += m
     order = np.argsort(-dense, 1)[:, :4]
     W2 = np.take_along_axis(dense, order, 1); W2 /= np.maximum(W2.sum(1, keepdims=True), 1e-6)
     return order.astype(np.uint16), W2.astype(np.float32)
@@ -284,6 +284,9 @@ def fit_mhclo(path, V):
                 refs.append(([int(x) for x in p[:3]], [float(x) for x in p[3:6]], [float(x) for x in p[6:9]]))
             elif len(p) == 1 and p[0].lstrip("-").isdigit():
                 refs.append(([int(p[0])], [1.0], [0, 0, 0]))
+            elif p[0] in ("delete_verts", "weights", "offsets") or not refs:
+                in_verts = in_verts and not refs and p[0] not in ("delete_verts",)   # nt "material" ridu enne tippe
+                if p[0] == "delete_verts": in_verts = False
             else:
                 in_verts = False
     s = np.ones(3)
@@ -573,9 +576,14 @@ def build_body(name):
     eye_mat = g.material("eyes", (1, 1, 1), 0.15, 0.0, eye_tex, alpha=0.5)
     P, J, W, VT, F, FT = fit_mhclo(f"{MHDATA}/eyes/high-poly/high-poly.mhclo", V)
     g.mesh("eyes", proxy_mesh(P, J, W, VT, F, FT), eye_mat); names.append("eyes")
-    # kulmud on nahatekstuuris
+    # päris kulmud ja ripsmed (MakeHuman CC0), kui varad on olemas
+    if MH_DIR:
+        MHH.init(sys.modules[__name__])
+        for kind, md, tex in MHH.face_parts(MH_DIR, name, V):
+            mat = g.material(kind, (1, 1, 1), 0.8, 0.0, g.image_uri(f"../textures/{tex}"), double=True, alpha=0.4)
+            g.mesh(kind, md, mat); names.append(kind)
     g.write(f"{PROJECT}/assets/people/bodies/{name}.glb", globals_, names,
-            {"source": "MPFB2 base.obj, macrodetails targets, game_engine rig/weights; MakeHuman high-poly eyes (CC0)", "body": name})
+            {"source": "MPFB2 base.obj, macrodetails targets, game_engine rig/weights; MakeHuman high-poly eyes, eyebrows, eyelashes (CC0)", "body": name})
     return V, N, globals_
 
 def brow_faces(V):
@@ -822,7 +830,7 @@ def build_garment(body, item_id, item, V, globals_, normals):
         if grp in DRAPED:
             # kõik kihid samal langenud pinnal (nõgusad kohad täidetud), siis kihi nihe ja siledad servad
             Pd, Nd = DRAPED[grp]
-            extra = np.full(len(V), 0.012 if grp != "helper-skirt" else 0.0)
+            extra = np.full(len(V), 0.012 if grp != "helper-skirt" else 0.1)   # seelik veidi lahedam (põlved ei paista läbi)
             if item["slot"] == "legs" and grp == "helper-tights" and not any(k in item_id for k in ("hose", "leggings", "stockings")):
                 # püksisääred lahedamad, värvel jääb särgi alla
                 crotch = joint_y(V, "joint-l-upper-leg"); ankle = joint_y(V, "joint-l-ankle")
@@ -843,6 +851,7 @@ def build_garment(body, item_id, item, V, globals_, normals):
     return True
 
 import hair as HAIR
+import mh_hair as MHH
 
 def hair_items_for(body):
     male = body in ("man", "boy")
@@ -876,6 +885,7 @@ def build_hair(body, V, N_body, globals_):
 UV_M = {}
 HEADS = {}
 DRAPED = {}
+MH_DIR = sys.argv[sys.argv.index("--mh-hair") + 1] if "--mh-hair" in sys.argv else os.environ.get("MH_HAIR_DIR", "")
 CURRENT_BODY = None
 if __name__ == "__main__":
     ONLY_BODIES = [b for b in os.environ.get("ONLY_BODIES", "").split(",") if b]
@@ -897,5 +907,6 @@ if __name__ == "__main__":
                 DRAPED[grp] = (Pd, vertex_normals(Pd, fall))
             made = sum(build_garment(name, iid, it, V, globals_, normals) for iid, it in ITEMS.items()
                        if it["slot"] not in ("hair", "beard") and (not ONLY_ITEMS or any(iid.startswith(k) for k in ONLY_ITEMS.split(","))))
-            if not ONLY_ITEMS or "hair" in ONLY_ITEMS: made += build_hair(name, V, N_body, globals_)
+            if MH_DIR and (not ONLY_ITEMS or "mh_" in ONLY_ITEMS or "hair" in ONLY_ITEMS):
+                MHH.init(sys.modules[__name__]); made += MHH.build(MH_DIR, name, V, globals_)
             print("  proovirõivaid", made)

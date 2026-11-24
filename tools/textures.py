@@ -281,7 +281,7 @@ def skin_baked(S, faces_uv, f, masks, tone, seed=1, beard=False):
     base = base * (1 - nails) + np.array([0.94, 0.82, 0.78]) * nails
     # kulmud: karvatõmbed piki kulmu
     hairs = fnoise(S, 0.5, seed + 9, aniso=(0.22, 1.0))
-    ba = np.clip(f["brow"] * (0.7 + 0.6 * hairs), 0, 1)[..., None] * 0.95
+    ba = np.clip(f["brow"] * (0.7 + 0.6 * hairs), 0, 1)[..., None] * 0.35   # päris kulmud on eraldi võrk
     base = base * (1 - ba) + np.array([0.22, 0.16, 0.11]) * ba
     if beard:
         st = np.clip(f["beard"] * (0.35 + 0.9 * fine), 0, 1)[..., None] * 0.28

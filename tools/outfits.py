@@ -18,15 +18,17 @@ T=["torso"];UA=["upperarms"];FA=["forearms"];H=["hips"];TH=["thighs"];SH=["shins
 ARMS=UA+FA;LEGS=H+TH+SH
 
 # ---------------- juuksed ja habemed (tools/hair.py)
-for sid,s in HAIR.STYLES.items(): item(sid,s["name"],"hair",[],[],"hair",hair_color=True)
-for bid,b in HAIR.BEARDS.items(): item(bid,b["name"],"beard",[],[],"hair",hair_color=True)
+# päris soengud ja habemed: MakeHumani CC0 juuksekaardid (tools/mh_hair.py)
+import mh_hair as MHH
+for hid,(pack,rel,name,bulky) in MHH.HAIRS.items(): item(hid,name,"hair",[],[],"hair",hair_color=True,bulky=bulky)
+for bid,(name,parts) in MHH.BEARDS.items(): item(bid,name,"beard",[],[],"hair",hair_color=True)
 
 # ---------------- 0 kiviaeg
 item("stone_hide_loincloth","Nahkne niudevöö","underwear",H,[HIDE],"hide")
 item("stone_hide_tunic","Nahkne kuub","torso",T+H,[HIDE,BROWN],"hide")
 item("stone_hide_leggings","Nahksäärised","socks",TH+SH,[HIDE,BROWN],"hide")
 item("stone_moccasins","Nahkkingad (mokassiinid)","feet",F,[LEATHER],"leather")
-item("stone_fur_boots","Karusnahksed säärsaapad","feet",F+SH,[FUR],"fur")
+item("stone_fur_boots","Karusnahksed säärsaapad","feet",F,[FUR],"fur")
 item("stone_fur_cloak","Karusnahkne keep","outer",T+UA,[FUR],"fur")
 item("stone_fur_cape","Karusnahkne õlakate","outer",[],[FUR,"8a7258"],"fur")
 item("stone_fur_vest","Karusnahkne vest","torso",T,[FUR,"8a7258"],"fur")
@@ -82,7 +84,7 @@ item("med_long_robe","Pikk villane rüü","torso",T+LEGS+ARMS,[BROWN,GREY,BLACK,
 item("med_surcoat","Varrukateta pealiskuub","outer",T+H+TH,[MADDER,WOAD,GREEN],"wool")
 item("med_hood","Kapuuts õlakattega","head",N,[MADDER,WOAD,GREEN,BROWN],"wool",hair=True)
 item("med_turnshoes","Pöördkingad","feet",F,[LEATHER],"leather")
-item("med_boots","Nahksaapad","feet",F+SH,[LEATHER,BLACK],"leather")
+item("med_boots","Nahksaapad","feet",F,[LEATHER,BLACK],"leather")
 item("med_belt_pouch","Vöö ja kukkur","belt",[],[LEATHER],"leather")
 item("med_linen_chemise","Linane alussärk","shirt",T+H+TH+ARMS,[LINEN],"linen")
 item("med_wool_kirtle","Pikk villane kleit","torso",T+LEGS+ARMS,WOOL,"wool")
@@ -101,7 +103,7 @@ item("ren_breeches","Pluuderpüksid","legs",H+TH,[BLACK,BROWN,GREY],"wool")
 item("ren_trousers","Laiad püksid","legs",LEGS,[BROWN,GREY,UNDYED],"wool")
 item("ren_stockings","Villased sukad","socks",SH,[UNDYED,GREY,MADDER],"knit")
 item("ren_shoes","Nahkkingad","feet",F,[LEATHER,BLACK],"leather")
-item("ren_boots","Säärsaapad","feet",F+SH,[LEATHER,BLACK],"leather")
+item("ren_boots","Säärsaapad","feet",F,[LEATHER,BLACK],"leather")
 item("ren_flat_cap","Barett","head",[],[BLACK,BROWN],"felt",hair=True)
 item("ren_smock","Linane särk","shirt",T+ARMS,[WHITE,LINEN],"linen")
 item("ren_bodice_gown","Liibuga kleit","torso",T+LEGS,[MADDER,GREEN,BROWN,WOAD],"wool")
@@ -178,7 +180,7 @@ item("mil_white_trousers","Valged vormipüksid","legs",LEGS,[WHITE,"d9d4c4"],"tw
 item("mil_shako","Šako","head",[],[BLACK],"felt",hair=True)
 item("mil_kepi","Vormimüts","head",[],[],"felt",hair=True,team=True)
 item("mil_crossbelts","Ristirihmad","belt",[],[WHITE],"leather")
-item("mil_army_boots","Sõjaväesaapad","feet",F+SH,[BLACK],"leather")
+item("mil_army_boots","Sõjaväesaapad","feet",F,[BLACK],"leather")
 item("mil_camo_jacket","Laigulise mustriga välivormi jope","outer",T+ARMS+H,["ffffff"],"camo")
 item("mil_camo_trousers","Laigulise mustriga välivormi püksid","legs",LEGS,["ffffff"],"camo")
 item("mil_combat_helmet","Lahingukiiver","head",[],[OLIVE],"jersey",hair=True)
@@ -198,9 +200,9 @@ eras=[
            o("Seelik ja vest","stone_hide_skirt","stone_fur_vest","stone_moccasins","stone_amber_necklace"),
            o("Karusnahaga","stone_hide_dress","stone_fur_boots","stone_fur_cape"),
            o("Niinseelik","stone_bast_skirt","stone_hide_top","stone_hide_leggings","stone_moccasins","stone_amber_necklace")],
-  "hair":{"man":["hair_m_wild","hair_m_shoulder","hair_m_braid","hair_m_ponytail","hair_m_crop"],
-          "woman":["hair_w_long","hair_w_braids2","hair_w_braid","hair_w_bun_low","hair_w_curly"]},
-  "beards":["beard_long","beard_full","","beard_short",""],
+  "hair":{"man":["mh_shaggy", "mh_long", "mh_messy", "mh_short_messy", "mh_short03"],
+          "woman":["mh_long", "mh_shaggy", "mh_braid", "mh_curly_long", "mh_braid_french"]},
+  "beards":["mh_beard_long", "mh_beard_long", "", "mh_beard_goatee", ""],
   "jobs":{"hunter":{"all":["stone_fur_hood","stone_fur_cloak"]}},"tools":{}},
  {"id":"bronze","name":"Pronksiaeg",
   "man":[o("Mähisrõivas","bronze_wool_wrap","bronze_wool_cape","bronze_felt_cap","bronze_leather_shoes"),
@@ -213,9 +215,9 @@ eras=[
            o("Õlarätiga","bronze_wool_blouse","bronze_long_skirt","bronze_wool_shawl","bronze_leather_shoes","bronze_hairnet"),
            o("Villane kleit","bronze_wool_dress","bronze_belt_disc","bronze_wool_cape","bronze_leather_shoes"),
            o("Nööriseelik ja keep","bronze_wool_blouse","bronze_cord_skirt","bronze_wool_cape","bronze_leather_shoes")],
-  "hair":{"man":["hair_m_shoulder","hair_m_ponytail","hair_m_crop","hair_m_braid","hair_m_wild"],
-          "woman":["hair_w_bun_high","hair_w_bun_low","hair_w_long","hair_w_ponytail","hair_w_braids2"]},
-  "beards":["beard_full","beard_short","beard_long","",""],
+  "hair":{"man":["mh_long", "mh_short_messy", "mh_messy", "mh_short03", "mh_ponytail"],
+          "woman":["mh_braid", "mh_braid_french", "mh_long", "mh_bun_messy", "mh_bun_braid"]},
+  "beards":["mh_beard_long", "mh_beard_goatee", "mh_moustache", "", ""],
   "jobs":{"bronze_foundry":{"all":["work_leather_apron"]}},
   "tools":{"lumber":"bronze_axe","forester":"bronze_axe","builder":"bronze_hammer","mason":"bronze_chisel","quarry":"bronze_pick","mine":"bronze_pick","coppermine":"bronze_pick","tinmine":"bronze_pick","farm":"bronze_sickle","hunter":"bronze_spear","fisher":"bronze_fishing_spear","bronze_foundry":"bronze_tongs"}},
  {"id":"iron","name":"Rauaaeg",
@@ -229,9 +231,9 @@ eras=[
            o("Peplos","iron_linen_shift","iron_peplos","iron_pastlad","iron_breast_ornaments"),
            o("Triibuline seelik","iron_linen_shift","iron_skirt_striped","iron_soba","iron_pastlad"),
            o("Ruuduline seelik ja põll","iron_linen_shift","iron_skirt_plaid","iron_apron","iron_pastlad","iron_spiral_headband")],
-  "hair":{"man":["hair_m_suebian","hair_m_shoulder","hair_m_crop","hair_m_ponytail","hair_m_bowl"],
-          "woman":["hair_w_braid","hair_w_braids2","hair_w_bun_low","hair_w_crown","hair_w_long"]},
-  "beards":["beard_full","","beard_moustache","","beard_long"],
+  "hair":{"man":["mh_viking", "mh_long", "mh_short03", "mh_messy", "mh_ponytail"],
+          "woman":["mh_braid", "mh_braid_french", "mh_bun_braid", "mh_long", "mh_bun_messy"]},
+  "beards":["mh_beard_long", "", "mh_moustache", "", "mh_beard_goatee"],
   "jobs":{"smith":{"all":["work_leather_apron"]},"smelter":{"all":["work_leather_apron"]}},
   "tools":{"lumber":"iron_axe","forester":"iron_axe","builder":"iron_hammer","mason":"iron_chisel","quarry":"iron_pick","mine":"iron_pick","farm":"iron_sickle","hunter":"iron_spear","fisher":"iron_fishing_net","smith":"iron_smith_hammer"}},
  {"id":"medieval","name":"Keskaeg",
@@ -245,9 +247,9 @@ eras=[
            o("Pealiskleit","med_linen_chemise","med_wool_kirtle","med_sideless_gown","med_turnshoes"),
            o("Mantliga","med_linen_chemise","med_wool_kirtle","med_wool_mantle","med_headcloth","med_turnshoes"),
            o("Triibuline kleit","med_linen_chemise","med_kirtle_striped","med_apron","med_turnshoes")],
-  "hair":{"man":["hair_m_bowl","hair_m_crop","hair_m_bob","hair_m_shoulder","hair_m_buzz"],
-          "woman":["hair_w_braids2","hair_w_braid","hair_w_crown","hair_w_bun_low","hair_w_long"]},
-  "beards":["","","beard_short","beard_full","",""],
+  "hair":{"man":["mh_bob_page", "mh_short03", "mh_short01", "mh_messy", "mh_bob_curled"],
+          "woman":["mh_braid", "mh_bun_braid", "mh_bun_messy", "mh_braid_french", "mh_long"]},
+  "beards":["", "", "mh_beard_goatee", "mh_beard_long", "", ""],
   "jobs":{"farm":{"all":["work_straw_hat"]},"smith":{"all":["work_leather_apron"]}},
   "tools":{"lumber":"iron_axe","forester":"iron_axe","builder":"iron_hammer","mason":"iron_chisel","quarry":"iron_pick","mine":"iron_pick","farm":"scythe","fisher":"iron_fishing_net","smith":"iron_smith_hammer"}},
  {"id":"renaissance","name":"Renessanss",
@@ -261,9 +263,9 @@ eras=[
            o("Triibuline seelik","ren_smock","ren_bodice","ren_skirt_striped","ren_apron","ren_shoes"),
            o("Õlarätiga","ren_smock","ren_bodice_gown","ren_shawl","ren_coif","ren_shoes"),
            o("Liivik ja seelik","ren_smock","ren_bodice","ren_skirt","ren_shawl","ren_shoes")],
-  "hair":{"man":["hair_m_bob","hair_m_crop","hair_m_sidepart","hair_m_shoulder","hair_m_buzz"],
-          "woman":["hair_w_bun_low","hair_w_crown","hair_w_braid","hair_w_bun_high","hair_w_braids2"]},
-  "beards":["beard_goatee","","beard_moustache","","beard_full"],
+  "hair":{"man":["mh_bob_curled", "mh_bob_page", "mh_short01", "mh_short04", "mh_short03"],
+          "woman":["mh_bun_braid", "mh_bun_messy", "mh_braid", "mh_long", "mh_bob_curled"]},
+  "beards":["mh_beard_goatee", "", "mh_moustache", "", "mh_beard_long"],
   "jobs":{"farm":{"all":["work_straw_hat"]},"smith":{"all":["work_leather_apron"]},"printer":{"all":["work_leather_apron"]}},
   "tools":{"lumber":"steel_axe","builder":"steel_hammer","mason":"steel_chisel","mine":"steel_pick","farm":"scythe","smith":"iron_smith_hammer"}},
  {"id":"industrial","name":"Tööstusajastu",
@@ -277,9 +279,9 @@ eras=[
            o("Suurrätiga","ind_blouse","ind_long_skirt","ind_wool_shawl","ind_boots"),
            o("Pikk kleit","ind_dress","ind_apron","ind_boots"),
            o("Ruuduline seelik ja jakk","ind_blouse","ind_skirt_plaid","ind_cardigan","ind_boots")],
-  "hair":{"man":["hair_m_slicked","hair_m_sidepart","hair_m_crop","hair_m_buzz","hair_m_curly"],
-          "woman":["hair_w_bun_low","hair_w_bun_high","hair_w_braid","hair_w_crown","hair_w_ponytail"]},
-  "beards":["beard_moustache","beard_full","","beard_short",""],
+  "hair":{"man":["mh_short01", "mh_short02", "mh_short04", "mh_messy", "mh_short03"],
+          "woman":["mh_bun_messy", "mh_bun_braid", "mh_ponytail", "mh_braid", "mh_braid_french"]},
+  "beards":["mh_moustache", "mh_beard_long", "", "mh_moustache", ""],
   "jobs":{"fisher":{"all":["work_oilskin_coat"]},"farm":{"all":["work_straw_hat"]},"steelworks":{"all":["work_leather_apron"]}},
   "tools":{"lumber":"saw_two_man","builder":"steel_hammer","mine":"steel_pick","farm":"pitchfork","steelworks":"steel_tongs"}},
  {"id":"modern","name":"Moodne ajastu",
@@ -293,9 +295,9 @@ eras=[
            o("Kampsun","mod_sweater","mod_jeans","mod_shoes"),
            o("Kleit","mod_dress","mod_shoes"),
            o("Jopega","mod_tshirt","mod_jeans","mod_work_jacket","mod_sneakers")],
-  "hair":{"man":["hair_m_sidepart","hair_m_buzz","hair_m_crop","hair_m_slicked","hair_m_topknot"],
-          "woman":["hair_w_ponytail","hair_w_bob","hair_w_pixie","hair_w_long","hair_w_curly"]},
-  "beards":["","","beard_short","beard_full","",""],
+  "hair":{"man":["mh_short02", "mh_short04", "mh_short_messy", "mh_short01", "mh_messy"],
+          "woman":["mh_bob01", "mh_bob_blunt_bangs", "mh_ponytail", "mh_pixie", "mh_long_bangs"]},
+  "beards":["", "", "mh_moustache", "mh_beard_goatee", "", ""],
   "jobs":{"builder":{"all":["work_hard_hat","work_hi_vis_vest"]},"mine":{"all":["work_hard_hat"]},"autofactory":{"all":["work_overall"]},"refinery":{"all":["work_overall","work_hard_hat"]}},
   "tools":{"lumber":"chainsaw","builder":"power_drill"}},
 ]
