@@ -260,6 +260,9 @@ def build(profile, jobs):
     duplicates = 0
     loose = []
     for path in sorted(ASSETS.rglob("*")):
+        # These authored material sets already have matching color, normal and height maps.
+        if path.is_relative_to(ASSETS / "house_designer" / "walls"):
+            continue
         if path.suffix.lower() not in RASTER:
             continue
         sidecar = Path(f"{path}.import")
