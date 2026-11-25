@@ -12,6 +12,7 @@ const Coastal = preload("res://scripts/coastal_starts.gd")
 const ShorePlacement = preload("res://scripts/coastal_placement.gd")
 const Geography = preload("res://scripts/world_geography.gd")
 const Campaign = preload("res://scripts/campaign_state.gd")
+const HouseEras=preload("res://scripts/house_eras.gd")
 const DetailView = preload("res://scripts/detail_view.gd")
 const DetailNeighbors = preload("res://scripts/detail_neighbors.gd")
 const DetailRoads = preload("res://scripts/detail_roads.gd")
@@ -1001,7 +1002,7 @@ func update_city_markers() -> void:
 		var key:=str(int(city.id));var tile:=str(int(city.c))+":"+str(int(city.r))
 		if int(city.team)!=0 and not Campaign.visible_now(game,0,city):continue
 		active[key]=true
-		var upgrade:=Production.upgrade_level(game,int(city.team))
+		var upgrade:=Production.visual_age(game,int(city.team))
 		if not city_markers.has(key):
 			towns_changed.append(Vector2i(int(city.c),int(city.r)))
 			var icon:=MeshInstance3D.new()
@@ -1096,7 +1097,7 @@ func update_landmark_markers() -> void:
 	update_landmark_glow()
 
 func update_landmark_glow() -> void:
-	var hour:=fposmod(8.0+elapsed/60.0,24.0)
+	var hour:=daylight_hour()
 	var elevation:=sin((hour-6.0)*PI/12.0)
 	var daylight:=clampf((elevation+0.09)/0.52,0,1)
 	var torch:=clampf((0.4-daylight)/0.36,0,1)
@@ -1116,6 +1117,26 @@ func merchant_land_path(from: Dictionary,to: Dictionary,team: int) -> Variant:
 	for cell in cells:path.append({"c":cell.x,"r":cell.y})
 	merchant_path_cache[key]={"found":true,"path":path}
 	return path.duplicate(true)
+
+func district_builder_path(parent: Dictionary,from: Dictionary,to: Dictionary,team: int) -> Variant:
+	var route:Variant=merchant_land_path(from,to,team)
+	if route==null:return null
+	var territory:Dictionary=territory_allocation.get("territory",{})
+	var accessible:=func(tile: Vector2i) -> bool:
+		if DistrictContexts.existing(parent,tile)!=null:return true
+		var owner:Variant=territory.get(DistrictContexts.key(tile))
+		return owner!=null and int(owner.id)==int(parent.id)
+	var detour:=false
+	for step in route:
+		if not accessible.call(Vector2i(int(step.c),int(step.r))):detour=true;break
+	if not detour:return route
+	var passable:=func(cell: Dictionary,tile: Vector2i) -> bool:
+		return accessible.call(tile) and Geography.traversable_cell(cell,tile)
+	var cells:Variant=Grid.find_path(grid,Vector2i(int(from.c),int(from.r)),Vector2i(int(to.c),int(to.r)),passable)
+	if cells==null:return null
+	var result:Array=[]
+	for tile in cells:result.append({"c":tile.x,"r":tile.y})
+	return result
 
 func update_ship_markers() -> void:
 	if ship_root==null:return
@@ -1860,7 +1881,7 @@ func update_building_preview(screen: Vector2) -> void:
 	var city: Dictionary=current_build_context()
 	if not is_instance_valid(building_preview) or building_preview_type!=type:
 		clear_building_preview()
-		building_preview=detail_root.create_designed_building(type,Production.upgrade_level(game,int(city.team)),game.get("houseDesignTemplatesV354",{}).get(type,{}))
+		building_preview=detail_root.create_designed_building(type,Production.visual_age(game,int(city.team)),game.get("houseDesignTemplatesV354",{}).get(type,{}))
 		if building_preview==null:return
 		building_preview_type=type;detail_root.add_child(building_preview)
 	var requested:=Vector2(roundf(hit.x/2.0)*2.0,roundf(hit.z/2.0)*2.0)
@@ -2260,7 +2281,8 @@ func _process(delta: float) -> void:
 			if rival and not city.get("reservePendingV168",false):
 				AIStoneDefenses.update_builders(game,city)
 				tick_ai_field(city,runtime,city)
-				for district in city.get("districts",{}).values():tick_ai_field(district,ensure_city_runtime(district),city)
+				for district in city.get("districts",{}).values():
+					if DistrictContexts.has_activity(district):tick_ai_field(district,ensure_city_runtime(district),city)
 				var defense_rule=func(type):return CityRules.urban_rule(game,city,city_cell_data(city),type,is_coast(int(city.c),int(city.r)),city_has_river(city),DistrictContexts.all_buildings(city))
 				var defense_context=func(parent,tile):return district_context_at(parent,tile,true)
 				var outer_rule=func(ctx,type):return CityRules.urban_rule(game,ctx,city_cell_data(ctx),type,is_coast(int(ctx.c),int(ctx.r)),city_has_river(ctx),DistrictContexts.all_buildings(city),{"outerRingV184":true})
@@ -2287,7 +2309,7 @@ func _process(delta: float) -> void:
 			if city.get("districts",{}).is_empty():build_event=Builder.tick(game,city,nav,production_dt,runtime.builder_navs)
 			else:
 				var parent:Dictionary=city
-				build_event=DistrictBuilders.tick(game,city,production_dt,func(tile):return district_context_at(parent,tile,true),district_nav_for,merchant_land_path)
+				build_event=DistrictBuilders.tick(game,city,production_dt,func(tile):return district_context_at(parent,tile,true),district_nav_for,func(from,to,team):return district_builder_path(parent,from,to,team))
 				for finished in build_event.get("district_completed",[]):
 					var updated:Dictionary=finished.ctx;ensure_city_runtime(updated).nav.rebuild(updated.economy.buildings,updated.world.resources)
 					if finished.building.get("type","")=="bridge" and finished.building.get("ready",false):activate_city_bridge(updated)
@@ -2329,7 +2351,7 @@ func _process(delta: float) -> void:
 					var stamp:=visible_city_building_stamp(city)
 					if int(visible_view.get_meta("live_city_stamp",-1))!=stamp:
 						visible_view.set_meta("live_city_stamp",stamp)
-						var upgrade:=Production.upgrade_level(game,int(city.team))
+						var upgrade:=Production.visual_age(game,int(city.team))
 						visible_view.sync_buildings(city,upgrade)
 						for hall in city.economy.buildings:
 							if hall.type!="hall" or hall.get("virtual",false):continue
@@ -2339,7 +2361,7 @@ func _process(delta: float) -> void:
 								visible_view.place_hall(hall.x,hall.z,upgrade,float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
 							break
 			if build_event.has("completed") and active:
-				if detail_mode:detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+				if detail_mode:detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 				update_status("Hoone valmis.")
 		ArmyRecovery.tick(game,delta)
 		if float(game.time)-float(game.get("lastAIResearchPlan",0))>=12.0:
@@ -2367,8 +2389,8 @@ func _process(delta: float) -> void:
 		var research_events := Research.tick_research(game,delta)
 		if city_created and (int(game.ages[0])!=previous_age or Production.upgrade_level(game,0)!=previous_upgrade) and detail_mode and not settler_mode and not detail_inspection:
 			var city: Dictionary=game.cities[active_city_index];var hall: Dictionary=city.economy.buildings[0]
-			detail_root.place_hall(hall.x,hall.z,Production.upgrade_level(game,0),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
-			detail_root.sync_buildings(city,Production.upgrade_level(game,0))
+			detail_root.place_hall(hall.x,hall.z,Production.visual_age(game,0),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
+			detail_root.sync_buildings(city,Production.visual_age(game,0))
 		if not research_events.is_empty():
 			refresh_research_options()
 			for event in research_events:
@@ -2597,8 +2619,8 @@ func open_selected_tile(inspection_only:=false) -> void:
 	detail_root.person.visible=false
 	if not observed_city.is_empty():
 		var hall: Dictionary=observed_city.economy.buildings[0]
-		if not hall.get("virtual",false):detail_root.place_hall(hall.x,hall.z,Production.upgrade_level(game,int(observed_city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
-		detail_root.sync_buildings(observed_city,Production.upgrade_level(game,int(observed_city.team)))
+		if not hall.get("virtual",false):detail_root.place_hall(hall.x,hall.z,Production.visual_age(game,int(observed_city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
+		detail_root.sync_buildings(observed_city,Production.visual_age(game,int(observed_city.team)))
 		detail_root.add_village_life(self,"city:"+str(observed_city.id),int(observed_city.team))
 	elif not observed_village.is_empty():
 		var buildings:=Discoveries.village_layout(observed_village)
@@ -2662,8 +2684,8 @@ func toggle_detail() -> void:
 		if city_created and not settler_mode:
 			var city: Dictionary = game.cities[active_city_index]
 			var hall: Dictionary = city.economy.buildings[0]
-			detail_root.place_hall(hall.x,hall.z,Production.upgrade_level(game,int(city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
-			detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+			detail_root.place_hall(hall.x,hall.z,Production.visual_age(game,int(city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
+			detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 			detail_root.add_village_life(self,"city:"+str(city.id),int(city.team))
 			detail_root.sync_removed_resources(city.world.resources,elapsed,city.economy.buildings)
 			build_row.visible = true
@@ -2780,8 +2802,8 @@ func finish_city_visuals(city: Dictionary,from_migration:=false) -> void:
 	update_research_status()
 	if detail_mode:
 		var hall: Dictionary = city.economy.buildings[0]
-		detail_root.place_hall(hall.x,hall.z,Production.upgrade_level(game,int(city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
-		detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+		detail_root.place_hall(hall.x,hall.z,Production.visual_age(game,int(city.team)),float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
+		detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 		detail_root.add_village_life(self,"city:"+str(city.id),int(city.team))
 		camera_target=Vector3(hall.x,0,hall.z)
 		update_camera()
@@ -2856,7 +2878,7 @@ func follow_detail_camera() -> void:
 
 # Find the live view of a visible neighbouring city without changing selection.
 func visible_city_building_stamp(city: Dictionary) -> int:
-	var data: Array=[Production.upgrade_level(game,int(city.team))]
+	var data: Array=[Production.visual_age(game,int(city.team))]
 	for b in city.economy.buildings:
 		data.append([b.get("type",""),b.get("x",0),b.get("z",0),b.get("ready",false),float(b.get("hp",0))>0,b.get("virtual",false),b.get("buildingRotationV228",0),b.get("shoreAngle",0),b.get("width",0),b.get("depth",0),b.get("houseUpgradeLevelV218",0),b.get("woodFortTierV1757",0),b.get("houseDesignV354",{})])
 	return hash(data)
@@ -3039,8 +3061,8 @@ func rotate_selected_building() -> void:
 	var result:=BuildingOperations.rotate(game,city,building,func(x,z):return build_terrain_passable(x,z,city.team))
 	if result.has("error"):update_status(result.error);return
 	city_nav.rebuild(buildings,city.world.resources)
-	if building.type=="hall":detail_root.place_hall(building.x,building.z,Production.upgrade_level(game,int(city.team)),float(building.get("buildingRotationV228",0)),building.get("houseDesignV354",{}))
-	detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+	if building.type=="hall":detail_root.place_hall(building.x,building.z,Production.visual_age(game,int(city.team)),float(building.get("buildingRotationV228",0)),building.get("houseDesignV354",{}))
+	detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 	detail_root.sync_removed_resources(city.world.resources,elapsed,buildings)
 	update_selected_building();update_status("Hoone pööratud.")
 
@@ -3050,7 +3072,7 @@ func upgrade_selected_house() -> void:
 	if selected_building_index<0 or selected_building_index>=buildings.size():return
 	var result:=BuildingOperations.upgrade_house(game,city,buildings[selected_building_index])
 	if result.has("error"):update_status(result.error);return
-	detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+	detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 	update_selected_building();update_resources_status();update_status("Elamu täiustatud: mahutavus kahekordistus.")
 
 func remove_selected_building() -> void:
@@ -3064,7 +3086,7 @@ func remove_selected_building() -> void:
 	var runtime:=ensure_city_runtime(city)
 	runtime.production.synchronize(city_nav,city.world,buildings)
 	Labor.allocate(game,game.cities[active_city_index])
-	detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+	detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 	detail_root.sync_removed_resources(city.world.resources,elapsed,buildings)
 	update_selected_building();update_resources_status();update_status("Hoone kustutatud.")
 
@@ -3292,7 +3314,7 @@ func update_research_status() -> void:
 		var names: Array[String]=[]
 		for id in r.queue:names.append(Research.DATA.data.techs[id].name)
 		research_label.text+=" · Järjekord: "+", ".join(names)
-	if r.get("ageWait") is Dictionary:
+	if r.get("ageWait") is Dictionary and r.ageWait.get("id")==r.active:
 		var missing: Array[String]=[]
 		for key in r.ageWait.missing:missing.append("%s %.0f" % [Economy.DATA.data.resource_names.get(key,key),r.ageWait.missing[key]])
 		if not missing.is_empty():research_label.text+=" · Puudub: "+", ".join(missing)
@@ -3770,7 +3792,7 @@ func city_cell_data(city: Dictionary,preview:=false) -> Dictionary:
 	for kind in base_deposits:cell.deposits[kind]=base_deposits[kind]
 	return cell
 
-func ensure_city_runtime(city: Dictionary) -> Dictionary:
+func ensure_city_runtime(city: Dictionary,retain:=true) -> Dictionary:
 	var key:=str(int(city.id))+(":"+str(int(city.c))+":"+str(int(city.r)) if city.has("districtOf") else "")
 	if city_runtimes.has(key):return city_runtimes[key]
 	var heights:=DetailTerrainScript.tile_heights(grid,int(city.c),int(city.r))
@@ -3796,7 +3818,7 @@ func ensure_city_runtime(city: Dictionary) -> Dictionary:
 	for cargo in city.economy.cargo:
 		if cargo.has("portCargoId"):production.next_cargo_id=maxi(production.next_cargo_id,int(cargo.portCargoId)+1)
 	var runtime={"heights":heights,"visual":visual,"nav":nav,"river":river,"production":production,"training":Training.new(),"market":MarketHouseholds.new(),"builder_navs":{}}
-	city_runtimes[key]=runtime
+	if retain:city_runtimes[key]=runtime
 	return runtime
 
 func prepare_city_navigation(city: Dictionary) -> void:
@@ -3859,7 +3881,7 @@ func place_city_building() -> void:
 		var result:=BridgeRules.place(city,grid[int(city.r)*Grid.COLS+int(city.c)],build_angle)
 		if result.has("error"):update_status(result.error);return
 		result.building.accessEntry=access
-		detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+		detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 		build_placement_mode=false;clear_building_preview();update_resources_status();update_status("Silla ehitus on järjekorras.");return
 	var target:=build_position
 	var field: Dictionary={}
@@ -3883,7 +3905,7 @@ func place_city_building() -> void:
 	if result.has("error"):update_status(result.error);return
 	if city.has("districtOf"):city.economy.buildings.append(result.building)
 	var design:Dictionary=game.get("houseDesignTemplatesV354",{}).get(type,{})
-	if not design.is_empty() and str(design.get("id",""))==house_designer_id(type,city):result.building.houseDesignV354=design.duplicate(true)
+	if not HouseEras.adapt(design,house_designer_id(type,city)).is_empty():result.building.houseDesignV354=design.duplicate(true)
 	if not coast_placement.is_empty():
 		for key in ["shoreAngle","landEntry","baseY","riverBankV276"]:
 			if coast_placement.has(key):result.building[key]=coast_placement[key]
@@ -3899,7 +3921,7 @@ func place_city_building() -> void:
 	if deposit_id>=0:result.building.depositId=deposit_id
 	Builder.clear_footprint(city.world,result.building)
 	city_nav.rebuild(city.economy.buildings,city.world.resources)
-	detail_root.sync_buildings(city,Production.upgrade_level(game,int(city.team)))
+	detail_root.sync_buildings(city,Production.visual_age(game,int(city.team)))
 	detail_root.sync_removed_resources(city.world.resources,elapsed,city.economy.buildings)
 	update_resources_status()
 	build_placement_mode=false;clear_building_preview()
@@ -4071,12 +4093,13 @@ func tick_ai_build(city: Dictionary,runtime: Dictionary) -> void:
 				if not error.is_empty():continue
 				if not is_same(candidate,city) and merchant_land_path(city,candidate,int(city.team))==null:continue
 				var context: Variant=candidate
-				if candidate.get("lazy",false):context=district_context_at(city,Vector2i(int(candidate.c),int(candidate.r)),true)
+				if candidate.get("lazy",false):context=district_context_at(city,Vector2i(int(candidate.c),int(candidate.r)),true,false)
 				if context==null:continue
 				var expansion:bool=candidate.get("expandV138",false);var was_expansion:bool=context.get("urbanExpansionV138",false)
 				if expansion:context.urbanExpansionV138=true
-				var local_runtime: Dictionary=runtime if is_same(context,city) else ensure_city_runtime(context)
+				var local_runtime: Dictionary=runtime if is_same(context,city) else ensure_city_runtime(context,not candidate.get("lazy",false))
 				if place_ai_building(context,local_runtime,type,city,false,0,int(zone)):
+					if candidate.get("lazy",false):keep_ai_district(city,context,local_runtime)
 					if expansion:territory_stamp=""
 					city.aiPlacementRetry={};return
 				if expansion and not was_expansion:context.erase("urbanExpansionV138")
@@ -4440,8 +4463,8 @@ func fit_game_dialog(dialog: AcceptDialog,desired: Vector2i) -> void:
 	await get_tree().process_frame
 	if not is_instance_valid(dialog) or not dialog.visible:return
 	var viewport_size:=Vector2i(get_viewport().get_visible_rect().size)
-	dialog.size=Vector2i(mini(desired.x,viewport_size.x-20),mini(desired.y,viewport_size.y-40))
-	dialog.position=Vector2i(maxi(0,(viewport_size.x-dialog.size.x)/2),maxi(0,(viewport_size.y-dialog.size.y)/2))
+	dialog.size=Vector2i(mini(desired.x,viewport_size.x-20),mini(desired.y,viewport_size.y-58))
+	dialog.position=Vector2i(maxi(0,(viewport_size.x-dialog.size.x)/2),maxi(34,(viewport_size.y-dialog.size.y+22)/2))
 
 func city_has_river(city: Dictionary) -> bool:
 	for d in [Vector2i.ZERO,Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1)]:
@@ -4574,15 +4597,13 @@ func restore_field_battle() -> void:
 
 
 func house_design_is_default(design: Dictionary) -> bool:
-	var defaults:Dictionary=preload("res://data/house_default_designs.json").data
-	var id:=str(design.get("id",""))
-	return defaults.has(id) and JSON.stringify(defaults[id])==JSON.stringify(design)
+	var reference:=HouseEras.default_plan(str(design.get("id","")))
+	return not reference.is_empty() and JSON.stringify(reference)==JSON.stringify(design)
 
 func house_designer_id(type: String,city: Dictionary) -> String:
 	if city.is_empty() or type in ["bridge","road"]:return ""
-	var age:=maxi(int(DetailView.BUILD_RULES.data.age.get(type,0)),Production.upgrade_level(game,int(city.team)))
-	if age>2:return ""
-	return DetailView.designer_id(type,age)
+	var age:=maxi(int(DetailView.BUILD_RULES.data.age.get(type,0)),Production.visual_age(game,int(city.team)))
+	return HouseEras.project_id(type,age)
 
 func open_type_house_designer(type: String,index: int) -> void:
 	if not city_created or settler_mode or (detail_mode and not can_build_on_detail()):return
@@ -4648,7 +4669,7 @@ func open_selected_house_designer() -> void:
 	panel.reset_requested.connect(func():
 		if not buildings.has(building):return
 		building.erase("houseDesignV354")
-		var age:=Production.upgrade_level(game,int(city.team))
+		var age:=Production.visual_age(game,int(city.team))
 		if building.type=="hall":detail_root.place_hall(building.x,building.z,age,float(building.get("buildingRotationV228",0)))
 		detail_root.sync_buildings(city,age);update_status("Algne hoonekujundus taastatud.")
 	)
@@ -4656,7 +4677,7 @@ func open_selected_house_designer() -> void:
 		if not buildings.has(building):return
 		if house_design_is_default(design):building.erase("houseDesignV354")
 		else:building.houseDesignV354=design.duplicate(true)
-		var age:=Production.upgrade_level(game,int(city.team))
+		var age:=Production.visual_age(game,int(city.team))
 		if building.type=="hall":detail_root.place_hall(building.x,building.z,age,float(building.get("buildingRotationV228",0)),building.get("houseDesignV354",{}))
 		detail_root.sync_buildings(city,age);update_status("Hoone kujundus salvestatud.")
 	)
@@ -4699,7 +4720,7 @@ func current_build_context() -> Dictionary:
 func can_build_on_detail() -> bool:
 	return detail_mode and (not detail_inspection or not detail_district.is_empty())
 
-func district_context_at(parent: Dictionary,tile: Vector2i,create:=false) -> Variant:
+func district_context_at(parent: Dictionary,tile: Vector2i,create:=false,retain:=true) -> Variant:
 	var existing:Variant=DistrictContexts.existing(parent,tile)
 	if existing!=null:return existing
 	if not create or tile.x<0 or tile.y<0 or tile.x>=Grid.COLS or tile.y>=Grid.ROWS:return null
@@ -4707,11 +4728,18 @@ func district_context_at(parent: Dictionary,tile: Vector2i,create:=false) -> Var
 	if owner==null or int(owner.id)!=int(parent.id):return null
 	var key:=DistrictContexts.key(tile)
 	if not game.has("tileWorlds"):game.tileWorlds={}
-	if not game.tileWorlds.has(key):
+	var world:Dictionary=game.tileWorlds.get(key,{})
+	if world.is_empty():
 		var cell:=city_cell_data({"c":tile.x,"r":tile.y})
-		game.tileWorlds[key]=DetailWorldScript.create(grid,cell,visual_biome(tile.y*Grid.COLS+tile.x),int(game.seed))
-	var world:Dictionary=game.tileWorlds[key]
-	return DistrictContexts.create(parent,tile,world,int(game.seed),float(game.time))
+		world=DetailWorldScript.create(grid,cell,visual_biome(tile.y*Grid.COLS+tile.x),int(game.seed))
+	if retain:game.tileWorlds[key]=world
+	return DistrictContexts.create(parent,tile,world,int(game.seed),float(game.time),retain)
+
+func keep_ai_district(parent: Dictionary,district: Dictionary,runtime: Dictionary) -> void:
+	if not district.has("districtOf"):return
+	var key:=DistrictContexts.key(Vector2i(int(district.c),int(district.r)))
+	parent.districts[key]=district;game.tileWorlds[key]=district.world
+	city_runtimes[str(int(parent.id))+":"+key]=runtime
 
 func district_nav_for(ctx: Dictionary,worker: Dictionary) -> LocalNavigation:
 	var runtime:=ensure_city_runtime(ctx);var base:LocalNavigation=runtime.nav
@@ -4720,13 +4748,16 @@ func district_nav_for(ctx: Dictionary,worker: Dictionary) -> LocalNavigation:
 	var nav:LocalNavigation=district_agents[key].nav;nav.trail_time=elapsed;return nav
 
 func tick_city_districts(parent: Dictionary,delta: float,production_dt: float,basic_dt: float) -> void:
+	var city_buildings: Array=[]
 	for district in parent.get("districts",{}).values():
+		if not DistrictContexts.has_activity(district):continue
+		if city_buildings.is_empty():city_buildings=DistrictContexts.all_buildings(parent)
 		DistrictContexts.attach(parent,district);district.economy.time=parent.economy.time
 		district.waterFetchV267=parent.get("waterFetchV267",false);district.waterFetchFarV280=parent.get("waterFetchFarV280",false)
 		var runtime:=ensure_city_runtime(district);var nav:LocalNavigation=runtime.nav;nav.trail_time=elapsed
 		Production.apply_building_upgrades(game,district)
 		city_cell_data(district)
-		runtime.production.city_wide_buildings=DistrictContexts.all_buildings(parent)
+		runtime.production.city_wide_buildings=city_buildings
 		var changed:bool=runtime.production.tick(game,district,nav,production_dt,grid,basic_dt)
 		var view:Node=visible_city_detail(district) if detail_mode else null
 		if view!=null:
@@ -4738,7 +4769,7 @@ func tick_city_districts(parent: Dictionary,delta: float,production_dt: float,ba
 			if changed:view.sync_removed_resources(district.world.resources,elapsed,district.economy.buildings)
 			var stamp:=visible_city_building_stamp(district)
 			if int(view.get_meta("district_building_stamp",-1))!=stamp:
-				view.set_meta("district_building_stamp",stamp);view.sync_buildings(district,Production.upgrade_level(game,int(parent.team)))
+				view.set_meta("district_building_stamp",stamp);view.sync_buildings(district,Production.visual_age(game,int(parent.team)))
 
 
 func wall_drawing_active() -> bool:
@@ -4874,7 +4905,7 @@ func place_wall_segments(type: String,segments: Array) -> Dictionary:
 		if first.is_empty():continue
 		var runtime:=ensure_city_runtime(first);runtime.nav.rebuild(first.economy.buildings,first.world.resources)
 		var view:Node=visible_city_detail(first)
-		if view!=null:view.sync_buildings(first,Production.upgrade_level(game,team));view.sync_removed_resources(first.world.resources,elapsed,first.economy.buildings)
+		if view!=null:view.sync_buildings(first,Production.visual_age(game,team));view.sync_removed_resources(first.world.resources,elapsed,first.economy.buildings)
 	Labor.allocate(game,parent);return {"built":prepared.size()}
 
 # The same city-relative plan can span any owned nearby detail tile.
@@ -5020,7 +5051,9 @@ func plan_ai_rural(parent: Dictionary) -> void:
 				if not is_coast(int(tile.c),int(tile.r)):continue
 			elif not cell.get("deposits",{}).get(deposit,false):continue
 			if merchant_land_path(parent,tile,team)==null:continue
-			var ctx:Variant=district_context_at(parent,Vector2i(int(tile.c),int(tile.r)),true)
+			var pos:=Vector2i(int(tile.c),int(tile.r))
+			var exists_before:=DistrictContexts.existing(parent,pos)!=null
+			var ctx:Variant=district_context_at(parent,pos,true,false)
 			if ctx==null:continue
 			var duplicate:=false;var local_count:=0
 			for b in ctx.economy.buildings:
@@ -5031,7 +5064,9 @@ func plan_ai_rural(parent: Dictionary) -> void:
 			var urban:Dictionary=territory_allocation.get("urban",{}).get(str(int(parent.id)),{})
 			if type=="farm" and not urban.has(DistrictContexts.key(Vector2i(int(ctx.c),int(ctx.r)))) and local_count>=2:continue
 			if not CityRules.urban_rule(game,ctx,cell,type,is_coast(int(ctx.c),int(ctx.r)),city_has_river(ctx),all).is_empty():continue
-			if place_ai_building(ctx,ensure_city_runtime(ctx),type,parent):
+			var local_runtime:=ensure_city_runtime(ctx,exists_before)
+			if place_ai_building(ctx,local_runtime,type,parent):
+				if not exists_before:keep_ai_district(parent,ctx,local_runtime)
 				pending+=1;all=DistrictContexts.all_buildings(parent);break
 		if pending>=2:break
 

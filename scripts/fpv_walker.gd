@@ -29,7 +29,7 @@ var model: Node3D
 var motion:=Motion.new()
 var overlay: CanvasLayer
 var bar: Control
-var hint: Label
+var hint: PanelContainer
 var names_button: Button
 var saved_camera: Dictionary={}
 var walking_environment: Environment
@@ -74,7 +74,12 @@ func _ready() -> void:
 	buttons.add_child(names_button)
 	var reposition:=Button.new();reposition.text="Paiguta ümber";reposition.pressed.connect(func():exit_walking();placed=false;start());buttons.add_child(reposition)
 	var leave:=Button.new();leave.text="Välju";leave.pressed.connect(exit_walking);buttons.add_child(leave)
-	hint=Label.new();hint.text="Klõpsa detailkaardil kohta, kuhu tegelane asetada · Esc katkestab";hint.position=Vector2(20,65);hint.visible=false;overlay.add_child(hint)
+	hint=PanelContainer.new();hint.theme=InterfaceTheme.get_theme();hint.visible=false;overlay.add_child(hint)
+	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP);hint.offset_left=-175;hint.offset_right=175;hint.offset_top=84
+	var placement:=HBoxContainer.new();hint.add_child(placement)
+	var instruction:=Label.new();instruction.text="Puuduta kaardil vaba kohta" if Mobile.active else "Klõpsa kaardil vaba kohta"
+	instruction.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;instruction.size_flags_horizontal=Control.SIZE_EXPAND_FILL;placement.add_child(instruction)
+	var cancel:=Button.new();cancel.text="Katkesta";cancel.pressed.connect(cancel_placing);placement.add_child(cancel)
 	touch_stick=Panel.new();touch_stick.size=Vector2(110,110);touch_stick.mouse_filter=Control.MOUSE_FILTER_IGNORE;touch_stick.visible=false
 	var ring:=StyleBoxFlat.new();ring.bg_color=Color(0.08,0.12,0.12,0.32);ring.border_color=Color(1,1,1,0.45);ring.set_border_width_all(2);ring.set_corner_radius_all(55);touch_stick.add_theme_stylebox_override("panel",ring);bar.add_child(touch_stick)
 	touch_knob=Panel.new();touch_knob.size=Vector2(38,38);touch_knob.position=Vector2(36,36);touch_knob.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -86,7 +91,7 @@ func start() -> void:
 	if active:exit_walking();return
 	if placing:cancel_placing();return
 	if placed and tile==current_tile():enter();return
-	placing=true;hint.visible=true;host.update_status("Klõpsa kaardil tegelase asukoht.")
+	placing=true;hint.visible=true
 
 func current_tile() -> Vector2i:
 	if is_instance_valid(host.detail_root):return host.detail_root.tree_cell
@@ -223,7 +228,7 @@ func pier_height(x: float,z: float) -> Variant:
 				if building.get("type","") not in ["fisher","harbor"] or not building.get("ready",false) or float(building.get("hp",0))<=0:continue
 				var bx:=float(building.x)+dc*225.0;var bz:=float(building.z)+dr*195.0
 				if absf(x-bx)>35 or absf(z-bz)>35:continue
-				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if surface==null:continue
 				var base:float=host.detail_rendered_height(bx,bz)
 				if building.has("baseY"):
@@ -266,10 +271,10 @@ func blocked(x: float,z: float) -> bool:
 			if bounds!=null:
 				var early:float=maxf(float(bounds.rx),float(bounds.rz))*2.0+35.0
 				if absf(x-(float(b.x)+dc*225.0))>=early or absf(z-(float(b.z)+dr*195.0))>=early:continue
-				var age:=Production.upgrade_level(host.game,int(city.team))
+				var age:=Production.visual_age(host.game,int(city.team))
 				var reach:float=maxf(maxf(float(bounds.rx),float(bounds.rz))*0.82+2.0,HouseCollision.reach(host.detail_root,b,age))
 				if absf(x-(float(b.x)+dc*225.0))>=reach or absf(z-(float(b.z)+dr*195.0))>=reach:continue
-				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if hit==true:return true
 				if hit==null and b.type not in ["woodgate","gatehouse"] and absf(x-(float(b.x)+dc*225.0))<float(bounds.rx)*0.82 and absf(z-(float(b.z)+dr*195.0))<float(bounds.rz)*0.82:return true
 	return false

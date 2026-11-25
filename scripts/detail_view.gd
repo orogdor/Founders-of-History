@@ -19,6 +19,7 @@ const OAK = preload("res://assets/world/oak_high.glb")
 const PINE = preload("res://assets/world/pine_high.glb")
 const PALM = preload("res://assets/world/palm_high.glb")
 const ROCK = preload("res://assets/world/rock_high.glb")
+const HouseEras=preload("res://scripts/house_eras.gd")
 const HousePlanModel=preload("res://scripts/house_plan_model.gd")
 const MODEL_FITS = preload("res://data/building_fits.json")
 const MODEL_ANIMATIONS = preload("res://data/procedural_animations.json")
@@ -189,32 +190,29 @@ func apply_vertex_colors(node: Node) -> void:
 	for child in node.get_children():apply_vertex_colors(child)
 
 static func designer_id(type: String,age: int) -> String:
-	var tier:=clampi(age,0,2)
-	for era in range(tier,0,-1):
-		var candidate:=type+"@"+str(era)
-		if MODEL_FITS.data.has(candidate):return candidate
-	if MODEL_FITS.data.has(type):return type
-	for era in range(tier+1,3):
-		var candidate:=type+"@"+str(era)
-		if MODEL_FITS.data.has(candidate):return candidate
-	return ""
+	return HouseEras.fit_id(type,age)
 
 func create_designed_building(type: String,age: int,design: Dictionary={},tier:=1) -> Node3D:
 	var building_age:=maxi(int(BUILD_RULES.data.age.get(type,0)),age)
-	var id:=designer_id(type,building_age)
-	if type=="palisade" and tier==2 and id=="palisade" and design.is_empty():id="palisade-tier2"
-	var procedural: String="procedural_"+type+"@"+str(clampi(building_age,0,6))
-	if (building_age>=3 or id.is_empty()) and ResourceLoader.exists("res://assets/buildings/"+procedural+".glb"):id=procedural
-	if id.is_empty():return null
-	var file: String="res://assets/buildings/"+id+".glb"
-	if not ResourceLoader.exists(file):return null
+	var fit_id:=designer_id(type,building_age)
+	if type=="palisade" and tier==2 and fit_id=="palisade" and design.is_empty():fit_id="palisade-tier2"
+	var plan:=HouseEras.live_plan(type,building_age,design)
+	var id:=fit_id
 	var raw: Node3D
-	if not design.is_empty() and str(design.get("id",""))==id and building_age<=2:raw=HousePlanModel.from_design(design)
-	else:raw=load(file).instantiate()
-	if id.begins_with("procedural_") and type not in FALLBACK_MODEL_TYPES:apply_town_material(raw)
-	else:apply_vertex_colors(raw)
-	if MODEL_FITS.data.has(id):
-		var fit: Dictionary=MODEL_FITS.data[id]
+	if not plan.is_empty():
+		raw=HousePlanModel.from_design(plan)
+		id=str(plan.id)
+	else:
+		var procedural: String="procedural_"+type+"@"+str(clampi(building_age,0,6))
+		if (building_age>=3 or fit_id.is_empty()) and ResourceLoader.exists("res://assets/buildings/"+procedural+".glb"):id=procedural
+		if id.is_empty():return null
+		var file: String="res://assets/buildings/"+id+".glb"
+		if not ResourceLoader.exists(file):return null
+		raw=load(file).instantiate()
+		if id.begins_with("procedural_") and type not in FALLBACK_MODEL_TYPES:apply_town_material(raw)
+		else:apply_vertex_colors(raw)
+	if not id.begins_with("procedural_") and MODEL_FITS.data.has(fit_id):
+		var fit: Dictionary=MODEL_FITS.data[fit_id]
 		raw.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
 		raw.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
 	var wrapper:=Node3D.new()

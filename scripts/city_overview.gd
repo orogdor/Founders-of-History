@@ -57,7 +57,7 @@ func set_card(key: String,value: String,sub: String,ratio: float=-1,warn:=false)
 func open_screen() -> void:
  if not host.city_created:return
  var viewport_size:=get_viewport().get_visible_rect().size
- scroll.custom_minimum_size=Vector2(maxf(200,minf(540,viewport_size.x-90)),maxf(160,minf(410,viewport_size.y-120)))
+ scroll.custom_minimum_size=Vector2(maxf(200,minf(540,viewport_size.x-90)),maxf(100,minf(379,viewport_size.y-150)))
  grid.columns=2 if viewport_size.x<500 else 3
  refresh();popup_centered();host.fit_game_dialog(self,Vector2i(600,500))
 

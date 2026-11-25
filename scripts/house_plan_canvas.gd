@@ -1,4 +1,6 @@
 extends Control
+
+const HouseEras=preload("res://scripts/house_eras.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const Paper=preload("res://assets/house_designer/plan-paper.svg")
 const Edit=preload("res://scripts/house_plan_edit.gd")
@@ -83,7 +85,7 @@ func _draw() -> void:
  var plan:=current_plan()
  draw_set_transform_matrix(plan_transform())
  draw_texture_rect(Paper,Rect2(Vector2.ZERO,Vector2(960,625)),false)
- var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{})
+ var definition:Dictionary=HouseEras.definition(str(design.get("id","")))
  if view_scale>=1.8:
   for x in range(10,960,20):draw_line(Vector2(x,0),Vector2(x,625),Color("65492712"),1)
   for y in range(10,625,20):draw_line(Vector2(0,y),Vector2(960,y),Color("65492712"),1)
@@ -113,7 +115,7 @@ func _draw() -> void:
  for item in plan.get("items",[]):draw_plan_item(item)
  if show_dimensions:draw_plan_dimensions(plan,geometry)
  if drag:
-  var shape:=Plan.candidate(tool,drag_start,drag_end,Edit.LIMITS[clampi(era,0,2)])
+  var shape:=Plan.candidate(tool,drag_start,drag_end,Edit.LIMITS[clampi(era,0,Edit.LIMITS.size()-1)])
   if not shape.is_empty() and shape.has("type"):
    var poly:=Plan.room_polygon(shape)
    if poly.size()>2:draw_polyline(PackedVector2Array(Array(poly)+[poly[0]]),Color("2b6540"),3)

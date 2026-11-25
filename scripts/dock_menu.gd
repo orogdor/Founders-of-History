@@ -497,7 +497,8 @@ func populate_villages() -> void:
 	var research: Dictionary=host.game.research[0]
 	var topic: String=str(Research.DATA.data.techs.get(str(research.active),{}).get("name","Ühtegi uuringut pole käimas"))
 	var treasury:=make_trade_group("Kuningriigi kassa",topic,"cmd_research")
-	var boost:=Button.new();boost.text="Kiirenda uuringut\n40 kulda → +12 punkti";boost.disabled=research.active==null;boost.pressed.connect(boost_research);treasury.add_child(boost)
+	var points:=Research.purchasable_points(host.game,0)
+	var boost:=Button.new();boost.text="Kiirenda uuringut\n40 kulda → +%.1f punkti" % points if points>0.000001 else "Uuringut ei saa praegu kiirendada";boost.disabled=points<=0.000001;boost.pressed.connect(boost_research);treasury.add_child(boost)
 	var count:=0
 	for landmark in host.game.get("landmarks",[]):
 		if Discoveries.village_type(landmark)!="traders":continue
@@ -543,7 +544,7 @@ func trade_from_group(id: String,offer_id: String) -> void:
 func boost_research() -> void:
 	var result:=Research.buy_research(host.game,0)
 	if result.has("error"):host.update_status(result.error)
-	else:host.update_status("Kassa: 40 kulda → uuring kiirenes (+12 punkti), "+str(result.town))
+	else:host.update_status("Kassa: 40 kulda → +%.1f teaduspunkti · %s" % [result.points,result.town])
 	rebuild()
 
 func open_village(id: String) -> void:

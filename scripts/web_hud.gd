@@ -175,6 +175,7 @@ func build_hud() -> void:
 	version.add_theme_color_override("font_outline_color",Color("101820"));version.add_theme_constant_override("outline_size",4)
 	var hint:=text_item("status_line","",15)
 	hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_color_override("font_outline_color",Color("101820"));hint.add_theme_constant_override("outline_size",4)
 	hotspot("world_toggle","Vaheta kaardivaadet",func():host.toggle_detail())
 	for key in ["gold","food","stone"]:hotspot(key+"_button","Kuningriigi varud",open_stores.bind(key))
 	hotspot("population_button","Linnad ja asunikud",func():stores_panel.visible=false;dock_menu.open_menu("cities"))
@@ -183,8 +184,8 @@ func build_hud() -> void:
 	image_button("settings","ui-art-v306_settings","Menüü ja mängu seaded",toggle_menu)
 	picture("research_frame","ui-art-v302_research")
 	image_button("research_icon","ui-art-v263_cmd_research","Uurimine",open_research)
-	text_item("research_title","Avastus:",14,Color("24170c"))
-	var research_name:=text_item("research_name","Vali uurimus",15,Color("24170c"))
+	var research_name:=text_item("research_name","Vali uurimus",15,Color("ffe7b6"))
+	research_name.add_theme_stylebox_override("normal",menu_box(Color("12202a"),Color("9b783b")))
 	research_name.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var progress:=ProgressBar.new()
 	progress.show_percentage=false;progress.min_value=0;progress.max_value=100
@@ -264,9 +265,8 @@ func layout() -> void:
 	place("pause",right*0.91,4,48,45)
 	place("settings",right*0.952,4,42,43)
 	place("research_frame",7,54,248,356)
-	place("research_icon",65,80,135,135)
-	place("research_title",46,177,170,20)
-	place("research_name",42,196,178,35)
+	place("research_icon",75,78,114,114)
+	place("research_name",23,172,218,46)
 	place("research_progress",69,253,124,4)
 	for i in 4:place("research_queue_"+str(i),[5.0,45.0,101.0,160.0][i],[225.0,257.0,268.0,257.0][i],54,53)
 	place("research_all",205,228,47,53)
@@ -533,7 +533,7 @@ func show_journal() -> void:
 	for i in mini(60,events.size()):lines.append("Käik %d · %s" % [floori(float(events[i].get("time",0))/60.0)+1,str(events[i].get("text",""))])
 	journal_text.text="\n\n".join(lines) if not lines.is_empty() else "Sündmusi veel ei ole."
 	var viewport_size:=get_viewport_rect().size
-	journal_text.custom_minimum_size=Vector2(maxf(180,minf(500,viewport_size.x-90)),maxf(150,minf(420,viewport_size.y-120)))
+	journal_text.custom_minimum_size=Vector2(maxf(180,minf(500,viewport_size.x-90)),maxf(100,minf(390,viewport_size.y-150)))
 	journal_dialog.popup_centered();host.fit_game_dialog(journal_dialog,Vector2i(560,500))
 
 func change_zoom(factor: float) -> void:
@@ -583,8 +583,12 @@ func _process(delta: float) -> void:
 		last_research_art=stamp
 		var tech_path: String=UI+"tech/"+active+".webp"
 		var icon: TextureButton=elements.research_icon
+		icon.tooltip_text=labels.research_name.text
 		var selected_path: String=tech_path if ResourceLoader.exists(tech_path) else UI+"ui-art-v263_cmd_research.webp"
 		if icon.texture_normal.resource_path != selected_path:icon.texture_normal=load(selected_path)
+		if selected_path==tech_path:
+			var mask:=ShaderMaterial.new();mask.shader=preload("res://scripts/house_ui_circle.gdshader");icon.material=mask
+		else:icon.material=null
 		for i in 4:
 			var button: TextureButton=elements["research_queue_"+str(i)]
 			var id: String=str(queue[i]) if i<queue.size() else ""

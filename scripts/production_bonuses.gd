@@ -10,6 +10,9 @@ static func upgrade_level(state: Dictionary,team: int) -> int:
 	var known: Array=state.research[team].known
 	return 6 if "modernity" in known else (5 if "industrialization" in known else (4 if "renaissance" in known else (3 if "medieval_crafts" in known else (2 if "iron_crafts" in known else (1 if "bronze_crafts" in known else 0)))))
 
+static func visual_age(state: Dictionary,team: int) -> int:
+	return maxi(int(state.ages[team]),upgrade_level(state,team))
+
 static func national(state: Dictionary,team: int) -> float:
 	return 1.0+upgrade_level(state,team)*0.25+(0.1 if "stone_crafts" in state.research[team].known else 0.0)
 

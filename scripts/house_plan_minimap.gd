@@ -1,4 +1,6 @@
 extends Control
+
+const HouseEras=preload("res://scripts/house_eras.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
 var design: Dictionary={}
@@ -22,7 +24,7 @@ func _draw() -> void:
  var source_factor:float=minf(0.42,168.0/maxf(60,lo.distance_to(hi))) if not cloud.is_empty() else 0.185
  var factor:float=source_factor*minf(size.x,size.y)/192.0
  draw_set_transform(size/2-center*factor,0,Vector2.ONE*factor)
- var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{})
+ var definition:Dictionary=HouseEras.definition(str(design.get("id","")))
  if str(design.get("id",""))=="fisher" or definition.get("base","")=="fisher" or definition.get("coast",false):draw_rect(Rect2(0,548,960,77),Color("426c7a"))
  for key in ["yard","plot"]:
   if design.get(key) is Array:

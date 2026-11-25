@@ -7,6 +7,7 @@ const PanelFrame=preload("res://scripts/panel_frame.gd")
 const Era=preload("res://scripts/era_economy.gd")
 const Economy=preload("res://scripts/economy_rules.gd")
 const UI := "res://assets/ui/"
+const Circle=preload("res://scripts/house_ui_circle.gdshader")
 var host: Node
 var update_clock:=0.0
 var last_state: String=""
@@ -25,6 +26,7 @@ var summary: Label
 var queue_label: Label
 var pause_button: Button
 var queue_buttons: Array[Button]=[]
+var queue_pictures: Array[TextureRect]=[]
 var age_buttons: Array[Button]=[]
 var progression: Dictionary={}
 var graph: Dictionary={}
@@ -68,17 +70,19 @@ func _ready() -> void:
 	var minus:=Button.new();minus.text="−";minus.tooltip_text="Vähenda tehnoloogiapuud";minus.pressed.connect(change_zoom.bind(-0.1));add_child(minus);elements.minus=minus
 	var scale_label:=Label.new();scale_label.text="%d%%" % roundi(zoom_level*100);scale_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;add_child(scale_label);elements.scale_label=scale_label
 	var plus:=Button.new();plus.text="+";plus.tooltip_text="Suurenda tehnoloogiapuud";plus.pressed.connect(change_zoom.bind(0.1));add_child(plus);elements.plus=plus
-	detail_picture=TextureRect.new();detail_picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
-	detail_picture.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;detail_picture.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	add_child(detail_picture);elements.detail_picture=detail_picture
-	detail_title=Label.new();detail_title.add_theme_font_size_override("font_size",23);detail_title.add_theme_color_override("font_color",Color("ffe7ae"))
-	var title_font:=SystemFont.new();title_font.font_names=PackedStringArray(["Georgia","Times New Roman","serif"]);title_font.font_weight=700;detail_title.add_theme_font_override("font",title_font)
-	detail_title.clip_text=true;add_child(detail_title);elements.detail_title=detail_title
 	var detail_scroll:=ScrollContainer.new();detail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(detail_scroll);elements.detail=detail_scroll
+	var inspector:=VBoxContainer.new();inspector.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	inspector.add_theme_constant_override("separation",7);detail_scroll.add_child(inspector)
+	detail_picture=TextureRect.new();detail_picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+	detail_picture.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;detail_picture.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	inspector.add_child(detail_picture)
+	detail_title=Label.new();detail_title.add_theme_font_size_override("font_size",23);detail_title.add_theme_color_override("font_color",Color("ffe7ae"))
+	var title_font:=SystemFont.new();title_font.font_names=PackedStringArray(["Georgia","Times New Roman","serif"]);title_font.font_weight=700;detail_title.add_theme_font_override("font",title_font)
+	detail_title.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;inspector.add_child(detail_title)
 	detail=Label.new();detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	detail.add_theme_color_override("font_color",Color("f6e6c2"));detail.add_theme_font_size_override("font_size",12);detail.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	detail_scroll.add_child(detail)
+	inspector.add_child(detail)
 	var start:=Button.new();start.text="Alusta uurimist";start.pressed.connect(start_selected);add_child(start);elements.start=start
 	var gold:=StyleBoxFlat.new();gold.bg_color=Color("c8a465");gold.set_corner_radius_all(3)
 	var gold_disabled:=gold.duplicate();gold_disabled.bg_color=Color("655b47")
@@ -92,7 +96,12 @@ func _ready() -> void:
 		var circle:=StyleBoxFlat.new();circle.bg_color=Color("071725");circle.border_color=Color("ae8b4f");circle.set_border_width_all(2);circle.set_corner_radius_all(100)
 		button.add_theme_stylebox_override("normal",circle);button.add_theme_stylebox_override("disabled",circle);button.add_theme_stylebox_override("hover",circle)
 		button.add_theme_color_override("font_color",Color("d9b673"));button.add_theme_color_override("font_disabled_color",Color("d9b673"));button.add_theme_font_size_override("font_size",26)
-		add_child(button);queue_buttons.append(button);elements["queue_slot_"+str(i)]=button
+		add_child(button);queue_buttons.append(button)
+		var portrait:=TextureRect.new();portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var mask:=ShaderMaterial.new();mask.shader=Circle;portrait.material=mask
+		button.add_child(portrait);portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT,Control.PRESET_MODE_MINSIZE,3)
+		queue_pictures.append(portrait)
 	get_viewport().size_changed.connect(layout);layout()
 
 func layout() -> void:
@@ -106,34 +115,29 @@ func layout() -> void:
 	var left:=30.0*factor;var right:=dimensions.x-30.0*factor
 	var inspector_width:=290.0*factor
 	var map_width:=maxf(100.0,right-left-inspector_width-20.0*factor)
-	var map_top:=233.0*factor
+	var map_top:=224.0*factor
 	var queue_top:=dimensions.y-127.0*factor
 	var map_height:=maxf(70.0,queue_top-map_top)
 	var inspector_x:=left+map_width+20.0*factor
-	var picture_top:=158.0*factor
+	var picture_top:=154.0*factor
 	var action_top:=queue_top-(82.0 if elements.queue.visible else 40.0)*factor
-	var picture_height:=clampf(action_top-picture_top-95.0*factor,32.0*factor,170.0*factor)
-	var title_top:=picture_top+picture_height+8.0*factor
-	var text_top:=title_top+30.0*factor
+	detail_picture.custom_minimum_size.y=clampf((action_top-picture_top)*0.24,0,112.0*factor)
 	detail_title.add_theme_font_size_override("font_size",maxi(12,roundi(23.0*factor)))
 	var coords: Dictionary={
 		"frame":[0,0,dimensions.x,dimensions.y],"eyebrow":[left,28*factor,map_width,16*factor],
 		"heading":[left,46*factor,map_width,42*factor],"close":[dimensions.x-53*factor,20*factor,38*factor,38*factor],
-		"summary":[left,104*factor,map_width,40*factor],"pause":[dimensions.x-224*factor,103*factor,194*factor,34*factor],
-		"tree_summary":[left,153*factor,maxf(0,map_width-140*factor),25*factor],
-		"minus":[left+map_width-130*factor,153*factor,36*factor,30*factor],"scale_label":[left+map_width-91*factor,153*factor,48*factor,30*factor],"plus":[left+map_width-38*factor,153*factor,36*factor,30*factor],
+		"summary":[left,95*factor,map_width,65*factor],"pause":[dimensions.x-224*factor,103*factor,194*factor,34*factor],
+		"tree_summary":[left,165*factor,maxf(0,map_width-140*factor),25*factor],
+		"minus":[left+map_width-130*factor,164*factor,36*factor,26*factor],"scale_label":[left+map_width-91*factor,164*factor,48*factor,26*factor],"plus":[left+map_width-38*factor,164*factor,36*factor,26*factor],
 		"map_back":[left,map_top,map_width,map_height],"scroll":[left,map_top,map_width,map_height],
 		"divider":[inspector_x,153*factor,1*factor,maxf(1,queue_top-153*factor)],
-		"detail_picture":[inspector_x+18*factor,picture_top,inspector_width-18*factor,picture_height],
-		"detail_title":[inspector_x+18*factor,title_top,inspector_width-18*factor,27*factor],
-		"detail":[inspector_x+18*factor,text_top,inspector_width-18*factor,maxf(0.0,action_top-text_top-6.0*factor)],
+		"detail":[inspector_x+18*factor,picture_top,inspector_width-18*factor,maxf(0.0,action_top-picture_top-7.0*factor)],
 		"start":[inspector_x+18*factor,queue_top-40*factor,inspector_width-18*factor,38*factor],
 		"queue":[inspector_x+18*factor,queue_top-82*factor,inspector_width-18*factor,38*factor],
 		"queue_line":[left,queue_top+15*factor,dimensions.x-left*2,1*factor],"queue_label":[left,queue_top,0,0]}
 	for name in coords:
 		var item: Array=coords[name];var node: Control=elements[name]
 		node.position=origin+Vector2(item[0],item[1]);node.size=Vector2(item[2],item[3])
-	detail.custom_minimum_size.x=maxf(80,elements.detail.size.x-18)
 	var shown:=0
 	for age in age_buttons.size():
 		var age_button:=age_buttons[age]
@@ -201,7 +205,7 @@ func refresh() -> void:
 		var button:=queue_buttons[i]
 		var id: String=str(all[i]) if i<all.size() and all[i]!=null else ""
 		var image_path:=UI+"tech/"+id+".webp"
-		button.icon=load(image_path) if not id.is_empty() and ResourceLoader.exists(image_path) else null
+		queue_pictures[i].texture=load(image_path) if not id.is_empty() and ResourceLoader.exists(image_path) else null
 		button.text="+" if id.is_empty() else ""
 		button.disabled=id.is_empty()
 		button.tooltip_text=("Aktiivne: " if i==0 else "Eemalda järjekorrast: ")+str(techs.get(id,{}).get("name","")) if not id.is_empty() else "Tühi järjekorrakoht"
@@ -243,7 +247,8 @@ func update_research_text(r: Dictionary) -> void:
 	elif r.known.size()>=techs.size():title="Kõik tehnoloogiad uuritud"
 	elif not r.queue.is_empty():title="Järjekorras: "+str(techs.get(str(r.queue[0]),{}).get("name",r.queue[0]))
 	var tempo: String={"epic":"Eepiline","normal":"Tavaline","fast":"Kiire"}.get(str(host.game.get("tempo","normal")),"Tavaline")
-	summary.text=title+" · %.1f teaduspunkti/min · tempo: %s. 1 elanik = 1 teadust/min. Iga valmis aktiivne haridusasutus korrutab linna teaduse ×1,5; avastused lisavad boonuseid." % [rate,tempo]
+	summary.text=title+"\n%.1f teaduspunkti/min · %s tempo" % [rate,tempo.to_lower()]
+	summary.tooltip_text="1 elanik = 1 teaduspunkt minutis. Valmis aktiivne haridusasutus korrutab linna teaduse ×1,5. Avastused annavad lisapunkte."
 	for id in card_states:
 		var label: Label=card_states[id]
 		if id in r.known:label.text="Uuritud"

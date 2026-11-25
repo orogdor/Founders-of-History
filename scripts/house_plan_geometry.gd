@@ -2,6 +2,17 @@ extends RefCounted
 # Plan calculations translated from the original V355 house builder. Coordinates
 # remain in the original 960x625 plan space (73 px per metre).
 const PX_PER_M:=73.0
+const DOOR_WIDTH_METERS:=1.32
+
+static func door_height(era: int,style: String="") -> float:
+ return [1.91,1.98,2.05,2.02,2.10,2.18,2.20][era]+(0.08 if style=="arched" else 0.04 if style=="double" else 0.0)
+
+static func wall_height(design: Dictionary,era: int) -> float:
+ var base_height:float=[1.91,2.04,2.18,2.27,2.48,2.68,2.75][era]
+ var height:=base_height*float(design.get("wallScale",100))/100.0
+ for opening in design.get("openings",[]):
+  if opening.get("type","")=="door":height=maxf(height,door_height(era,str(opening.get("style","")))+0.16)
+ return height
 
 static func point(p: Dictionary) -> Vector2:
  return Vector2(float(p.get("x",0)),float(p.get("y",0)))
@@ -78,11 +89,16 @@ static func plan_geometry(design: Dictionary) -> Dictionary:
    floors.append(poly)
  var curved:=[]
  for room in design.get("rooms",[]):
-  if room.get("type","")=="round":curved.append_array(edges(room_polygon(room)))
+  if room.get("type","")=="round":
+   for side in edges(room_polygon(room)):
+    side.curve_center=point(room.a);side.curve_radius=float(room.r)
+    curved.append(side)
  for wall in walls:
   wall.group="outer";wall.curved=false
   for side in curved:
-   if closest(wall.a,side.a,side.b).distance_to(wall.a)<0.01 and closest(wall.b,side.a,side.b).distance_to(wall.b)<0.01:wall.curved=true;break
+   if closest(wall.a,side.a,side.b).distance_to(wall.a)<0.01 and closest(wall.b,side.a,side.b).distance_to(wall.b)<0.01:
+    wall.curved=true;wall.curve_center=side.curve_center;wall.curve_radius=side.curve_radius
+    break
  for run in design.get("wallRuns",[]):
   for i in range(1,run.size()):walls.append({"a":point(run[i-1]),"b":point(run[i]),"group":"outer"})
  for wall in design.get("inner",[]):walls.append({"a":point(wall.a),"b":point(wall.b),"group":"inner"})
@@ -129,7 +145,8 @@ static func opening_hit(design: Dictionary,p: Vector2,type: String) -> Dictionar
  if hit.is_empty():return {}
  var edge:Dictionary=hit.edge;var length:float=edge.a.distance_to(edge.b)
  if length<=0:return {}
- var size:=minf(42.0 if type=="door" else 30.0,length*0.72)
+ if type=="door" and not edge.get("curved",false) and length<DOOR_WIDTH_METERS*PX_PER_M+8.0:return {}
+ var size:=minf(DOOR_WIDTH_METERS*PX_PER_M if type=="door" else 30.0,length-8.0)
  var t:float=edge.a.distance_to(hit.point)/length;var padding:float=(size/2.0+4.0)/length
  if not edge.get("curved",false):hit.point=edge.a.lerp(edge.b,clampf(t,padding,1.0-padding))
  return hit
@@ -154,22 +171,27 @@ static func shelter_shape(run: Array) -> bool:
  var x:=b-a;var y:=c-b;var z:=d-c;var left:=x.length();var back:=y.length();var right:=z.length()
  return minf(left,minf(back,right))>=35 and minf(left,right)/maxf(left,right)>0.68 and absf(x.dot(y)/(left*back))<0.20 and absf(z.dot(y)/(right*back))<0.20 and x.dot(z)/(left*right)<-0.92
 
-static func opening_width(opening: Dictionary,edge: Dictionary) -> float:
+static func opening_width(opening: Dictionary,edge: Dictionary,for_estimate:=false) -> float:
  var widths:Dictionary={"hide":40.0,"wattle":40.0,"plank":42.0,"double":64.0,"arched":46.0,"mycenaean":44.0,"greek":42.0,"hole":24.0,"shutter":30.0,"slit":12.0,"lattice":34.0,"archwin":34.0}
- var fallback:=42.0 if opening.get("type","")=="door" else 30.0
- return minf(float(widths.get(opening.get("style",""),fallback)),edge.a.distance_to(edge.b)*0.72)
+ var length:float=edge.a.distance_to(edge.b)
+ if for_estimate:return minf(float(widths.get(opening.get("style",""),42.0 if opening.get("type","")=="door" else 30.0)),length*0.72)
+ if opening.get("type","")=="door":
+  return minf(PX_PER_M*(1.50 if opening.get("style","")=="double" else DOOR_WIDTH_METERS),maxf(length-8.0,length*0.72))
+ return minf(float(widths.get(opening.get("style",""),30.0)),length*0.72)
 
-static func split_wall(edge: Dictionary,design: Dictionary) -> Array:
+static func split_wall(edge: Dictionary,design: Dictionary,for_estimate:=false) -> Array:
  var a:Vector2=edge.a;var b:Vector2=edge.b;var direction:=b-a;var length:=direction.length()
  if length<0.000001:return []
  var cuts:=[];var finishes:=[];var stops:Array=[0.0,1.0]
  for opening in design.get("openings",[]):
   if opening.get("group","")!=edge.group:continue
   var p:=point(opening.point);var d:=closest(p,a,b).distance_to(p);var curved:bool=edge.get("curved",false)
-  var half:=35.0 if curved and opening.type=="door" else 21.0 if opening.type=="door" else 15.0
+  var half:=DOOR_WIDTH_METERS*PX_PER_M*0.56 if opening.type=="door" else 15.0
+  if for_estimate and opening.type=="door":half=35.0 if curved else 21.0
   if d>(half if curved else 2.0):continue
   var projection:float=(p-a).dot(direction)/(length*length)
-  var reach:float=(sqrt(maxf(0,half*half-d*d*(1.0 if d<2 else 0.25))) if curved else opening_width(opening,edge)/2)/length
+  var reach:float=(sqrt(maxf(0,half*half-d*d*(1.0 if d<2 else 0.25))) if curved else opening_width(opening,edge,for_estimate)/2)/length
+  if not for_estimate and not curved and opening.type=="door":projection=clampf(projection,reach,1.0-reach)
   var cut:Dictionary={"from":clampf(projection-reach,0,1),"to":clampf(projection+reach,0,1),"opening":opening,"curved":curved}
   cuts.append(cut);stops.append(cut.from);stops.append(cut.to)
  for choice in design.get("wallFinishes",[]):
@@ -184,6 +206,7 @@ static func split_wall(edge: Dictionary,design: Dictionary) -> Array:
   var start:float=stops[i-1];var end:float=stops[i]
   if end-start<0.0001:continue
   var middle:float=(start+end)/2;var item:Dictionary={"a":a.lerp(b,start),"b":a.lerp(b,end),"group":edge.group,"finish":design.get("wallStyle","") if edge.group=="outer" else "weave"}
+  if edge.get("curved",false):item.curve_center=edge.curve_center;item.curve_radius=edge.curve_radius
   for cut in cuts:
    if cut.from<=middle and cut.to>=middle:item.type=cut.opening.type;item.opening=cut.opening;item.curved=cut.curved;break
   for finish in finishes:

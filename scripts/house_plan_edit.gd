@@ -1,7 +1,9 @@
 extends RefCounted
+
+const HouseEras=preload("res://scripts/house_eras.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
-const LIMITS:=[8.5,10.5,12.3]
+const LIMITS:=HouseEras.LIMITS
 
 # The editor keeps the same dictionaries and field names as the original game.
 static func snap(design: Dictionary,tool: String,p: Vector2,snap_on:=true) -> Vector2:
@@ -24,10 +26,10 @@ static func in_floor(p: Vector2,floors: Array) -> bool:
  return false
 
 static func add_shape(design: Dictionary,tool: String,start: Vector2,end: Vector2,era: int) -> Dictionary:
- var shape:=Plan.candidate(tool,start,end,LIMITS[clampi(era,0,2)])
+ var shape:=Plan.candidate(tool,start,end,LIMITS[clampi(era,0,LIMITS.size()-1)])
  if shape.is_empty():return {"error":"Liiga väike ala."}
  var next:=design.duplicate(true)
- var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{})
+ var definition:Dictionary=HouseEras.definition(str(design.get("id","")))
  var coastal:=str(definition.get("base",design.get("id","")))=="fisher" or bool(definition.get("coast",false))
  if tool=="pier":
   if not coastal:return {"error":"Muuli saab lisada ainult rannaehitisele."}
@@ -87,7 +89,7 @@ static func append_wall(design: Dictionary,a: Vector2,b: Vector2,era: int) -> Di
    var p:=Plan.point(run[i]);var q:=Plan.point(run[(i+1)%run.size()]);area+=p.cross(q)
    low=low.min(p);high=high.max(p)
   if run.size()<3 or absf(area/2)<900:return {"error":"Hoones peab jääma rohkem ruumi."}
-  if maxf(high.x-low.x,high.y-low.y)>LIMITS[clampi(era,0,2)]*Plan.PX_PER_M+1:return {"error":"Hoone ületab ajastu lubatud suuruse."}
+  if maxf(high.x-low.x,high.y-low.y)>LIMITS[clampi(era,0,LIMITS.size()-1)]*Plan.PX_PER_M+1:return {"error":"Hoone ületab ajastu lubatud suuruse."}
   for i in run.size():
    for j in range(i+2,run.size()):
     if not Plan.crosses(Plan.point(run[i]),Plan.point(run[(i+1)%run.size()]),Plan.point(run[j]),Plan.point(run[(j+1)%run.size()])).is_empty():return {"error":"Välisseinad ei tohi ristuda."}
@@ -112,7 +114,7 @@ static func append_wall(design: Dictionary,a: Vector2,b: Vector2,era: int) -> Di
 
 static func item_zone(design: Dictionary,type: String,p: Vector2) -> String:
  if not Catalog.data.itemSizes.has(type):return ""
- var id:=str(design.id);var definition:Dictionary=Catalog.data.catalog.get(id,{})
+ var id:=str(design.id);var definition:Dictionary=HouseEras.definition(id)
  if type=="tower" and str(definition.get("base",id))=="watchtower":return "site"
  var dims:Array=Catalog.data.itemSizes[type];var half:=Vector2(float(dims[0]),float(dims[1]))/2
  var corners:=PackedVector2Array([p-half,Vector2(p.x+half.x,p.y-half.y),p+half,Vector2(p.x-half.x,p.y+half.y)])

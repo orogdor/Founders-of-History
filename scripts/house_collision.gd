@@ -1,15 +1,19 @@
 extends RefCounted
 const PlanCollision=preload("res://scripts/house_plan_collision.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
-const Defaults=preload("res://data/house_default_designs.json")
+const HouseEras=preload("res://scripts/house_eras.gd")
 const DATA=preload("res://data/house_collisions.json")
 const FITS=preload("res://data/building_fits.json")
 const RULES=preload("res://data/build_rules.json")
 static var custom_cache: Dictionary={}
 static var reach_cache: Dictionary={}
 
+static func collision_key(design: Dictionary) -> String:
+ var id:=str(design.get("id",""))
+ return id if is_same(design,HouseEras.default_plan(id)) else JSON.stringify(design)
+
 static func custom_walls(design: Dictionary) -> Array:
- var key:=JSON.stringify(design)
+ var key:=collision_key(design)
  if not custom_cache.has(key):
   if custom_cache.size()>=128:custom_cache.clear();reach_cache.clear()
   custom_cache[key]=PlanCollision.walls(design)
@@ -19,13 +23,12 @@ static func custom_walls(design: Dictionary) -> Array:
 # footprint. This radius includes all original or custom collision segments.
 static func reach(detail: Node,building: Dictionary,age: int) -> float:
  var type:=str(building.get("type",""));var visual_age:=maxi(int(RULES.data.age.get(type,0)),age)
- if visual_age>2:return 0.0
  var id:String=detail.designer_id(type,visual_age)
  if type=="palisade" and int(building.get("woodFortTierV1757",1))==2 and building.get("houseDesignV354",{}).is_empty() and id=="palisade":id="palisade-tier2"
- if not DATA.data.has(id) or not FITS.data.has(id):return 0.0
- var design: Variant=building.get("houseDesignV354",{})
- var custom: bool=design is Dictionary and not design.is_empty() and str(design.get("id",""))==id
- var key:=id+":"+(JSON.stringify(design) if custom else "default")
+ var design:=HouseEras.live_plan(type,visual_age,building.get("houseDesignV354",{}))
+ var custom:=not design.is_empty()
+ if not FITS.data.has(id) or (not custom and (visual_age>2 or not DATA.data.has(id))):return 0.0
+ var key:=id+":"+(collision_key(design) if custom else "default")
  var radius:=float(reach_cache.get(key,-1))
  if radius<0:
   var fit:Dictionary=FITS.data[id];var walls:Array=custom_walls(design) if custom else DATA.data[id];radius=0.0
@@ -44,11 +47,10 @@ static func pier_surface(detail: Node,building: Dictionary,age: int,x: float,z: 
  var type:=str(building.get("type",""))
  if type not in ["fisher","harbor"] or not building.get("ready",false):return null
  var visual_age:=maxi(int(RULES.data.age.get(type,0)),age)
- if visual_age>2:return null
  var id:String=detail.designer_id(type,visual_age)
- if not Defaults.data.has(id) or not FITS.data.has(id):return null
- var design: Dictionary=building.get("houseDesignV354",{})
- if design.is_empty() or str(design.get("id",""))!=id:design=Defaults.data[id]
+ if not FITS.data.has(id):return null
+ var design:=HouseEras.live_plan(type,visual_age,building.get("houseDesignV354",{}))
+ if design.is_empty() and visual_age<=2:design=HouseEras.default_plan(id)
  var outline:=Plan.pier_outline(design.get("pier"))
  if outline.size()<3:return null
  var fit:Dictionary=FITS.data[id];var dx:=x-(float(building.x)+offset.x);var dz:=z-(float(building.z)+offset.y)
@@ -62,10 +64,11 @@ static func pier_surface(detail: Node,building: Dictionary,age: int,x: float,z: 
 # the normal game clearance. Empty collision lists are valid designer models.
 static func hits(detail: Node,building: Dictionary,age: int,x: float,z: float,offset: Vector2=Vector2.ZERO) -> Variant:
  var type:=str(building.get("type",""));var visual_age:=maxi(int(RULES.data.age.get(type,0)),age)
- if visual_age>2:return null
  var id:String=detail.designer_id(type,visual_age)
  if type=="palisade" and int(building.get("woodFortTierV1757",1))==2 and building.get("houseDesignV354",{}).is_empty() and id=="palisade":id="palisade-tier2"
- if not DATA.data.has(id) or not FITS.data.has(id):return null
+ var design:=HouseEras.live_plan(type,visual_age,building.get("houseDesignV354",{}))
+ var custom:=not design.is_empty()
+ if not FITS.data.has(id) or (not custom and (visual_age>2 or not DATA.data.has(id))):return null
  var fit:Dictionary=FITS.data[id]
  var default_angle:=PI/2 if building.get("wallAxis",false) and type in ["palisade","stonewall","reinforced_wall","woodgate","gatehouse"] else 0.0
  var angle:=float(building.get("buildingRotationV228",building.get("wallAngleV175",building.get("shoreAngle",default_angle))))
@@ -78,8 +81,6 @@ static func hits(detail: Node,building: Dictionary,age: int,x: float,z: float,of
  elif building.get("extendedPalisadeV166",false) and type in ["palisade","woodgate","gatehouse"]:scale_x=2.0
  var lx:float=(dx*c-dz*s)/scale_x;var lz:float=(dx*s+dz*c)/scale_z
  var sx:=float(fit.scale[0]);var sz:=float(fit.scale[2]);var cx:=float(fit.offset[0]);var cz:=float(fit.offset[2])
- var design: Variant=building.get("houseDesignV354",{})
- var custom: bool=design is Dictionary and not design.is_empty() and str(design.get("id",""))==id
  var walls:Array=custom_walls(design) if custom else DATA.data[id]
  for wall in walls:
   var a:=Vector2(float(wall[0])*sx+cx,float(wall[1])*sz+cz)

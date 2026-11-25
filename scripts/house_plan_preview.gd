@@ -1,4 +1,6 @@
 extends SubViewportContainer
+
+const HouseEras=preload("res://scripts/house_eras.gd")
 signal walking_changed(active: bool)
 const SurfaceDetail=preload("res://scripts/surface_detail.gd")
 const Mobile=preload("res://scripts/mobile_profile.gd")
@@ -39,8 +41,8 @@ var shore_depth:=0.0
 func _ready() -> void:
  stretch=true;mouse_filter=Control.MOUSE_FILTER_STOP
  viewport=SubViewport.new();viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;viewport.own_world_3d=true;add_child(viewport)
- var world:=WorldEnvironment.new();var environment:=Environment.new();environment.background_mode=Environment.BG_COLOR;environment.background_color=Color("aababc");environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;environment.ambient_light_color=Color("e8e2d1");environment.ambient_light_energy=0.5;world.environment=environment;viewport.add_child(world)
- var light:=DirectionalLight3D.new();light.rotation_degrees=Vector3(-55,-35,0);light.light_energy=0.8;light.shadow_enabled=true;viewport.add_child(light)
+ var world:=WorldEnvironment.new();var environment:=Environment.new();environment.background_mode=Environment.BG_COLOR;environment.background_color=Color("aababc");environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;environment.ambient_light_color=Color("e8e2d1");environment.ambient_light_energy=0.42;world.environment=environment;viewport.add_child(world)
+ var light:=DirectionalLight3D.new();light.rotation_degrees=Vector3(-42,-35,0);light.light_energy=0.67;light.light_color=Color("fff4e5");light.shadow_enabled=true;viewport.add_child(light)
  var ground:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(80,80);plane.subdivide_width=92;plane.subdivide_depth=92
  var earth:=StandardMaterial3D.new();earth.albedo_texture=load("res://assets/house_designer/land-earth.webp");earth.albedo_color=Color("b4b891");earth.uv1_scale=Vector3(28.2667,28.2667,1);earth.texture_repeat=true;earth.vertex_color_use_as_albedo=true;SurfaceDetail.apply(earth,not Mobile.active)
  var arrays:=plane.surface_get_arrays(0);var colors:=PackedColorArray()
@@ -60,7 +62,7 @@ func coast_plane(color: String,depth: float,metallic: float) -> MeshInstance3D:
 
 func show_design(design: Dictionary) -> void:
  walk_design=design.duplicate(true);model.rebuild(design);set_roof_visible(roof_visible)
- var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{})
+ var definition:Dictionary=HouseEras.definition(str(design.get("id","")))
  coast_active=str(design.get("id",""))=="fisher" or definition.get("base","")=="fisher" or definition.get("coast",false)
  shore_depth=(548.0-PlanCollision.origin(design).y)/Plan.PX_PER_M
  shore_sand.visible=coast_active;shore_water.visible=coast_active
@@ -130,8 +132,8 @@ func start_walking(floor:=0,upper: Dictionary={}) -> bool:
   for room in upper.rooms:walk_floors.append(Plan.room_polygon(room))
   for gallery in upper.get("gallery",[]):walk_floors.append(Plan.room_polygon({"type":"rect","a":gallery.a,"b":gallery.b}))
   var center:Vector2=model.roof_center(walk_floors[0]);var spawn:Vector2=(center-walk_origin)/Plan.PX_PER_M
-  var definition:Dictionary=Catalog.data.catalog.get(str(walk_design.get("id","")),{});var era:=clampi(int(definition.get("era",0)),0,2)
-  var lift:float=[0.0,0.67,0.87][era];lift+=(0.88+lift)*(float(walk_design.get("wallScale",100))/100-1)
+  var definition:Dictionary=HouseEras.definition(str(walk_design.get("id","")));var era:=int(definition.get("era",0))
+  var height:=Plan.wall_height(walk_design,era)
   if walk_blocked(spawn):
    var found:=false
    for radius in range(1,17):
@@ -139,7 +141,7 @@ func start_walking(floor:=0,upper: Dictionary={}) -> bool:
      var candidate:=spawn+Vector2.from_angle(angle*TAU/16.0)*radius*0.15
      if not walk_blocked(candidate):spawn=candidate;found=true;break
     if found:break
-  walk_pos=Vector3(spawn.x,0.88+lift+0.145,spawn.y);walk_yaw=0;walk_pitch=-0.05;walking=true;camera.fov=65;walking_changed.emit(true);update_camera();return true
+  walk_pos=Vector3(spawn.x,height+0.145,spawn.y);walk_yaw=0;walk_pitch=-0.05;walking=true;camera.fov=65;walking_changed.emit(true);update_camera();return true
  walk_walls=PlanCollision.walls(walk_design);walk_tower_walls=PlanCollision.walls(walk_design,false,true);walk_high_walls=PlanCollision.walls(walk_design,true,true)
  var stair:=Fence.wall_stair_plan(walk_design)
  if not stair.is_empty():

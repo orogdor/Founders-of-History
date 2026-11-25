@@ -71,7 +71,7 @@ func _process(delta: float) -> void:
 		for b in city.economy.buildings:building_stamp.append([b.get("type"),b.get("x"),b.get("z"),b.get("buildingRotationV228"),b.get("wallAxis"),b.get("ready"),float(b.get("hp",0))>0])
 		var next:=str(age)+str(building_stamp)
 		if next!=stamp:stamp=next;rebuild(city.economy.buildings,age)
-	var hour:=fposmod(8.0+float(host.game.time)/60.0,24.0);var elevation:=sin((hour-6.0)*PI/12.0)
+	var hour:=host.daylight_hour() as float;var elevation:=sin((hour-6.0)*PI/12.0)
 	var daylight:=clampf((elevation+0.09)/0.52,0,1);var power:=clampf((0.4-daylight)/0.36,0,1)
 	for fire in fire_nodes:fire.visible=power>0.04
 	for i in lights.size():lights[i].light_energy=power*(0.95+0.05*sin(float(host.game.time)*9+i))

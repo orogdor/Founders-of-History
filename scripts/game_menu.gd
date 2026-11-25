@@ -106,7 +106,7 @@ func _ready() -> void:
 		scale_select.add_item(str(percent)+"%");scale_select.set_item_metadata(scale_select.item_count-1,percent)
 		if absf(float(percent)/100.0-hud.user_ui_scale)<0.001:scale_select.select(scale_select.item_count-1)
 	scale_select.item_selected.connect(change_ui_scale);options_body.add_child(scale_select)
-	add_graphics_option("display","Kuvarežiim",[["Aken","windowed"],["Täisekraan","fullscreen"],["Ääristeta täisekraan","borderless"]])
+	if not Mobile.active:add_graphics_option("display","Kuvarežiim",[["Aken","windowed"],["Täisekraan","fullscreen"],["Ääristeta täisekraan","borderless"]])
 	add_graphics_option("resolution","Resolutsiooniskaala",[["50%",50],["70%",70],["75%",75],["85%",85],["100%",100],["125%",125],["150%",150]])
 	add_graphics_option("antialias","Servade silumine",[["Väljas",0],["MSAA 2×",2],["MSAA 4×",4]])
 	add_graphics_option("fps","FPS piirang",[["30 FPS",30],["60 FPS",60],["120 FPS",120],["Piiramata",0]])
@@ -242,7 +242,7 @@ func add_graphics_option(key: String,label_text: String,choices: Array) -> void:
 func load_graphics_settings() -> void:
 	var config:=ConfigFile.new();config.load(SETTINGS_PATH)
 	var defaults={"display":"windowed","resolution":70 if Mobile.active else 100,"antialias":0,"fps":60,"shadows":true,"names":not Mobile.active,"daylight":"dynamic","ambient":"normal","performance":false}
-	for key in defaults:
+	for key in graphics_controls:
 		var option:OptionButton=graphics_controls[key];var value:Variant=config.get_value("mobile_graphics" if Mobile.active else "graphics",key,defaults[key]);var found:=false
 		for i in option.item_count:
 			if option.get_item_metadata(i)==value:option.select(i);found=true;break
@@ -259,8 +259,8 @@ func apply_graphics_settings(save: bool) -> void:
 	get_viewport().scaling_3d_scale=float(selected.resolution)/100.0
 	get_viewport().msaa_3d=Viewport.MSAA_4X if int(selected.antialias)==4 else Viewport.MSAA_2X if int(selected.antialias)==2 else Viewport.MSAA_DISABLED
 	var mode:=DisplayServer.WINDOW_MODE_WINDOWED
-	if selected.display=="fullscreen":mode=DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
-	elif selected.display=="borderless":mode=DisplayServer.WINDOW_MODE_FULLSCREEN
+	if selected.get("display","windowed")=="fullscreen":mode=DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+	elif selected.get("display","windowed")=="borderless":mode=DisplayServer.WINDOW_MODE_FULLSCREEN
 	if not Mobile.active and DisplayServer.window_get_mode()!=mode:DisplayServer.window_set_mode(mode)
 	host.graphics_daylight=str(selected.daylight);host.graphics_ambient=str(selected.ambient);host.update_daylight()
 	if performance_label!=null:performance_label.visible=bool(selected.performance)

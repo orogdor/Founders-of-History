@@ -27,7 +27,7 @@ static func at_city(cities: Array,tile: Vector2i) -> Variant:
   if context!=null:return context
  return null
 
-static func create(parent: Dictionary,tile: Vector2i,world: Dictionary,seed: int,time: float) -> Dictionary:
+static func create(parent: Dictionary,tile: Vector2i,world: Dictionary,seed: int,time: float,retain:=true) -> Dictionary:
  if int(parent.c)==tile.x and int(parent.r)==tile.y:return parent
  if not parent.has("districts"):parent.districts={}
  var k:=key(tile)
@@ -35,12 +35,19 @@ static func create(parent: Dictionary,tile: Vector2i,world: Dictionary,seed: int
  var economy:=Economy.initial_state(seed);economy.settlers=[];economy.units=[];economy.cargo=[];economy.time=parent.economy.get("time",time)
  economy.buildings=[{"type":"hall","x":0,"z":0,"team":parent.team,"hp":1200,"ready":true,"virtual":true}]
  var district:Dictionary={"c":tile.x,"r":tile.y,"foundedAt":time,"world":world,"economy":economy}
- parent.districts[k]=district;attach(parent,district);return district
+ if retain:parent.districts[k]=district
+ attach(parent,district);return district
 
 static func contexts(parent: Dictionary) -> Array:
  var result:=[parent]
  for district in parent.get("districts",{}).values():result.append(district)
  return result
+
+static func has_activity(context: Dictionary) -> bool:
+ if not context.world.get("workers",{}).is_empty() or not context.economy.get("cargo",[]).is_empty():return true
+ for building in context.economy.buildings:
+  if not building.get("virtual",false) and float(building.get("hp",0))>0:return true
+ return false
 
 static func all_buildings(parent: Dictionary) -> Array:
  var result:=[]
