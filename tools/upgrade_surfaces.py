@@ -189,7 +189,9 @@ def build_texture(task):
     if height is not None and needs_normal is not None:
         # JPEG/WebP colour compression must not change the displacement data.
         displacement = height.copy()
-        displacement.thumbnail((1024, 1024) if profile == "desktop" else (512, 512), Image.Resampling.LANCZOS)
+        # Keep synthesized parallax data compact so updates fit the Windows launcher.
+        height_limit = 640 if profile == "desktop" else 512
+        displacement.thumbnail((height_limit, height_limit), Image.Resampling.LANCZOS)
         save_image(displacement, GENERATED / f"{key}-height.png", "data")
         texture_import(GENERATED / f"{key}-height.png", "data", profile)
         if needs_normal:
