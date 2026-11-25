@@ -1,6 +1,7 @@
 class_name EconomyRules
 extends RefCounted
 const DATA := preload("res://data/economy.json")
+const Flows = preload("res://scripts/city_resource_flows.gd")
 const Availability = preload("res://scripts/era_availability.gd")
 
 static func tempo_factor(state: Dictionary) -> float:
@@ -18,7 +19,7 @@ static func can_afford(resources: Dictionary, cost: Dictionary) -> bool:
 		food += maxf(0.0,float(available.get(key,0.0))) * float(DATA.data.food_nutrition[key])
 	return food >= float(cost.bread)
 
-static func take_food(stock: Dictionary, meals: float) -> float:
+static func take_food(stock: Dictionary, meals: float, on_use := Callable()) -> float:
 	var need := maxf(0.0,meals)
 	var served := 0.0
 	var keys: Array = DATA.data.food_keys.duplicate()
@@ -35,14 +36,18 @@ static func take_food(stock: Dictionary, meals: float) -> float:
 		var available := maxf(0.0,float(stock.get(key,0.0)))
 		var units := minf(available,need/nutrition)
 		stock[key] = maxf(0.0,available-units)
+		if units > 0.0 and on_use.is_valid(): on_use.call(key,units)
 		served += units*nutrition
 		need -= units*nutrition
 	return served
 
-static func spend_resources(stock: Dictionary, cost: Dictionary) -> void:
+static func spend_resources(stock: Dictionary, cost: Dictionary, on_use := Callable()) -> void:
 	for key in cost:
-		if key != "bread": stock[key] = float(stock.get(key,0.0))-float(cost[key])
-	if cost.has("bread") and float(cost.bread) != 0: take_food(stock,float(cost.bread))
+		if key == "bread": continue
+		var amount := float(cost[key])
+		stock[key] = float(stock.get(key,0.0))-amount
+		if amount > 0.0 and on_use.is_valid(): on_use.call(key,amount)
+	if cost.has("bread") and float(cost.bread) != 0: take_food(stock,float(cost.bread),on_use)
 
 static func storage_limit(buildings: Array, key: String) -> float:
 	var counts := {}
@@ -146,7 +151,7 @@ static func housing_capacity(buildings: Array) -> float:
 static func worker_efficiency(assigned: float, need: float) -> float:
 	return pow(minf(1,maxf(0,assigned)/need),0.85) if need > 0 else 1.0
 
-static func consume_households(city: Dictionary, realm: Dictionary, buildings: Array, near_water: bool) -> bool:
+static func consume_households(city: Dictionary, realm: Dictionary, buildings: Array, near_water: bool, seconds := 0.0) -> bool:
 	var houses: Array = []
 	var well := false
 	for b in buildings:
@@ -160,30 +165,34 @@ static func consume_households(city: Dictionary, realm: Dictionary, buildings: A
 		var lack := maxf(0,water_need-float(realm.resources.get("water",0)))
 		if lack > 0:
 			realm.resources.water = float(realm.resources.get("water",0))+lack
+			Flows.record(realm,seconds,"water",lack)
 			city.waterFetchV267 = true
 			if not near_water: city.waterFetchFarV280 = true
+	var on_use := Flows.consumption(realm,seconds)
 	var hall_residents := minf(pop,4)
-	var food_ok := consume_household_item(realm.resources,"bread",hall_residents*0.6,{})
-	var water_ok := consume_household_item(realm.resources,"water",hall_residents*0.45,{})
+	var food_ok := consume_household_item(realm.resources,"bread",hall_residents*0.6,{},on_use)
+	var water_ok := consume_household_item(realm.resources,"water",hall_residents*0.45,{},on_use)
 	var fed := food_ok and water_ok
 	var house_residents := maxf(0,pop-hall_residents)
 	for i in houses.size():
 		var occupants := minf(1.5,maxf(0,house_residents-i*1.5))
 		if occupants <= 0: continue
-		food_ok = consume_household_item(realm.resources,"bread",occupants*0.6,houses[i])
-		water_ok = consume_household_item(realm.resources,"water",occupants*0.45,houses[i])
+		food_ok = consume_household_item(realm.resources,"bread",occupants*0.6,houses[i],on_use)
+		water_ok = consume_household_item(realm.resources,"water",occupants*0.45,houses[i],on_use)
 		if not food_ok or not water_ok: fed = false
 	return fed
 
-static func consume_household_item(stock: Dictionary, key: String, amount: float, house: Dictionary) -> bool:
+static func consume_household_item(stock: Dictionary, key: String, amount: float, house: Dictionary, on_use := Callable()) -> bool:
 	var held_key := "foodHeld" if key == "bread" else "waterHeld"
 	var remaining := amount
 	if not house.is_empty():
 		var held := minf(remaining,float(house.get(held_key,0)))
 		house[held_key] = maxf(0,float(house.get(held_key,0))-held)
 		remaining -= held
-	var used := take_food(stock,remaining) if key == "bread" else minf(remaining,float(stock.get(key,0)))
-	if key != "bread": stock[key] = maxf(0,float(stock.get(key,0))-used)
+	var used := take_food(stock,remaining,on_use) if key == "bread" else minf(remaining,float(stock.get(key,0)))
+	if key != "bread":
+		stock[key] = maxf(0,float(stock.get(key,0))-used)
+		if used > 0.0 and on_use.is_valid(): on_use.call(key,used)
 	return remaining-used < 0.0001
 
 static func market_food_growth(buildings: Array, stock: Dictionary, pop: float, age: int) -> Dictionary:
@@ -215,11 +224,12 @@ static func demographics_turn(city: Dictionary, economy: Dictionary, buildings: 
 	var food_need: float = floor(float(realm.pop)*0.6*100+0.5)/100.0
 	var water_need: float = floor(float(realm.pop)*0.45*100+0.5)/100.0
 	realm.resources.gold = float(realm.resources.get("gold",0))+realm.pop
+	Flows.record(realm,float(economy.time),"gold",float(realm.pop))
 	realm.housingCapacity = cap
 	realm.householdNeed = food_need
 	realm.foodNeed = food_need
 	realm.waterNeed = water_need
-	var supplied := consume_households(city,realm,buildings,near_water)
+	var supplied := consume_households(city,realm,buildings,near_water,float(economy.time))
 	realm.housingShortage = not supplied
 	if not realm.has("growthProgress"): realm.growthProgress = 0.0
 	var growth := market_food_growth(buildings, realm.resources, realm.pop, age)

@@ -1,6 +1,7 @@
 class_name MarketHouseholds
 extends RefCounted
 const Nav=preload("res://scripts/local_navigation.gd")
+const Flows=preload("res://scripts/city_resource_flows.gd")
 const Econ=preload("res://scripts/economy_rules.gd")
 const District=preload("res://scripts/district_context.gd")
 const Travelers=preload("res://scripts/district_builders.gd")
@@ -19,7 +20,8 @@ func tick(state: Dictionary,city: Dictionary,dt: float,context_at: Callable,nav_
    for id in ctx.world.workers:
     if str(id).begins_with("shopper:"):ctx.world.workers[id].visible=false;ctx.world.workers[id].moving=false
   return
- var stock: Dictionary=city.economy.realms[city.team].resources
+ var realm: Dictionary=city.economy.realms[city.team]
+ var stock: Dictionary=realm.resources
  for index in mini(64,houses.size()):
   var home: Dictionary=houses[index].ctx;var house: Dictionary=houses[index].building
   var id: String="shopper:%d:%d:%d:%d" % [int(city.id),int(home.c),int(home.r),home.economy.buildings.find(house)]
@@ -57,7 +59,9 @@ func tick(state: Dictionary,city: Dictionary,dt: float,context_at: Callable,nav_
   if not nav.move(worker,Nav.door(market.building),dt,3.0,true):Travelers.attach(city,worker,context_at);continue
   var food_need:=minf(3,maxf(0,5-float(house.get("foodHeld",0))))
   var water_load:=minf(2,minf(maxf(0,4-float(house.get("waterHeld",0))),float(stock.get("water",0))))
-  var food_load:=Econ.take_food(stock,food_need)
+  var seconds:=float(city.economy.time)
+  var food_load:=Econ.take_food(stock,food_need,Flows.consumption(realm,seconds))
   if food_load<0.01 and water_load<0.01:worker.status="Turul puudub toit ja vesi";Travelers.attach(city,worker,context_at);continue
+  Flows.record(realm,seconds,"water",-water_load)
   stock.water=float(stock.get("water",0))-water_load;worker.breadLoad=food_load;worker.waterLoad=water_load;worker.carried=food_load+water_load;worker.shoppingPhase="home";worker.status="Ostis toidu ja vee"
   Travelers.attach(city,worker,context_at)

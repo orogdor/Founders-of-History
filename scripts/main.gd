@@ -44,6 +44,8 @@ const AITreasury = preload("res://scripts/ai_treasury.gd")
 const Diplomacy = preload("res://scripts/diplomacy_rules.gd")
 const Raids = preload("res://scripts/world_raids.gd")
 const Merchants = preload("res://scripts/world_merchants.gd")
+const CityResourceTable = preload("res://scripts/city_resource_table.gd")
+const ResourceFlows = preload("res://scripts/city_resource_flows.gd")
 const Economy = preload("res://scripts/economy_rules.gd")
 const LocalNav = preload("res://scripts/local_navigation.gd")
 const CityRules = preload("res://scripts/city_build_rules.gd")
@@ -178,7 +180,7 @@ var research_label: Label
 var resources_label: Label
 var resources_button: Button
 var resources_dialog: AcceptDialog
-var resources_detail: RichTextLabel
+var resources_detail: CityResourceTable
 var labor_dialog: AcceptDialog
 var labor_scroll: ScrollContainer
 var labor_summary: Label
@@ -1501,11 +1503,10 @@ func build_ui() -> void:
 	resources_button.pressed.connect(show_resource_details)
 	resources_row.add_child(resources_button)
 	resources_dialog=AcceptDialog.new()
-	resources_dialog.title="Linna varud"
-	resources_dialog.min_size=Vector2i(400,420)
+	resources_dialog.title="Linna majandus · ühisladu"
 	add_child(resources_dialog);style_game_dialog(resources_dialog)
-	resources_detail=RichTextLabel.new()
-	resources_detail.custom_minimum_size=Vector2(360,350)
+	resources_dialog.add_theme_stylebox_override("panel",InterfaceTheme.panel(12))
+	resources_detail=CityResourceTable.new()
 	resources_dialog.add_child(resources_detail)
 	city_row=HBoxContainer.new()
 	city_row.visible=false
@@ -2324,6 +2325,7 @@ func _process(delta: float) -> void:
 			var difficulty: String=game.get("difficulty","normal")
 			var production_dt:=delta*(0.6 if difficulty=="easy" else 0.95 if difficulty=="hard" else 0.8) if rival else delta
 			var basic_dt:=delta*(0.6 if difficulty=="easy" else 0.75) if rival else delta
+			if not rival: ResourceFlows.observe(city.economy.realms[city.team],float(city.economy.time))
 			CityNeeds.consume_luxuries(city,int(game.ages[city.team]),delta)
 			Production.apply_building_upgrades(game,city)
 			tick_city_demographics(city,delta)
@@ -3751,17 +3753,15 @@ func change_basic_labor(value: float,key: String) -> void:
 func show_resource_details() -> void:
 	if not city_created:return
 	refresh_resource_details()
-	resources_dialog.popup_centered(Vector2i(500,470));fit_game_dialog(resources_dialog,Vector2i(500,470))
+	var available := Vector2i(get_viewport().get_visible_rect().size)-Vector2i(20,58)
+	var size := Vector2i(574,470).min(available)
+	resources_dialog.popup_centered(size)
+	fit_game_dialog(resources_dialog,size)
 
 func refresh_resource_details() -> void:
 	if not city_created or resources_detail==null:return
-	var stock: Dictionary=game.cities[active_city_index].economy.realms[0].resources
-	var lines: Array[String]=[]
-	for key in Economy.DATA.data.resource_names:
-		var amount:=float(stock.get(key,0))
-		if amount>0.00001 or key in ["wood","stone","water","bread","plank","clay","pottery","cutstone","copper","tin","bronze","carts","ore","coal","iron","weapons"]:
-			lines.append("%s: %.1f" % [Economy.DATA.data.resource_names[key],amount])
-	resources_detail.text="\n".join(lines)
+	var city: Dictionary = game.cities[active_city_index]
+	resources_detail.refresh(city.economy.realms[city.team],float(city.economy.time))
 
 func update_resources_status() -> void:
 	if not city_created: return

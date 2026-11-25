@@ -1,5 +1,6 @@
 class_name LumberProduction
 extends RefCounted
+const Flows = preload("res://scripts/city_resource_flows.gd")
 const Gather=preload("res://scripts/gather_rules.gd")
 const Nav=preload("res://scripts/local_navigation.gd")
 const Econ=preload("res://scripts/economy_rules.gd")
@@ -167,9 +168,14 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		building.status="Toodab";building.timer=float(building.get("timer",0))+work_dt/4.5
 		if building.timer+0.00000001>=float(definition.cycle):
 			building.timer=maxf(0,building.timer-definition.cycle)
-			Econ.spend_resources(realm.resources,ingredients)
+			Econ.spend_resources(realm.resources,ingredients,Flows.consumption(realm,float(economy.time)))
 			if key=="power":
-				realm.resources.power=minf(cap,float(realm.resources.get("power",0))+float(definition.rate));changed=true;continue
+				var before := float(realm.resources.get("power",0))
+				var after := minf(cap,before+float(definition.rate))
+				realm.resources.power = after
+				Flows.record(realm,float(economy.time),key,after-before)
+				changed = true
+				continue
 			var p:=Nav.door(building)
 			economy.cargo.append({"x":p.x,"z":p.z,"key":key,"amount":definition.rate,"parent":building.get("parent",0),"team":city.team,"portCargoId":next_cargo_id})
 			next_cargo_id+=1;changed=true
@@ -241,7 +247,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 						worker.heading=atan2(mine.x-worker.x,mine.z-worker.z)
 						var mined:=Minerals.harvest(world,mine,definition,work_dt,1.0/4.5)
 						if mined>0:
-							Econ.spend_resources(realm.resources,ingredients)
+							Econ.spend_resources(realm.resources,ingredients,Flows.consumption(realm,float(economy.time)))
 							var p:=Nav.door(mine)
 							economy.cargo.append({"x":p.x,"z":p.z,"key":output,"amount":mined,"parent":mine.get("parent",0),"team":city.team,"portCargoId":next_cargo_id})
 							next_cargo_id+=1;changed=true
@@ -282,7 +288,10 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 			var unloaded:=minf(float(cargo.amount),free)
 			realm.resources[key]=float(realm.resources.get(key,0))+unloaded
 			cargo.amount-=unloaded
-			if unloaded>0:record_delivery(realm,economy.time,key,unloaded);changed=true
+			if unloaded > 0:
+				record_delivery(realm,economy.time,key,unloaded)
+				Flows.record(realm,float(economy.time),key,unloaded)
+				changed = true
 			if cargo.amount<=0.00001:economy.cargo.erase(cargo);cargo_navs.erase(id)
 			else:cargo.status="Ladu täis"
 	return changed
@@ -312,6 +321,7 @@ func tick_basic(city: Dictionary,base: LocalNavigation,assigned: Dictionary,dt: 
 			var delivered:=minf(amount,free)
 			stock[key]=float(stock.get(key,0))+delivered
 			record_delivery(economy.realms[city.team],economy.time,key,delivered)
+			Flows.record(economy.realms[city.team],float(economy.time),key,delivered)
 			changed=true
 	return changed
 

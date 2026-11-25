@@ -26,7 +26,7 @@ func _ready() -> void:
  detail_toggle=Button.new();detail_toggle.text="▸ Linna üksikasjad";detail_toggle.alignment=HORIZONTAL_ALIGNMENT_LEFT;detail_toggle.pressed.connect(toggle_details);body.add_child(detail_toggle)
  details=RichTextLabel.new();details.fit_content=true;details.visible=false;details.scroll_active=false;details.add_theme_color_override("default_color",Color("e6d4aa"));body.add_child(details)
  var row:=HBoxContainer.new();row.add_theme_constant_override("separation",6);body.add_child(row)
- for item in [["Ehita",func():hide();host.game_hud.dock_menu.open_menu("build")],["Varud",func():hide();host.show_resource_details()],["Töölised",func():hide();host.show_basic_labor()],["Värbamine",func():hide();host.show_training()]]:
+ for item in [["Ehita",func():hide();host.game_hud.dock_menu.open_menu("build")],["Majandus",func():hide();host.show_resource_details()],["Töölised",func():hide();host.show_basic_labor()],["Värbamine",func():hide();host.show_training()]]:
   var button:=Button.new();button.text=item[0];button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;button.pressed.connect(item[1]);row.add_child(button)
  var trade_row:=HBoxContainer.new();trade_row.add_theme_constant_override("separation",6);body.add_child(trade_row)
  trade_button=Button.new();trade_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;trade_button.pressed.connect(toggle_city_trade);trade_row.add_child(trade_button)
