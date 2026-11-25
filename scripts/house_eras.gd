@@ -116,11 +116,14 @@ static func update_finish(plan: Dictionary,age: int,civic: bool,upper: bool) -> 
   if opening.get("type","")=="door":opening.style=DOORS[age]
   elif age>=5:opening.style="glazed"
 
-static func live_plan(type: String,age: int,design: Dictionary) -> Dictionary:
+static func live_plan(type: String,age: int,design: Dictionary,prefer_imported_default:=false) -> Dictionary:
  var id:=project_id(type,age)
  if id.is_empty():return {}
  var custom:=adapt(design,id)
  if not custom.is_empty():return custom
+ # Keep the authored mesh for rendering while callers such as collision can
+ # still use the updated default plan, including its walkable entrances.
+ if prefer_imported_default:return {}
  var reference:=default_plan(id)
  if age>=3 and id!=fit_id(type,age) and type!="mill":return reference
  if age<=2 and reference.get("build","wall")=="wall" and reference.get("openings",[]).any(func(opening):return opening.get("type","")=="door"):

@@ -16,12 +16,13 @@ static var has_vertex_colors:Dictionary={}
 static var town_material:ShaderMaterial
 static var low_material:StandardMaterial3D
 
-static func specification(type: String,age: int,design: Dictionary,tier: int) -> Dictionary:
+static func specification(type: String,age: int,design: Dictionary,tier: int,simplified:=false) -> Dictionary:
 	var building_age:=maxi(int(Rules.data.age.get(type,0)),age)
 	var fit_id:=Eras.fit_id(type,building_age)
 	if type=="palisade" and tier==2 and fit_id=="palisade" and design.is_empty():
 		fit_id="palisade-tier2"
-	var plan:=Eras.live_plan(type,building_age,design)
+	# At distance the matching plan provides a much lighter mesh than the GLB.
+	var plan:=Eras.live_plan(type,building_age,design,not simplified and building_age in [0,2])
 	var id:=str(plan.get("id",fit_id))
 	if plan.is_empty():
 		var procedural:="procedural_"+type+"@"+str(clampi(building_age,0,6))
@@ -94,7 +95,7 @@ static func bounds(node: Node,transform:=Transform3D.IDENTITY) -> AABB:
 	return result
 
 static func simplified_mesh(type: String,age: int,design: Dictionary={},tier:=1) -> ArrayMesh:
-	var spec:=specification(type,age,design,tier)
+	var spec:=specification(type,age,design,tier,true)
 	var key:String=spec.id
 	if not spec.plan.is_empty() and not is_same(spec.plan,Eras.default_plan(spec.id)):
 		key+=":"+str(hash(spec.plan))

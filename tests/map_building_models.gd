@@ -29,6 +29,11 @@ func run() -> void:
 		var low:=Models.simplified_mesh("house",age)
 		assert(high!=null and low!=null)
 		assert(high.get_meta("designer_id")==Eras.project_id("house",age))
+		if age in [0,2]:
+			var id:=Eras.fit_id("house",age)
+			var original_path:="res://assets/buildings/%s.glb" % id
+			assert(high.get_child(0).scene_file_path==original_path,"Expected the original house mesh")
+			assert(low==Models.simplified_mesh("house",age,Eras.default_plan(id)))
 		assert(low.surface_get_array_index_len(0)/3 < triangle_count(high)*0.25)
 		assert(Models.simplified_mesh("house",age)==low)
 		high.free()
