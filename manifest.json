@@ -1,16 +1,16 @@
 {
   "schema": 1,
   "runtime": "godot-4.7.2-windows-v1",
-  "revision": 13,
-  "source": "d56a84f18649823a6dea3f4d9f2d323704dd0c1c",
+  "revision": 14,
+  "source": "1f3178367bf519adb4dbefca37821590e8cca525",
   "base": {
     "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-base-v1/windows-base.pck",
     "sha256": "76dc077da861baca0907fc6923412172be96d3a0fbd0e28acd47204adbaacfea",
     "size": 772092496
   },
   "patch": {
-    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-13-1/windows-patch.pck",
-    "sha256": "27da7387e0c8975fcf9b507f4541e625ac8b60cc2165c066baaf485efdddf939",
-    "size": 1549974844
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-14-1/windows-patch.pck",
+    "sha256": "06cb2463383576e44f2852760b34445d7c61c64e2450e1bb4c3f2c073e8d9dde",
+    "size": 1549975116
   }
 }
