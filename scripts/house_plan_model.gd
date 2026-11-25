@@ -20,10 +20,26 @@ var roof_vents:Array[Vector2]=[]
 var origin:=Vector2(480,312)
 var materials:Dictionary={}
 var reed_surface: ShaderMaterial
+var simplified:=false
+const LOD_COLORS={
+ "limestone":"b4ac90","cutstone":"a8a38c","cyclopean":"80766b","marble":"dad2bc",
+ "fresco":"b18c62","brick":"985746","romanbrick":"a35f49","reticulatum":"9b8c69",
+ "prestigePlaster":"bea084","floor":"817054","reed":"705740","thatch":"705740",
+ "plank":"8e6b49","sod":"6c734b","bark":"6a5141","shingle":"62564c",
+ "tile":"a9654c","earth":"a3714e","roofplank":"765941","medievalRubble":"827c71",
+ "renaissanceLime":"c9bd9e","renaissanceAshlar":"b0a18a","industrialBrick":"965547",
+ "industrialIron":"596568","modernConcrete":"a3a197","modernPanel":"9ea4a1",
+ "slate":"525963","terracotta":"a35e47","seamMetal":"576c6c","membrane":"666c6c",
+ "glass":"566d73"
+}
 
 func material_for(style: String) -> StandardMaterial3D:
  if materials.has(style):return materials[style]
  var material:=StandardMaterial3D.new();material.albedo_color=Color(str(PALETTE.get(style,"ffffff")));material.roughness=1.0;material.cull_mode=BaseMaterial3D.CULL_DISABLED
+ if simplified:
+  material.albedo_color=Color(str(LOD_COLORS.get(style,PALETTE.get(style,"a69679"))))
+  materials[style]=material
+  return material
  if style in ["reed","thatch"]:material.albedo_color=Color("756b5c")
  var key:=str(TEXTURES.get(style,""))
  var relief:="res://assets/house_designer/walls/"+style
@@ -49,7 +65,7 @@ func material_for(style: String) -> StandardMaterial3D:
  materials[style]=material;return material
 
 func roof_surface_material() -> Material:
- if roof_material not in ["reed","thatch"]:return material_for(roof_material)
+ if simplified or roof_material not in ["reed","thatch"]:return material_for(roof_material)
  if reed_surface==null:
   reed_surface=ShaderMaterial.new();reed_surface.shader=ReedShader
   reed_surface.set_shader_parameter("reed_atlas",load("res://assets/house_designer/atlas-straw.webp"))
@@ -68,17 +84,25 @@ func rebuild(design: Dictionary) -> void:
  frame_material="industrialIron" if era>=5 else "wood"
  var height:=Plan.wall_height(design,era)
  var lift:=height-0.88
- if not design.get("upperLevel",false):
+ if not simplified and not design.get("upperLevel",false):
   if design.get("yard") is Array:add_yard(design.yard,design,era)
   if design.get("plot") is Array and not design.get("field") is Dictionary and not design.get("yard") is Array:add_yard(design.plot,design,era)
  for floor in geometry.floors:add_floor(floor)
- if design.get("field") is Dictionary and design.get("plot") is Array:add_field(design.plot,design.field)
+ if design.get("field") is Dictionary and design.get("plot") is Array:
+  if simplified:
+   var field_outline:=PackedVector2Array()
+   for point in design.plot:field_outline.append(Plan.point(point))
+   floor_material="floor"
+   add_floor(field_outline)
+  else:
+   add_field(design.plot,design.field)
  var fence_index:=0;var stair:=Fence.wall_stair_plan(design)
  for fence in Fence.layout(design):add_fence(fence,fence_index,stair);fence_index+=1
  if not stair.is_empty():add_defense_stair(stair)
  if design.get("pier") is Dictionary:add_pier(design.pier,str(design.get("id",""))=="harbor" and design.get("bronzeStyle",false))
  var opening_frames: Dictionary={}
  for wall in geometry.walls:
+  if simplified and wall.group=="inner":continue
   for span in Plan.split_wall(wall,design):
    var top:float=height if span.group=="outer" else 1.23+lift
    if span.group=="outer" and design.get("build","wall")=="open":
@@ -99,7 +123,8 @@ func rebuild(design: Dictionary) -> void:
     elif style=="hole":win+=Vector2(0.08,-0.08)
     add_wall(span,0,win.x);add_wall(span,win.y,top)
    else:add_wall(span,0,top)
- for frame in opening_frames.values():add_opening(frame,era,height)
+ if not simplified:
+  for frame in opening_frames.values():add_opening(frame,era,height)
  if era<=2 and str(design.get("roofForm","")) in ["flat","pediment"] and design.get("build","wall")!="tower":add_classical_features(design,height)
  var upper:Variant=design.get("upper")
  var upper_polys:=[]
@@ -114,7 +139,7 @@ func rebuild(design: Dictionary) -> void:
    var low:=Vector2(INF,INF);var high:=Vector2(-INF,-INF)
    for p in lower_poly:
     var at:=local(p);low=low.min(Vector2(at.x,at.z));high=high.max(Vector2(at.x,at.z))
-   for item in design.get("items",[]):
+   for item in ([] if simplified else design.get("items",[])):
     if item.get("type","")!="fire":continue
     var fire:=Plan.point(item.point);var inside:=false
     for floor in geometry.floors:
@@ -126,6 +151,7 @@ func rebuild(design: Dictionary) -> void:
  var towers:=Fence.tower_positions(design)
  for item in design.get("items",[]):
   var type:=str(item.type);var tower: Variant=null
+  if simplified and type not in ["tower","workShelter","stockShelter","longShelter","sideShelter","sideStockShelter","kiln","forge","furnace","well","millstone","quarrySite","shaft","claySite","bridgeSpan"]:continue
   if type=="tower":
    for candidate in towers:
     if candidate.point.distance_to(Plan.point(item.point))<0.001:tower=candidate;break
@@ -139,7 +165,7 @@ func rebuild(design: Dictionary) -> void:
   plan.plot=null;plan.yard=null;plan.pier=null;plan.openSite=false;plan.upperLevel=true
   var upper_start:=get_child_count();add_floor_link(design,plan,geometry.floors,height+0.145)
   for index in range(upper_start,get_child_count()):get_child(index).set_meta("house_upper",true)
-  var second:Node3D=load("res://scripts/house_plan_model.gd").new();second.name="SecondStorey";second.set_meta("house_upper",true);second.rebuild(plan)
+  var second:Node3D=load("res://scripts/house_plan_model.gd").new();second.name="SecondStorey";second.set_meta("house_upper",true);second.simplified=simplified;second.rebuild(plan)
   second.position=Vector3((second.origin.x-origin.x)/Plan.PX_PER_M,height+0.145,(second.origin.y-origin.y)/Plan.PX_PER_M);add_child(second)
 
 # The web designer blends a packed-earth compound into the surrounding meadow.
@@ -594,6 +620,7 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var surface:=SurfaceTool.new();surface.create_from(source_mesh,0);surface.generate_tangents()
  var wall_mesh:=surface.commit()
  var node:=MeshInstance3D.new();node.name="HouseWall";node.mesh=wall_mesh;node.material_override=wall_material;node.position=(a+b)/2+Vector3(0,(low+high)/2,0);node.rotation.y=-atan2(delta.z,delta.x);add_child(node)
+ if simplified and style!="halftimber":return
  if style=="wood":
   var rows:=maxi(1,roundi((high-low)/0.19));var row_height:float=(high-low)/rows
   for i in rows:
@@ -609,7 +636,7 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
    get_child(get_child_count()-1).name="HouseWallStave"
  elif style=="weave":add_woven_wall(a,b,low,high,width)
  elif style=="halftimber":
-  var side:=Vector3(-delta.z,0,delta.x).normalized();var posts:=maxi(1,roundi(delta.length()))
+  var side:=Vector3(-delta.z,0,delta.x).normalized();var posts:=maxi(1,roundi(delta.length()/(2.1 if simplified else 1.0)))
   for sign_ in [-1.0,1.0]:
    var offset:Vector3=side*sign_*(width/2+0.012)
    for y in [low+0.03,high-0.03]:add_wall_brace(a+offset+Vector3.UP*y,b+offset+Vector3.UP*y,0.035)
@@ -757,6 +784,9 @@ func add_classical_roof(room: Dictionary,design: Dictionary,lift: float,form: St
   surface.generate_normals();var node:=MeshInstance3D.new();node.name="RoofDeckPediment";node.mesh=surface.commit();add_child(node)
 
 func roof_grid(sample: Callable,columns: int,rows: int) -> void:
+ if simplified:
+  columns=mini(columns,maxi(1,columns/6))
+  rows=mini(rows,maxi(1,rows/8))
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
  for row in rows:
   for col in columns:
@@ -769,7 +799,7 @@ func roof_grid(sample: Callable,columns: int,rows: int) -> void:
 
 # Each overlapping course is raised at its lower edge, as in the web roof.
 func roof_courses(sample: Callable,columns: int,count: int,perimeter: bool) -> void:
- if roof_material not in ["reed","thatch"]:return
+ if simplified or roof_material not in ["reed","thatch"]:return
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
  for layer in count:
   for row in 3:
@@ -886,8 +916,9 @@ static func clear_cache() -> void:
 
 func roof_end(sample: Callable,along: float,inset: float,base: float) -> void:
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
- for i in 24:
-  var t0:=lerpf(inset,1.0,float(i)/24);var t1:=lerpf(inset,1.0,float(i+1)/24)
+ var steps:=4 if simplified else 24
+ for i in steps:
+  var t0:=lerpf(inset,1.0,float(i)/steps);var t1:=lerpf(inset,1.0,float(i+1)/steps)
   var a:Vector3=sample.call(along,t0);var b:Vector3=sample.call(along,t1);var c:=Vector3(a.x,minf(a.y,base),a.z);var d:=Vector3(b.x,minf(b.y,base),b.z)
   var quad:=[a,b,c,d];var uv:=[Vector2(t0,a.y),Vector2(t1,b.y),Vector2(t0,c.y),Vector2(t1,d.y)]
   for idx in [0,1,2,1,3,2]:surface.set_uv(uv[idx]);surface.add_vertex(quad[idx])
@@ -967,7 +998,8 @@ func add_column(base: Vector3,height: float,radius: float,style: String) -> void
 func add_pole(a: Vector3,b: Vector3,radius: float,style: String) -> void:
  var direction:=b-a;var length:=direction.length()
  if length<0.001:return
- var mesh:=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=length;mesh.radial_segments=8
+ var mesh:=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=length;mesh.radial_segments=4 if simplified else 8
+ if simplified:mesh.rings=0
  var node:=MeshInstance3D.new();node.name="SecondFloorSupport";node.mesh=mesh;node.material_override=material_for(style);node.position=(a+b)/2;node.quaternion=Quaternion(Vector3.UP,direction.normalized());add_child(node)
 
 

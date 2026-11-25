@@ -71,6 +71,7 @@ const WorldTerritory = preload("res://scripts/world_territory.gd")
 const WorldRivers = preload("res://scripts/world_rivers.gd")
 const WorldMarkerModels = preload("res://scripts/world_marker_models.gd")
 const WorldCityLayout = preload("res://scripts/world_city_layout.gd")
+const BuildingPlacement=preload("res://scripts/building_placement.gd")
 const Discoveries = preload("res://scripts/world_discoveries.gd")
 const DATA_PATH := "res://data/world_12345.json"
 const CELL_SIZE := 2.0
@@ -993,70 +994,93 @@ func update_other_settler_markers() -> void:
 	for id in other_settler_markers.keys():
 		if not active.has(id):other_settler_markers[id].queue_free();other_settler_markers.erase(id)
 
-func update_city_markers() -> void:
+func adjacent_defenses(context: Dictionary,parent: Dictionary={}) -> Array:
+	var result:Array=[]
+	if not context.has("id") or not context.has("c"):return result
+	if parent.is_empty():
+		for city in game.cities:
+			if int(city.id)==int(context.id):
+				parent=city
+				break
+	if parent.is_empty():return result
+	var tile:=Vector2i(int(context.c),int(context.r))
+	for row in range(-1,2):
+		for column in range(-1,2):
+			if row==0 and column==0:continue
+			var other:Variant=DistrictContexts.existing(parent,tile+Vector2i(column,row))
+			if other==null:continue
+			var offset:=Vector2(column,row)*BuildingPlacement.TILE_SIZE
+			for building in other.economy.buildings:
+				if not BuildingPlacement.alive(building) or not BuildingPlacement.is_defense(building):continue
+				var shifted:Dictionary=building.duplicate()
+				shifted.x=float(building.x)+offset.x
+				shifted.z=float(building.z)+offset.y
+				var span:=float(building.get("palisadeSpanV167",14.0))*0.5+9.0
+				if absf(shifted.x)>112.5+span or absf(shifted.z)>97.5+span:continue
+				result.append(shifted)
+	return result
+
+var city_marker_refresh_ms:=0
+
+func update_city_markers(force:=true) -> void:
 	if city_marker_root==null:return
 	city_marker_root.visible=not game.get("cities",[]).is_empty() and not detail_mode
 	if not city_marker_root.visible:return
-	var active: Dictionary={};var towns_changed: Array=[]
+	var now:=Time.get_ticks_msec()
+	if not force and now<city_marker_refresh_ms:return
+	city_marker_refresh_ms=now+200
+	var active:Dictionary={}
+	var changed:Array=[]
 	for city in game.cities:
-		var key:=str(int(city.id));var tile:=str(int(city.c))+":"+str(int(city.r))
-		if int(city.team)!=0 and not Campaign.visible_now(game,0,city):continue
-		active[key]=true
-		var upgrade:=Production.visual_age(game,int(city.team))
-		if not city_markers.has(key):
-			towns_changed.append(Vector2i(int(city.c),int(city.r)))
-			var icon:=MeshInstance3D.new()
-			WorldMarkerModels.add_city(icon,str(city.name),int(city.team),upgrade)
-			icon.set_meta("age",upgrade);icon.set_meta("team",int(city.team))
-			city_marker_root.add_child(icon);city_markers[key]=icon
-		var icon: MeshInstance3D=city_markers[key]
-		if int(icon.get_meta("age",-1))!=upgrade or int(icon.get_meta("team",-1))!=int(city.team):
-			towns_changed.append(Vector2i(int(city.c),int(city.r)))
-			for child in icon.get_children():icon.remove_child(child);child.queue_free()
-			WorldMarkerModels.add_city(icon,str(city.name),int(city.team),upgrade)
-			icon.set_meta("age",upgrade);icon.set_meta("team",int(city.team));icon.set_meta("town_stamp","")
-		var city_label:=icon.get_node_or_null("CityName") as Label3D
-		if city_label!=null:city_label.text=str(city.name)+" · "+str(floori(float(city.economy.realms[city.team].pop)))
-		var city_model:=icon.get_node_or_null("CityModel") as MeshInstance3D
-		var city_pos:=cell_position(Vector2i(int(city.c),int(city.r)))+Vector3(1,0,1)
-		icon.set_meta("tile",Vector2i(int(city.c),int(city.r)))
-		icon.position=city_pos+Vector3(0,world_marker_height(city_pos),0)
-		if city_model!=null:
-			city_model.visible=upgrade>0
-			city_model.scale=Vector3.ONE*(0.04*(1.0+minf(1.2,float(city.economy.realms[city.team].pop)/40.0)))
-		if upgrade==0:
-			var town_stamp:=WorldCityLayout.stamp(city.economy.buildings)
-			if str(icon.get_meta("town_stamp",""))!=town_stamp:
-				towns_changed.append(Vector2i(int(city.c),int(city.r)))
-				var old:=icon.get_node_or_null("TownBuildings")
-				if old!=null:icon.remove_child(old);old.queue_free()
-				icon.add_child(WorldCityLayout.build(city.economy.buildings,city_pos,world_marker_height));icon.set_meta("town_stamp",town_stamp)
-	# A developed district has its own world-map building, as in worldSync.
-	for city in game.cities:
-		if int(city.team)!=0 and not Campaign.visible_now(game,0,city):continue
+		var team:=int(city.team)
+		if team!=0 and not Campaign.visible_now(game,0,city):continue
+		var age:=Production.visual_age(game,team)
+		var id:=str(int(city.id))
+		sync_world_town(id,city,city,age,active,changed)
 		for district in city.get("districts",{}).values():
-			var first: Variant=null
-			for building in district.economy.buildings:
-				if not building.get("virtual",false):first=building;break
-			if first==null:continue
-			var at:=Vector2i(int(district.c),int(district.r));var key:="region:%d:%d:%d" % [int(city.id),at.x,at.y]
-			active[key]=true
-			var age:=maxi(Production.upgrade_level(game,int(city.team)),int(CityRules.DATA.data.age.get(first.type,0)))
-			var stamp:="%s:%s:%s" % [first.type,age,city.team]
-			if not city_markers.has(key):
-				var icon:=MeshInstance3D.new();city_marker_root.add_child(icon);city_markers[key]=icon;towns_changed.append(at)
-			var icon:MeshInstance3D=city_markers[key]
-			if str(icon.get_meta("district_stamp",""))!=stamp:
-				for child in icon.get_children():icon.remove_child(child);child.queue_free()
-				var factory:=DetailView.new();var visual:Node3D=factory.create_designed_building(str(first.type),age);factory.free()
-				if visual!=null:visual.scale=Vector3.ONE*0.1;icon.add_child(visual)
-				icon.set_meta("district_stamp",stamp)
-			var position:=cell_position(at)+Vector3(1,0,1);icon.position=position+Vector3(0,world_marker_height(position),0);icon.set_meta("tile",at)
+			if not district.economy.buildings.any(WorldCityLayout.drawable):continue
+			if team!=0 and not Campaign.visible_now(game,0,district):continue
+			var key:="region:%s:%d:%d" % [id,int(district.c),int(district.r)]
+			sync_world_town(key,district,city,age,active,changed)
 	for key in city_markers.keys():
-		if not active.has(key):
-			towns_changed.append(city_markers[key].get_meta("tile",Vector2i(-100,-100)))
-			city_markers[key].queue_free();city_markers.erase(key)
-	if not towns_changed.is_empty() and world_vegetation!=null:world_vegetation.invalidate_towns(towns_changed)
+		if active.has(key):continue
+		var icon:Node3D=city_markers[key]
+		changed.append(icon.get_meta("tile"))
+		icon.queue_free()
+		city_markers.erase(key)
+	if not changed.is_empty() and world_vegetation!=null:world_vegetation.invalidate_towns(changed)
+
+func sync_world_town(key: String,context: Dictionary,city: Dictionary,age: int,active: Dictionary,changed: Array) -> void:
+	active[key]=true
+	var at:=Vector2i(int(context.c),int(context.r))
+	var center:=cell_position(at)+Vector3(CELL_SIZE*0.5,0,CELL_SIZE*0.5)
+	var team:=int(city.team)
+	var icon:Node3D=city_markers.get(key)
+	if icon==null:
+		icon=Node3D.new()
+		icon.set_meta("tile",at)
+		city_marker_root.add_child(icon)
+		city_markers[key]=icon
+	if is_same(context,city):
+		if int(icon.get_meta("team",-1))!=team:
+			var previous:=icon.get_node_or_null("CityBadge")
+			if previous!=null:
+				icon.remove_child(previous);previous.queue_free()
+			WorldMarkerModels.add_city(icon,str(city.name),team)
+			icon.set_meta("team",team)
+		var label:=icon.get_node_or_null("CityBadge/CityName") as Label3D
+		if label!=null:label.text=str(city.name)+" · "+str(floori(float(city.economy.realms[team].pop)))
+	icon.position=center+Vector3.UP*world_marker_height(center)
+	var neighbors:=adjacent_defenses(context,city)
+	var buildings:Array=context.economy.buildings
+	var stamp:=WorldCityLayout.stamp(buildings,age,neighbors)
+	if icon.get_meta("town_stamp",-1)==stamp:return
+	var old:=icon.get_node_or_null("TownBuildings")
+	if old!=null:
+		icon.remove_child(old);old.queue_free()
+	icon.add_child(WorldCityLayout.build(buildings,age,center,world_marker_height,neighbors))
+	icon.set_meta("town_stamp",stamp)
+	changed.append(at)
 
 func update_landmark_markers() -> void:
 	if landmark_root==null:return
@@ -1075,9 +1099,9 @@ func update_landmark_markers() -> void:
 		var key: String=str(landmark.id);active[key]=true
 		var age:=Discoveries.village_age(game,landmark) if landmark.kind=="village" else -1
 		if not landmark_markers.has(key):
-			if age==0:towns_changed.append(Vector2i(int(landmark.c),int(landmark.r)))
+			if age>=0:towns_changed.append(Vector2i(int(landmark.c),int(landmark.r)))
 			var icon:=Node3D.new()
-			WorldMarkerModels.add_landmark(icon,landmark,age!=0);icon.set_meta("age",age)
+			WorldMarkerModels.add_landmark(icon,landmark);icon.set_meta("age",age)
 			landmark_root.add_child(icon);landmark_markers[key]=icon
 		var icon: Node3D=landmark_markers[key]
 		icon.set_meta("tile",Vector2i(int(landmark.c),int(landmark.r)))
@@ -1085,10 +1109,10 @@ func update_landmark_markers() -> void:
 		if int(icon.get_meta("age",-2))!=age:
 			towns_changed.append(Vector2i(int(landmark.c),int(landmark.r)))
 			for child in icon.get_children():icon.remove_child(child);child.queue_free()
-			WorldMarkerModels.add_landmark(icon,landmark,age!=0);icon.set_meta("age",age)
-		if age==0 and icon.get_node_or_null("TownBuildings")==null:icon.add_child(WorldCityLayout.build(Discoveries.village_layout(landmark),position,world_marker_height))
+			WorldMarkerModels.add_landmark(icon,landmark);icon.set_meta("age",age)
+		if age>=0 and icon.get_node_or_null("TownBuildings")==null:
+			icon.add_child(WorldCityLayout.build(Discoveries.village_layout(landmark),age,position,world_marker_height))
 		icon.position=position+Vector3(0,world_marker_height(position),0)
-		icon.scale=Vector3.ONE*(0.76 if landmark.get("claimedBy")!=null else 1.0)
 	for key in landmark_markers.keys():
 		if not active.has(key):
 			towns_changed.append(landmark_markers[key].get_meta("tile",Vector2i(-100,-100)))
@@ -2434,7 +2458,7 @@ func _process(delta: float) -> void:
 	update_raid_markers()
 	update_merchant_markers()
 	update_ship_markers()
-	update_city_markers()
+	update_city_markers(false)
 	update_other_settler_markers()
 	update_world_roads()
 	update_territory_visual()
@@ -2878,9 +2902,9 @@ func follow_detail_camera() -> void:
 
 # Find the live view of a visible neighbouring city without changing selection.
 func visible_city_building_stamp(city: Dictionary) -> int:
-	var data: Array=[Production.visual_age(game,int(city.team))]
-	for b in city.economy.buildings:
-		data.append([b.get("type",""),b.get("x",0),b.get("z",0),b.get("ready",false),float(b.get("hp",0))>0,b.get("virtual",false),b.get("buildingRotationV228",0),b.get("shoreAngle",0),b.get("width",0),b.get("depth",0),b.get("houseUpgradeLevelV218",0),b.get("woodFortTierV1757",0),b.get("houseDesignV354",{})])
+	var data:Array=[Production.visual_age(game,int(city.team))]
+	for building in city.economy.buildings:data.append(BuildingPlacement.stamp(building))
+	for building in adjacent_defenses(city):data.append(BuildingPlacement.stamp(building))
 	return hash(data)
 
 func visible_city_detail(city: Dictionary) -> Node:

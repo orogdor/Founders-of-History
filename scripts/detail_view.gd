@@ -20,11 +20,10 @@ const PINE = preload("res://assets/world/pine_high.glb")
 const PALM = preload("res://assets/world/palm_high.glb")
 const ROCK = preload("res://assets/world/rock_high.glb")
 const HouseEras=preload("res://scripts/house_eras.gd")
+const BuildingModels=preload("res://scripts/building_models.gd")
+const Placement=preload("res://scripts/building_placement.gd")
 const HousePlanModel=preload("res://scripts/house_plan_model.gd")
-const MODEL_FITS = preload("res://data/building_fits.json")
 const MODEL_ANIMATIONS = preload("res://data/procedural_animations.json")
-const TOWN_SHADER = preload("res://scripts/town_material.gdshader")
-const FALLBACK_MODEL_TYPES=["nitrate","oilwell","refinery","powerplant","autofactory","airfield","master_workshop","infirmary","keep"]
 const BUILD_RULES = preload("res://data/build_rules.json")
 const EconomyData=preload("res://data/economy.json")
 const EconomyRulesScript=preload("res://scripts/economy_rules.gd")
@@ -86,12 +85,10 @@ var deposit_models: Dictionary = {}
 var fish_models: Dictionary={}
 var worker_models: Dictionary = {}
 var worker_motions: Dictionary = {}
-var vertex_materials: Dictionary = {}
-var town_material: ShaderMaterial
-var vertex_color_surfaces: Dictionary = {}
 var building_root: Node3D
 var building_animations: Array=[]
 var construction_models: Array=[]
+var building_lods:Array[Node3D]=[]
 var hall_model: Node3D
 var builder_person: Node3D
 var builder_people: Array[Node3D]=[]
@@ -172,53 +169,13 @@ func first_mesh(node: Node) -> MeshInstance3D:
 	return null
 
 func apply_vertex_colors(node: Node) -> void:
-	if node is MeshInstance3D and node.mesh!=null:
-		for surface in node.mesh.get_surface_count():
-			var surface_key:=str(node.mesh.get_instance_id())+":"+str(surface)
-			if not vertex_color_surfaces.has(surface_key):
-				var arrays: Array=node.mesh.surface_get_arrays(surface)
-				vertex_color_surfaces[surface_key]=arrays[Mesh.ARRAY_COLOR]!=null and not arrays[Mesh.ARRAY_COLOR].is_empty()
-			if not vertex_color_surfaces[surface_key]:continue
-			var original: Material=node.get_active_material(surface)
-			if not original is BaseMaterial3D:continue
-			var key:=original.get_instance_id()
-			if not vertex_materials.has(key):
-				var corrected: BaseMaterial3D=original.duplicate()
-				corrected.vertex_color_use_as_albedo=true
-				vertex_materials[key]=corrected
-			node.set_surface_override_material(surface,vertex_materials[key])
-	for child in node.get_children():apply_vertex_colors(child)
+	BuildingModels.apply_imported_materials(node,false)
 
 static func designer_id(type: String,age: int) -> String:
 	return HouseEras.fit_id(type,age)
 
 func create_designed_building(type: String,age: int,design: Dictionary={},tier:=1) -> Node3D:
-	var building_age:=maxi(int(BUILD_RULES.data.age.get(type,0)),age)
-	var fit_id:=designer_id(type,building_age)
-	if type=="palisade" and tier==2 and fit_id=="palisade" and design.is_empty():fit_id="palisade-tier2"
-	var plan:=HouseEras.live_plan(type,building_age,design)
-	var id:=fit_id
-	var raw: Node3D
-	if not plan.is_empty():
-		raw=HousePlanModel.from_design(plan)
-		id=str(plan.id)
-	else:
-		var procedural: String="procedural_"+type+"@"+str(clampi(building_age,0,6))
-		if (building_age>=3 or fit_id.is_empty()) and ResourceLoader.exists("res://assets/buildings/"+procedural+".glb"):id=procedural
-		if id.is_empty():return null
-		var file: String="res://assets/buildings/"+id+".glb"
-		if not ResourceLoader.exists(file):return null
-		raw=load(file).instantiate()
-		if id.begins_with("procedural_") and type not in FALLBACK_MODEL_TYPES:apply_town_material(raw)
-		else:apply_vertex_colors(raw)
-	if not id.begins_with("procedural_") and MODEL_FITS.data.has(fit_id):
-		var fit: Dictionary=MODEL_FITS.data[fit_id]
-		raw.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
-		raw.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
-	var wrapper:=Node3D.new()
-	wrapper.set_meta("designer_id",id)
-	wrapper.add_child(raw)
-	return wrapper
+	return BuildingModels.create(type,age,design,tier)
 
 # Designed yards follow the rendered terrain instead of clipping into slopes.
 # Duplicate the mesh because cached designs can be reused at different sites.
@@ -295,6 +252,7 @@ func _process(delta: float) -> void:
 	nature_lod_timer+=delta
 	if nature_lod_timer<0.2:return
 	nature_lod_timer=0.0
+	update_building_lods(camera)
 	for bush in berry_models.values():update_nature_lod(bush,camera)
 	for animal in visible_animals.values():update_nature_lod(animal,camera)
 
@@ -433,13 +391,14 @@ func place_hall(x: float, z: float,age:=0,rotation:=0.0,design: Dictionary={}) -
 			resource.cleared = true
 			resource.amount = 0
 			hide_tree(resource.id)
-	if hall_model!=null:hall_model.queue_free()
+	if is_instance_valid(hall_model):hall_model.queue_free()
 	hall_model=create_designed_building("hall",age,design)
 	if hall_model==null:return
 	hall_model.position = Vector3(x,display_height(x,z),z)
 	hall_model.rotation.y=rotation
 	add_child(hall_model);conform_designed_yard(hall_model)
-	person.visible = false
+	remember_building_lod(hall_model,{"type":"hall","houseDesignV354":design},age)
+	person.visible=false
 
 
 func construction_tempo() -> float:
@@ -449,20 +408,80 @@ func construction_tempo() -> float:
 		node=node.get_parent()
 	return 1.0
 
-func configure_wall_transform(model: Node3D,b: Dictionary) -> void:
-	if b.type in ["palisade","stonewall","reinforced_wall"] and float(b.get("palisadeSpanV167",0))>0:
-		var start_embed:=float(b.get("cliffEmbedStartV179",0));var end_embed:=float(b.get("cliffEmbedEndV179",0));var shift:float=(end_embed-start_embed)/2.0;var angle:=float(b.get("wallAngleV175",0))
-		model.scale.x=(float(b.palisadeSpanV167)+start_embed+end_embed)/7.0;model.position.x+=cos(angle)*shift;model.position.z-=sin(angle)*shift
-	elif b.get("extendedPalisadeV166",false) and b.type in ["palisade","woodgate","gatehouse"]:model.scale.x=2.0
-	var default_angle:=PI/2 if b.get("wallAxis",false) and b.type in ["palisade","stonewall","reinforced_wall","woodgate","gatehouse"] else 0.0
-	model.rotation.y=float(b.get("buildingRotationV228",b.get("wallAngleV175",b.get("shoreAngle",default_angle))))
+func building_host() -> Node:
+	var node:=get_parent()
+	while node!=null:
+		if node.has_method("adjacent_defenses"):return node
+		node=node.get_parent()
+	return null
+
+func wall_ground(x: float,z: float) -> float:
+	var host:=building_host()
+	if host!=null and is_instance_valid(host.detail_root):
+		# Sample heights in the current detail coordinate system, also on tile seams.
+		var relative:Vector2=Vector2(tree_cell-host.detail_root.tree_cell)*Placement.TILE_SIZE
+		return host.detail_rendered_height(x+relative.x,z+relative.y)
+	return display_height(x,z)
+
+func place_wall_model(model: Node3D,b: Dictionary,defenses: Array,progress: float,static_caps: Dictionary={}) -> Dictionary:
+	var bounds:=BuildingModels.bounds(model)
+	var ends:=Placement.joined_endpoints(b,defenses)
+	var mesh:=Placement.cap_mesh(b)
+	var fittings:Array[MeshInstance3D]=[]
+	for end in ends:
+		var pose:=Placement.cap_transform(end,Vector3.ONE,wall_ground,mesh,progress)
+		if b.get("ready",false):
+			BuildingModels.add_instance(static_caps,mesh,pose)
+			continue
+		var cap:=MeshInstance3D.new()
+		cap.name="WallJoin"
+		cap.mesh=mesh
+		cap.transform=pose
+		building_root.add_child(cap)
+		fittings.append(cap)
+	model.transform=Placement.wall_transform(b,ends,bounds,Vector3.ONE,wall_ground,progress)
+	return {"ends":ends,"bounds":bounds,"caps":fittings}
+
+func remember_building_lod(model: Node3D,b: Dictionary,age: int) -> void:
+	model.set_meta("building_lod",{"type":b.type,"age":age,"design":b.get("houseDesignV354",{}),"tier":int(b.get("woodFortTierV1757",1))})
+	if model!=hall_model:building_lods.append(model)
+
+func update_building_lods(camera: Camera3D) -> void:
+	if is_instance_valid(hall_model):update_building_lod(hall_model,camera)
+	for model in building_lods:
+		if is_instance_valid(model):update_building_lod(model,camera)
+
+func update_building_lod(model: Node3D,camera: Camera3D) -> void:
+	var data:Dictionary=model.get_meta("building_lod",{})
+	if data.is_empty() or model.get_child_count()==0:return
+	var threshold:=85.0 if Mobile.active else 115.0
+	var original:Node3D=model.get_child(0)
+	var distance:=camera.global_position.distance_to(model.global_position)
+	var use_low:=distance>threshold+10.0 if original.visible else distance>threshold
+	if use_low == (not original.visible):return
+	var low:=model.get_node_or_null("BuildingLow") as MeshInstance3D
+	if use_low and low==null:
+		var mesh:=BuildingModels.simplified_mesh(data.type,data.age,data.design,data.tier)
+		if mesh==null:
+			model.remove_meta("building_lod")
+			return
+		low=MeshInstance3D.new()
+		low.name="BuildingLow"
+		low.mesh=mesh
+		model.add_child(low)
+	if low!=null:low.visible=use_low
+	original.visible=not use_low
 
 func sync_buildings(city: Dictionary,age:=0) -> void:
 	if building_root != null: building_root.queue_free()
 	building_root=Node3D.new()
-	building_animations.clear();construction_models.clear()
+	building_animations.clear();construction_models.clear();building_lods.clear()
 	add_child(building_root)
 	var cover_areas: Array=[]
+	var wall_caps:Dictionary={}
+	var defenses:Array=city.economy.buildings.filter(func(b):return Placement.alive(b) and Placement.is_defense(b))
+	var host:=building_host()
+	if host!=null:defenses.append_array(host.adjacent_defenses(city))
 	for building_index in city.economy.buildings.size():
 		var b: Dictionary=city.economy.buildings[building_index]
 		if not b.get("virtual",false) and float(b.get("hp",0))>0:
@@ -482,9 +501,13 @@ func sync_buildings(city: Dictionary,age:=0) -> void:
 				var partial:=create_designed_building(b.type,age,b.get("houseDesignV354",{}),int(b.get("woodFortTierV1757",1)))
 				if partial!=null:
 					var duration:float=float(b.get("buildTimeV1757",EconomyData.data.buildings[b.type].time))*construction_tempo()
-					partial.scale.y=0.15+0.85*clampf(float(b.get("progress",0))/maxf(1.0,duration),0,1)
-					partial.position=Vector3(b.x,y,b.z);configure_wall_transform(partial,b);building_root.add_child(partial);partial.set_meta("building_index",building_index)
-					construction_models.append({"model":partial,"building":b,"duration":duration})
+					var progress:=0.15+0.85*clampf(float(b.get("progress",0))/maxf(1.0,duration),0,1)
+					var placement:=place_wall_model(partial,b,defenses,progress)
+					building_root.add_child(partial)
+					partial.set_meta("building_index",building_index)
+					placement.merge({"model":partial,"building":b,"duration":duration,"progress":progress})
+					construction_models.append(placement)
+					remember_building_lod(partial,b,age)
 			else:
 				var marker:=MeshInstance3D.new()
 				var box:=BoxMesh.new();box.size=Vector3(float(b.get("width",4)),0.12,float(b.get("depth",4))) if b.type=="field" else Vector3(4,0.12,4);marker.mesh=box
@@ -494,17 +517,21 @@ func sync_buildings(city: Dictionary,age:=0) -> void:
 		else:
 			var model:=create_designed_building(b.type,age,b.get("houseDesignV354",{}),int(b.get("woodFortTierV1757",1)))
 			if model!=null:
-				if b.type=="field":model.scale=Vector3(float(b.get("width",16))/16.0,1,float(b.get("depth",16))/16.0)
-				elif b.type=="house" and int(b.get("houseUpgradeLevelV218",0))>=1:model.scale*=Vector3(1.12,1.42,1.10)
-				if b.has("baseY"):
-					y=y+float(b.baseY)-Terrain.detail_height(heights,b.x,b.z) if b.get("riverBankV276",false) else float(b.baseY)
-				model.position=Vector3(b.x,y+(0.12 if b.type=="field" else 0.0),b.z)
-				configure_wall_transform(model,b);building_root.add_child(model);conform_designed_yard(model)
+				if b.type in Placement.Walls:
+					place_wall_model(model,b,defenses,1.0,wall_caps)
+				else:
+					if b.has("baseY"):
+						y=y+float(b.baseY)-Terrain.detail_height(heights,b.x,b.z) if b.get("riverBankV276",false) else float(b.baseY)
+					model.transform=Placement.building_transform(b,Vector3.ONE,y+(0.12 if b.type=="field" else 0.0))
+				building_root.add_child(model)
+				conform_designed_yard(model)
+				remember_building_lod(model,b,age)
 				model.set_meta("building_index",building_index)
 				var id: String=model.get_meta("designer_id","")
 				for entry in MODEL_ANIMATIONS.data.get(id,[]):
 					var part: Node=model.find_child("part_"+str(int(entry.index)),true,false)
 					if part is Node3D:building_animations.append({"part":part,"building":b,"data":entry})
+	BuildingModels.add_batches(building_root,wall_caps,true)
 	if ground_cover!=null:ground_cover.set_areas(cover_areas)
 
 func mesh_hit_distance(node: Node,origin: Vector3,direction: Vector3) -> float:
@@ -921,22 +948,19 @@ func update_workers(city: Dictionary,time: float,age:=0) -> void:
 
 func update_building_animations(time: float) -> void:
 	for entry in construction_models:
-		if is_instance_valid(entry.model):entry.model.scale.y=0.15+0.85*clampf(float(entry.building.get("progress",0))/maxf(1.0,float(entry.duration)),0,1)
+		if not is_instance_valid(entry.model):continue
+		var progress:=0.15+0.85*clampf(float(entry.building.get("progress",0))/maxf(1.0,float(entry.duration)),0,1)
+		if is_equal_approx(progress,float(entry.progress)):continue
+		entry.progress=progress
+		var wall:Dictionary=entry.building
+		var model:Node3D=entry.model
+		model.transform=Placement.wall_transform(wall,entry.ends,entry.bounds,Vector3.ONE,wall_ground,progress)
+		for i in entry.caps.size():
+			var cap:MeshInstance3D=entry.caps[i]
+			cap.transform=Placement.cap_transform(entry.ends[i],Vector3.ONE,wall_ground,cap.mesh,progress)
 	for entry in building_animations:
 		var building: Dictionary=entry.building;var data: Dictionary=entry.data
-		if not building.get("ready",false) or (data.get("workOnly",false) and building.get("status","")!="Toodab"):continue
+		if not entry.part.is_visible_in_tree() or not building.get("ready",false) or (data.get("workOnly",false) and building.get("status","")!="Toodab"):continue
 		var axis:=Vector3.RIGHT if data.axis=="x" else Vector3.UP if data.axis=="y" else Vector3.BACK
 		var basis:=Basis(axis,time*float(data.speed));var raw: Array=data.pivot;var pivot:=Vector3(raw[0],raw[1],raw[2])
 		entry.part.transform=Transform3D(basis,pivot-basis*pivot)
-
-func apply_town_material(node: Node) -> void:
-	if node is MeshInstance3D and node.mesh!=null:
-		for surface in node.mesh.get_surface_count():
-			var surface_key:=str(node.mesh.get_instance_id())+":"+str(surface)
-			if not vertex_color_surfaces.has(surface_key):
-				var arrays: Array=node.mesh.surface_get_arrays(surface)
-				vertex_color_surfaces[surface_key]=arrays[Mesh.ARRAY_COLOR]!=null and not arrays[Mesh.ARRAY_COLOR].is_empty()
-			if not vertex_color_surfaces[surface_key]:continue
-			if town_material==null:town_material=ShaderMaterial.new();town_material.shader=TOWN_SHADER
-			node.set_surface_override_material(surface,town_material)
-	for child in node.get_children():apply_town_material(child)

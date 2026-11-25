@@ -360,7 +360,7 @@ func add_known_nature(host: Node,tile: Node3D,at: Vector2i,heights: Array,index:
 	nature.sync_removed_resources(world.resources,float(host.game.time),buildings)
 	if city!=null:
 		nature.person=Node3D.new();nature.add_child(nature.person)
-		var hall: Dictionary=city.economy.buildings[0];var upgrade:=Production.upgrade_level(host.game,int(city.team))
+		var hall: Dictionary=city.economy.buildings[0];var upgrade:=Production.visual_age(host.game,int(city.team))
 		if not hall.get("virtual",false):nature.place_hall(hall.x,hall.z,upgrade,float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
 		nature.sync_buildings(city,upgrade)
 		nature.add_village_life(host,"city:"+str(city.id),int(city.team),true)

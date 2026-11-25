@@ -10,7 +10,6 @@ const Geography=preload("res://scripts/world_geography.gd")
 const Town=preload("res://scripts/world_city_layout.gd")
 const Campaign=preload("res://scripts/campaign_state.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
-const Production=preload("res://scripts/production_bonuses.gd")
 const CHUNK:=8
 const SCALE:=0.04
 const MAX_CHUNKS:=96
@@ -142,11 +141,13 @@ func ensure_towns() -> void:
 	if not towns_dirty:return
 	towns_dirty=false;town_buckets.clear()
 	for city in host.game.get("cities",[]):
-		if Production.upgrade_level(host.game,int(city.team))!=0:continue
 		if int(city.team)!=0 and not Campaign.visible_now(host.game,0,city):continue
 		add_town_clearances(city.economy.buildings,Grid.center(int(city.c),int(city.r)))
+		for district in city.get("districts",{}).values():
+			if int(city.team)==0 or Campaign.visible_now(host.game,0,district):
+				add_town_clearances(district.economy.buildings,Grid.center(int(district.c),int(district.r)))
 	for landmark in host.game.get("landmarks",[]):
-		if landmark.kind!="village" or Discoveries.village_age(host.game,landmark)!=0:continue
+		if landmark.kind!="village":continue
 		var key:=str(int(landmark.c))+":"+str(int(landmark.r))
 		if not host.reveal_all and not host.game.explored[0].has(key):continue
 		add_town_clearances(Discoveries.village_layout(landmark),Grid.center(int(landmark.c),int(landmark.r)))
