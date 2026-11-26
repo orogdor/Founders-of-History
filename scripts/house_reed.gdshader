@@ -5,6 +5,7 @@ render_mode cull_disabled, diffuse_burley;
 
 uniform sampler2D reed_atlas : source_color, filter_linear_mipmap, repeat_disable;
 uniform vec4 reed_tint : source_color = vec4(0.46, 0.42, 0.36, 1.0);
+uniform bool settlement_detail = false;
 varying vec3 surface_world;
 
 void vertex() {
@@ -27,6 +28,13 @@ vec3 reed_sample(vec2 cell, vec2 uv) {
 }
 
 void fragment() {
+ if (settlement_detail) {
+  vec3 straw = reed_sample(vec2(3.0, 9.0), UV);
+  float tone = 0.94 + sin(surface_world.x * 1.08 + surface_world.z * 0.69) * 0.06;
+  ALBEDO = (straw * vec3(0.78, 0.74, 0.64) + vec3(0.028, 0.018, 0.010)) * tone;
+  ROUGHNESS = 0.90;
+  SPECULAR = 0.17;
+ } else {
  vec2 position = vec2(surface_world.x + 0.51 * surface_world.z + 0.32 * surface_world.y,
                       surface_world.z - 0.27 * surface_world.x + 0.81 * surface_world.y) * 0.94;
  vec2 cell = floor(position);
@@ -50,4 +58,5 @@ void fragment() {
         * (1.0 + visible_detail * (0.24 * (grain - 0.42) + 0.078 * strands));
  ROUGHNESS = clamp(0.92 - grain * 0.10, 0.78, 0.95);
  SPECULAR = 0.20;
+ }
 }

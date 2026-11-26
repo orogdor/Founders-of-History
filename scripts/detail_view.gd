@@ -96,6 +96,8 @@ var building_root: Node3D
 var building_animations: Array=[]
 var construction_models: Array=[]
 var building_lods:Array[Node3D]=[]
+static var building_mesh_frame: int=-1
+static var building_mesh_count:=0
 var hall_model: Node3D
 var builder_person: Node3D
 var builder_people: Array[Node3D]=[]
@@ -451,7 +453,10 @@ func place_wall_model(model: Node3D,b: Dictionary,defenses: Array,progress: floa
 	return {"ends":ends,"bounds":bounds,"caps":fittings}
 
 func remember_building_lod(model: Node3D,b: Dictionary,age: int) -> void:
-	model.set_meta("building_lod",{"type":b.type,"age":age,"design":b.get("houseDesignV354",{}),"tier":int(b.get("woodFortTierV1757",1))})
+	var footprint: Variant=LocalNavigation.clearance(b)
+	var width:float=7.0 if footprint==null else 2.0*maxf(float(footprint.rx),float(footprint.rz))
+	model.set_meta("building_lod",{"type":b.type,"age":age,"design":b.get("houseDesignV354",{}),
+		"tier":int(b.get("woodFortTierV1757",1)),"width":width,"level":0})
 	if model!=hall_model:building_lods.append(model)
 
 func update_building_lods(camera: Camera3D) -> void:
@@ -465,20 +470,40 @@ func update_building_lod(model: Node3D,camera: Camera3D) -> void:
 	var threshold:=85.0 if Mobile.active else 115.0
 	var original:Node3D=model.get_child(0)
 	var distance:=camera.global_position.distance_to(model.global_position)
-	var use_low:=distance>threshold+10.0 if original.visible else distance>threshold
-	if use_low == (not original.visible):return
+	var previous:=int(data.level)
+	var level:=0
+	if distance>(threshold+10.0 if previous==0 else threshold):
+		level=2
+		if not data.get("no_settlement",false) and data.type not in Placement.Walls and data.type not in ["field","woodgate","gatehouse","bridge"]:
+			var screen_height:=camera.get_viewport().get_visible_rect().size.y
+			var pixels:=float(data.width)*screen_height/(2.0*tan(deg_to_rad(camera.fov*0.5))*maxf(distance,1.0))
+			if pixels>(17.0 if previous==1 else 22.0):level=1
+	if previous==level:return
 	var low:=model.get_node_or_null("BuildingLow") as MeshInstance3D
-	if use_low and low==null:
-		var mesh:=BuildingModels.simplified_mesh(data.type,data.age,data.design,data.tier)
+	if level>0:
+		var frame:=Engine.get_process_frames()
+		if frame!=building_mesh_frame:building_mesh_frame=frame;building_mesh_count=0
+		var cached: Variant=data.get("mesh_"+str(level))
+		if cached==null and building_mesh_count>=2:return
+		var mesh: ArrayMesh=cached
+		if mesh==null:
+			building_mesh_count+=1
+			if level==1:
+				mesh=BuildingModels.settlement_mesh(data.type,data.age,data.design,data.tier)
+				if mesh==null:data.no_settlement=true;level=2
+			if level==2:mesh=BuildingModels.simplified_mesh(data.type,data.age,data.design,data.tier)
 		if mesh==null:
 			model.remove_meta("building_lod")
 			return
-		low=MeshInstance3D.new()
-		low.name="BuildingLow"
+		if low==null:
+			low=MeshInstance3D.new()
+			low.name="BuildingLow"
+			model.add_child(low)
 		low.mesh=mesh
-		model.add_child(low)
-	if low!=null:low.visible=use_low
-	original.visible=not use_low
+		data["mesh_"+str(level)]=mesh
+	if low!=null:low.visible=level>0
+	original.visible=level==0
+	data.level=level
 
 func sync_buildings(city: Dictionary,age:=0) -> void:
 	if building_root != null: building_root.queue_free()

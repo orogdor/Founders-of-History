@@ -23,7 +23,15 @@ func triangle_count(model: Node) -> int:
 	for child in model.get_children():count+=triangle_count(child)
 	return count
 
+func has_exterior_material(mesh: ArrayMesh) -> bool:
+	for i in mesh.get_surface_count():
+		var paint:=mesh.surface_get_material(i)
+		if paint is ShaderMaterial or (paint is BaseMaterial3D and paint.albedo_texture!=null):
+			return true
+	return false
+
 func run() -> void:
+	root.size=Vector2i(1280,720)
 	for age in Eras.NAMES.size():
 		var high:=Models.create("house",age)
 		var low:=Models.simplified_mesh("house",age)
@@ -36,6 +44,9 @@ func run() -> void:
 			assert(low==Models.simplified_mesh("house",age,Eras.default_plan(id)))
 		assert(low.surface_get_array_index_len(0)/3 < triangle_count(high)*0.25)
 		assert(Models.simplified_mesh("house",age)==low)
+		var middle:=Models.settlement_mesh("house",age)
+		assert(middle!=null and middle!=low and has_exterior_material(middle),"The settlement house must retain authored materials")
+		assert(Models.settlement_mesh("house",age)==middle,"Repeated houses should share a mesh")
 		high.free()
 		var gate_mesh:=Models.simplified_mesh("woodgate",age)
 		assert(gate_mesh!=null and gate_mesh.get_aabb().size.x>=6.4)
@@ -79,10 +90,13 @@ func run() -> void:
 	var model:=Models.create("house",3)
 	detail.add_child(model)
 	detail.remember_building_lod(model,home,3)
-	camera.position=Vector3(0,180,0)
+	camera.position=Vector3(0,145,0)
+	detail.update_building_lods(camera)
+	assert(model.get_node("BuildingLow").mesh==Models.settlement_mesh("house",3))
+	assert(not model.get_child(0).visible)
+	camera.position=Vector3(0,700,0)
 	detail.update_building_lods(camera)
 	assert(model.get_node("BuildingLow").mesh==Models.simplified_mesh("house",3))
-	assert(not model.get_child(0).visible)
 	camera.position=Vector3(0,3,7)
 	detail.update_building_lods(camera)
 	assert(model.get_child(0).visible and not model.get_node("BuildingLow").visible)

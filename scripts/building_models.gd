@@ -16,6 +16,7 @@ static var low_order:Array[String]=[]
 static var vertex_materials:Dictionary={}
 static var has_vertex_colors:Dictionary={}
 static var town_material:ShaderMaterial
+static var settlement_town_material:ShaderMaterial
 static var low_material:StandardMaterial3D
 
 static func specification(type: String,age: int,design: Dictionary,tier: int,simplified:=false) -> Dictionary:
@@ -42,12 +43,13 @@ static func create(type: String,age: int,design: Dictionary={},tier:=1) -> Node3
 	wrapper.add_child(raw)
 	return wrapper
 
-static func source(spec: Dictionary,simplified: bool) -> Node3D:
+static func source(spec: Dictionary,simplified: bool,settlement_detail:=false) -> Node3D:
 	var raw:Node3D
 	if not spec.plan.is_empty():
 		if simplified:
 			raw=HouseModel.new()
 			raw.simplified=true
+			raw.settlement_detail=settlement_detail
 			raw.rebuild(spec.plan)
 		else:
 			raw=HouseModel.from_design(spec.plan)
@@ -100,39 +102,102 @@ static func bounds(node: Node,transform:=Transform3D.IDENTITY) -> AABB:
 
 static func simplified_mesh(type: String,age: int,design: Dictionary={},tier:=1) -> ArrayMesh:
 	var spec:=specification(type,age,design,tier,true)
-	var key:String=spec.id
-	if not spec.plan.is_empty() and not is_same(spec.plan,Eras.default_plan(spec.id)):
-		key+=":"+str(hash(spec.plan))
+	var key:=mesh_key(spec)
 	if low_meshes.has(key):
 		low_order.erase(key)
 		low_order.append(key)
 		return low_meshes[key]
 	var raw:=source(spec,true)
 	if raw==null:return null
-	var arrays:Array=[]
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX]=PackedVector3Array()
-	arrays[Mesh.ARRAY_NORMAL]=PackedVector3Array()
-	arrays[Mesh.ARRAY_COLOR]=PackedColorArray()
-	arrays[Mesh.ARRAY_INDEX]=PackedInt32Array()
+	var arrays:=geometry_arrays()
 	if type in Placement.Walls and spec.plan.is_empty():
 		append_wall_shell(type,tier,bounds(raw),arrays)
 	else:
 		append_meshes(raw,Transform3D.IDENTITY,arrays,0.34 if type=="woodgate" else 0.0)
 	raw.free()
 	if arrays[Mesh.ARRAY_INDEX].is_empty():return null
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	mesh.surface_set_material(0,flat_material())
+	return cache_mesh(key,mesh)
+
+static func mesh_key(spec: Dictionary) -> String:
+	var key: String=spec.id
+	if not spec.plan.is_empty() and not is_same(spec.plan,Eras.default_plan(spec.id)):
+		key+=":"+str(hash(spec.plan))
+	return key
+
+static func cache_mesh(key: String,mesh: ArrayMesh) -> ArrayMesh:
+	low_meshes[key]=mesh
+	low_order.append(key)
+	if low_order.size()>LOW_CACHE_SIZE:low_meshes.erase(low_order.pop_front())
+	return mesh
+
+static func geometry_arrays(with_uv:=false) -> Array:
+	var arrays: Array=[]
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]=PackedVector3Array()
+	arrays[Mesh.ARRAY_NORMAL]=PackedVector3Array()
+	arrays[Mesh.ARRAY_COLOR]=PackedColorArray()
+	arrays[Mesh.ARRAY_INDEX]=PackedInt32Array()
+	if with_uv:arrays[Mesh.ARRAY_TEX_UV]=PackedVector2Array()
+	return arrays
+
+static func flat_material() -> StandardMaterial3D:
 	if low_material==null:
 		low_material=StandardMaterial3D.new()
 		low_material.vertex_color_use_as_albedo=true
 		low_material.cull_mode=BaseMaterial3D.CULL_DISABLED
 		low_material.roughness=0.92
+	return low_material
+
+static func settlement_mesh(type: String,age: int,design: Dictionary={},tier:=1) -> ArrayMesh:
+	var spec:=specification(type,age,design,tier,true)
+	var key:="settlement:"+mesh_key(spec)
+	if low_meshes.has(key):
+		low_order.erase(key)
+		low_order.append(key)
+		return low_meshes[key]
+	var raw:=source(spec,true,true)
+	if raw==null:return null
+	var groups: Dictionary={}
+	append_settlement(raw,Transform3D.IDENTITY,groups,{},spec.town_shader)
+	raw.free()
 	var mesh:=ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	mesh.surface_set_material(0,low_material)
-	low_meshes[key]=mesh
-	low_order.append(key)
-	if low_order.size()>LOW_CACHE_SIZE:low_meshes.erase(low_order.pop_front())
-	return mesh
+	for material in groups:
+		if groups[material][Mesh.ARRAY_INDEX].is_empty():continue
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,groups[material])
+		mesh.surface_set_material(mesh.get_surface_count()-1,material)
+	return cache_mesh(key,mesh) if mesh.get_surface_count()>0 else null
+
+static func append_settlement(node: Node,transform: Transform3D,groups: Dictionary,materials: Dictionary,town: bool) -> void:
+	var pose:Transform3D=transform*node.transform if node is Node3D else transform
+	if node is MeshInstance3D and node.mesh!=null:
+		for surface in node.mesh.get_surface_count():
+			var original: Material=node.get_active_material(surface)
+			if not materials.has(original):materials[original]=settlement_material(original,town)
+			var material: Material=materials[original]
+			if not groups.has(material):groups[material]=geometry_arrays(true)
+			append_surface(node.mesh,surface,original,pose,groups[material],0.0,material!=flat_material())
+	for child in node.get_children():append_settlement(child,pose,groups,materials,town)
+
+static func settlement_material(original: Material,town: bool) -> Material:
+	if town:
+		if settlement_town_material==null:
+			settlement_town_material=ShaderMaterial.new()
+			settlement_town_material.shader=TownShader
+			settlement_town_material.set_shader_parameter("close_detail",false)
+		return settlement_town_material
+	if original is ShaderMaterial:return original
+	if not original is StandardMaterial3D:return flat_material()
+	if original.albedo_texture==null and original.transparency==BaseMaterial3D.TRANSPARENCY_DISABLED:return flat_material()
+	var material: StandardMaterial3D=original.duplicate()
+	material.normal_enabled=false
+	material.heightmap_enabled=false
+	material.ao_enabled=false
+	material.vertex_color_use_as_albedo=true
+	material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return material
 
 static func append_wall_shell(type: String,tier: int,extents: AABB,output: Array) -> void:
 	# These long silhouettes must retain both ends, even at the lowest detail level.
@@ -187,12 +252,13 @@ static func append_meshes(node: Node,transform: Transform3D,output: Array,minimu
 	for child in node.get_children():
 		append_meshes(child,pose,output,minimum_ratio)
 
-static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Transform3D,output: Array,minimum_ratio:=0.0) -> void:
+static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Transform3D,output: Array,minimum_ratio:=0.0,keep_material:=false) -> void:
 	if mesh is ArrayMesh and mesh.surface_get_primitive_type(surface)!=Mesh.PRIMITIVE_TRIANGLES:return
 	var arrays:=mesh.surface_get_arrays(surface)
 	var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
 	var normals:Variant=arrays[Mesh.ARRAY_NORMAL]
 	var colors:Variant=arrays[Mesh.ARRAY_COLOR]
+	var uv:Variant=arrays[Mesh.ARRAY_TEX_UV]
 	var indices:Variant=arrays[Mesh.ARRAY_INDEX]
 	# Use the GLB importer's own simplification to keep the original silhouette.
 	if mesh is ArrayMesh and indices!=null and indices.size()>=72:
@@ -208,7 +274,7 @@ static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Tran
 			for i in count:
 				selected[i]=bytes.decode_u16(i*stride) if stride==2 else bytes.decode_u32(i*stride)
 			indices=selected
-	var tint:Color=material.albedo_color if material is BaseMaterial3D else Color.WHITE
+	var tint:Color=material.albedo_color if not keep_material and material is BaseMaterial3D else Color.WHITE
 	var normal_basis:=pose.basis.inverse().transposed() if absf(pose.basis.determinant())>0.000001 else Basis.IDENTITY
 	var count:int=indices.size() if indices!=null and not indices.is_empty() else vertices.size()
 	var mapped:Dictionary={}
@@ -221,6 +287,8 @@ static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Tran
 			var color:Color=tint*colors[vertex] if colors!=null and not colors.is_empty() else tint
 			color.a=1.0
 			output[Mesh.ARRAY_COLOR].append(color)
+			if output[Mesh.ARRAY_TEX_UV]!=null:
+				output[Mesh.ARRAY_TEX_UV].append(uv[vertex] if uv!=null and not uv.is_empty() else Vector2.ZERO)
 		output[Mesh.ARRAY_INDEX].append(mapped[vertex])
 
 
