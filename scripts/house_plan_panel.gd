@@ -22,7 +22,7 @@ var preview: SubViewportContainer
 var status: Label
 var title_label: Label
 var reset_button: Button
-var walk_button: Button
+var walk_button: TextureButton
 var tool_buttons: Dictionary={}
 var category_buttons: Dictionary={}
 var selected_category:="outer"
@@ -141,7 +141,8 @@ func _ready() -> void:
   var count:=Label.new();count.add_theme_font_size_override("font_size",13);count.add_theme_color_override("font_color",Color("f6e7c3"));row.add_child(count);resource_widgets[key]={"row":row,"icon":icon,"label":count}
  overview_button=make_button(actions,"Ülevaade",func():mobile_ledger_open=not mobile_ledger_open;update_stage_layout())
  make_button(actions,"Plaan / 3D",func():toggle_preview())
- walk_button=make_button(actions,"Kõnni",func():toggle_walk())
+ walk_button=InterfaceTheme.icon_button(preload("res://assets/ui/ui-art-v303_action_move.webp"),"Kõnni",toggle_walk)
+ walk_button.custom_minimum_size=Vector2(40,40);actions.add_child(walk_button)
  make_button(actions,"+",func():zoom_view(1.25))
  make_button(actions,"−",func():zoom_view(0.8))
  make_button(actions,"Kogu plaan",func():reset_view())
@@ -528,7 +529,7 @@ func choose_era(target: int) -> void:
 
 func select_preview_project(id: String) -> void:
  if HouseEras.default_plan(id).is_empty():return
- if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
+ if preview.walking:preview.stop_walking();refresh_walk_icon(false)
  if not canvas.design.is_empty():
   design_drafts[str(canvas.design.id)]={"design":canvas.design.duplicate(true),"history":canvas.history.duplicate(true),"future":canvas.future.duplicate(true),"floor":canvas.active_floor}
  var draft:Dictionary=design_drafts.get(id,{})
@@ -542,7 +543,7 @@ func select_preview_project(id: String) -> void:
 func show_catalogue(value: bool) -> void:
  catalogue_open=value;toolbar_ref.visible=not value;catalogue_title.visible=value;catalogue_kind_scroll.visible=value
  if value:
-  if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
+  if preview.walking:preview.stop_walking();refresh_walk_icon(false)
   dock_panel.visible=true;card_row.visible=true;card_scroll.visible=true;controls_panel.visible=false;options_panel.visible=false
   for key in tool_buttons:tool_buttons[key].visible=false
   build_catalogue()
@@ -841,7 +842,7 @@ func sync_floor_controls() -> void:
  if is_instance_valid(map_overlay):call_deferred("update_stage_layout")
 
 func select_floor(index: int) -> void:
- if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
+ if preview.walking:preview.stop_walking();refresh_walk_icon(false)
  canvas.select_floor(index)
  sync_floor_controls()
  preview.set_active_floor(canvas.active_floor)
@@ -858,7 +859,7 @@ func update_roof_overlay() -> void:
  roof_overlay.visible=preview.visible and not preview.walking and preview.roof_visible and not canvas.design.get("rooms",[]).is_empty()
 
 func toggle_preview() -> void:
- if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
+ if preview.walking:preview.stop_walking();refresh_walk_icon(false)
  preview.visible=not preview.visible;canvas.visible=not preview.visible;status.visible=not preview.visible
  refresh_web_view();sync_floor_controls()
  dock_panel.visible=not preview.visible
@@ -866,13 +867,18 @@ func toggle_preview() -> void:
  mini_preview.visible=not preview.visible;mini_plan.visible=preview.visible;mini_title_label.text="Plaan" if preview.visible else "3D eelvaade"
  if preview.visible:preview.show_design(canvas.design)
 
+func refresh_walk_icon(walking: bool) -> void:
+ walk_button.texture_normal=preload("res://assets/ui/ui-art-v303_action_stop.webp") if walking else preload("res://assets/ui/ui-art-v303_action_move.webp")
+ walk_button.tooltip_text="Lõpeta kõndimine" if walking else "Kõnni"
+ walk_button.accessibility_name=walk_button.tooltip_text
+
 func toggle_walk() -> void:
  if preview.walking:
-  preview.stop_walking();walk_button.text="Kõnni";status.text="3D-vaade.";refresh_web_view()
+  preview.stop_walking();refresh_walk_icon(false);status.text="3D-vaade.";refresh_web_view()
   return
  if not preview.visible:
   preview.visible=true;canvas.visible=false;status.visible=false;dock_panel.visible=false;roof_overlay.visible=false;mini_preview.visible=false;mini_plan.visible=true;mini_title_label.text="Plaan";preview.show_design(canvas.design)
- if preview.start_walking(canvas.active_floor,canvas.current_plan()):walk_button.text="Lõpeta kõndimine";status.text="WASD liigub, Shift jookseb, hiirega lohistades vaatad ringi.";refresh_web_view()
+ if preview.start_walking(canvas.active_floor,canvas.current_plan()):refresh_walk_icon(true);status.text="WASD liigub, Shift jookseb, hiirega lohistades vaatad ringi.";refresh_web_view()
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if not event is InputEventKey or not event.pressed or event.echo:return
@@ -900,7 +906,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func restore_history(redo: bool) -> void:
  if (canvas.future if redo else canvas.history).is_empty():return
- if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
+ if preview.walking:preview.stop_walking();refresh_walk_icon(false)
  canvas.drag=false;canvas.panning=false;canvas.moving_item=-1
  if redo:canvas.redo()
  else:canvas.undo()

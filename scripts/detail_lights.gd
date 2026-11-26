@@ -5,6 +5,9 @@ const LocalNav=preload("res://scripts/local_navigation.gd")
 const DOORS:={"house":[3.5,[1.25]],"hall":[4.5,[-2.05,2.05]],"market":[3.4,[-1.9,1.9]],"tavern":[3.1,[-1.55,1.55]],"barracks":[3.8,[-1.8,1.8]],"warehouse":[3.2,[-1.7,1.7]],"farm":[3.4,[1.45]],"lumber":[3.2,[1.45]],"quarry":[3.4,[1.45]],"mason":[3.1,[1.35]],"pottery_kiln":[3.0,[1.25]],"workshop":[3.2,[1.5]],"watchtower":[3.0,[1.35]],"stonetower":[3.1,[1.5]],"woodgate":[1.4,[-2.35,2.35]],"gatehouse":[1.5,[-2.55,2.55]],"harbor":[3.1,[1.3]],"port":[3.1,[1.4]],"library":[3.2,[-1.5,1.5]],"school":[3.1,[1.4]],"study":[3.0,[1.3]],"blacksmith":[3.0,[1.4]],"baker":[3.0,[1.3]],"mill":[3.0,[1.4]]}
 var host: Node
 var city_id:=0
+var site_tile:=Vector2i.ZERO
+const Districts=preload("res://scripts/district_context.gd")
+const Production=preload("res://scripts/production_bonuses.gd")
 var heights: Array=[]
 var visual_heights:=PackedVector4Array()
 var stamp: String=""
@@ -54,21 +57,28 @@ static func locations(buildings: Array,use_clearance:=false) -> Array:
 static func priority(kind: String) -> int:
 	return 0 if kind in ["woodgate","gatehouse","hall"] else 1 if kind=="house" else 2
 
-func setup(owner: Node,id: int,tile_heights: Array,visual:=PackedVector4Array()) -> void:
-	host=owner;city_id=id;heights=tile_heights;visual_heights=visual
+func setup(owner: Node,id: int,tile: Vector2i,tile_heights: Array,visual:=PackedVector4Array()) -> void:
+	host=owner;city_id=id;site_tile=tile;heights=tile_heights;visual_heights=visual
+
+static func local_context(cities: Array,id: int,tile: Vector2i) -> Dictionary:
+	for parent in cities:
+		if int(parent.id)==id:
+			var context: Variant=Districts.existing(parent,tile)
+			return context if context is Dictionary else {}
+	return {}
 
 func _process(delta: float) -> void:
 	if host==null:return
 	update_clock+=delta
-	var city: Dictionary={}
-	for candidate in host.game.get("cities",[]):
-		if int(candidate.id)==city_id:city=candidate;break
-	if city.is_empty():return
 	if update_clock>=1.0 or stamp.is_empty():
 		update_clock=0
-		var age:=int(host.game.ages[clampi(int(city.team),0,3)])
+		var city:=local_context(host.game.get("cities",[]),city_id,site_tile)
+		if city.is_empty():
+			if stamp!="vacant":stamp="vacant";rebuild([],0)
+			return
+		var age:=Production.visual_age(host.game,int(city.team))
 		var building_stamp: Array=[]
-		for b in city.economy.buildings:building_stamp.append([b.get("type"),b.get("x"),b.get("z"),b.get("buildingRotationV228"),b.get("wallAxis"),b.get("ready"),float(b.get("hp",0))>0])
+		for b in city.economy.buildings:building_stamp.append([b.get("type"),b.get("x"),b.get("z"),b.get("buildingRotationV228"),b.get("wallAxis"),b.get("ready"),b.get("virtual",false),float(b.get("hp",0))>0])
 		var next:=str(age)+str(building_stamp)
 		if next!=stamp:stamp=next;rebuild(city.economy.buildings,age)
 	var hour:=host.daylight_hour() as float;var elevation:=sin((hour-6.0)*PI/12.0)
@@ -79,6 +89,7 @@ func _process(delta: float) -> void:
 func rebuild(buildings: Array,age: int) -> void:
 	for child in get_children():child.queue_free()
 	fire_nodes.clear();lights.clear()
+	if buildings.is_empty():return
 	var kind:=fixture(age);var path: String="res://assets/world/city_lights/"+kind+".glb"
 	if not ResourceLoader.exists(path):return
 	var scene: PackedScene=load(path);var sites:=locations(buildings,true)

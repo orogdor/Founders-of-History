@@ -25,7 +25,8 @@ static func specification(type: String,age: int,design: Dictionary,tier: int,sim
 	if type=="palisade" and tier==2 and fit_id=="palisade" and design.is_empty():
 		fit_id="palisade-tier2"
 	# At distance the matching plan provides a much lighter mesh than the GLB.
-	var plan:=Eras.live_plan(type,building_age,design,not simplified and building_age in [0,2])
+	var early_round_hut:=building_age==0 and type in ["hunter","house"]
+	var plan:=Eras.live_plan(type,building_age,design,not simplified and building_age in [0,2] and not early_round_hut)
 	var id:=str(plan.get("id",fit_id))
 	if plan.is_empty():
 		var procedural:="procedural_"+type+"@"+str(clampi(building_age,0,6))

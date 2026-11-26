@@ -30,7 +30,7 @@ var motion:=Motion.new()
 var overlay: CanvasLayer
 var bar: Control
 var hint: PanelContainer
-var names_button: Button
+var names_button: TextureButton
 var saved_camera: Dictionary={}
 var walking_environment: Environment
 var sky_material: ShaderMaterial
@@ -61,29 +61,44 @@ func _ready() -> void:
 	info.add_theme_constant_override("outline_size", 4)
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(info)
-	var buttons:=HBoxContainer.new();buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT);buttons.position=Vector2(-340,54);bar.add_child(buttons)
+	var buttons:=HBoxContainer.new()
+	bar.add_child(buttons)
+	buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	buttons.offset_left=-175.0;buttons.offset_right=-16.0;buttons.offset_top=43.0
+	buttons.add_theme_constant_override("separation",6)
 	var version:=Label.new();version.name="GameVersion";version.text=BuildLabel.short_text(get_tree())
 	version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	version.offset_left=-178.0;version.offset_right=-24.0;version.offset_top=15.0
 	version.add_theme_font_size_override("font_size",16);version.add_theme_color_override("font_outline_color",Color("101820"))
 	version.add_theme_constant_override("outline_size",4);version.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(version)
-	names_button=Button.new();names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
-	names_button.pressed.connect(func():
+	names_button=walking_button(buttons,"action_focus","Näita üksuste nimesid",func():
 		host.game_hud.game_menu.set_graphics_value("names",not host.graphics_soldier_names)
-		names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas")
-	buttons.add_child(names_button)
-	var reposition:=Button.new();reposition.text="Paiguta ümber";reposition.pressed.connect(func():exit_walking();placed=false;start());buttons.add_child(reposition)
-	var leave:=Button.new();leave.text="Välju";leave.pressed.connect(exit_walking);buttons.add_child(leave)
+		update_names_icon())
+	update_names_icon()
+	walking_button(buttons,"map_center","Paiguta ümber",func():exit_walking();placed=false;start())
+	walking_button(buttons,"action_stop","Välju kõndimisest",exit_walking)
 	hint=PanelContainer.new();hint.theme=InterfaceTheme.get_theme();hint.visible=false;overlay.add_child(hint)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP);hint.offset_left=-175;hint.offset_right=175;hint.offset_top=84
 	var placement:=HBoxContainer.new();hint.add_child(placement)
 	var instruction:=Label.new();instruction.text="Puuduta kaardil vaba kohta" if Mobile.active else "Klõpsa kaardil vaba kohta"
 	instruction.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;instruction.size_flags_horizontal=Control.SIZE_EXPAND_FILL;placement.add_child(instruction)
-	var cancel:=Button.new();cancel.text="Katkesta";cancel.pressed.connect(cancel_placing);placement.add_child(cancel)
+	walking_button(placement,"action_stop","Katkesta paigutamine",cancel_placing)
 	touch_stick=Panel.new();touch_stick.size=Vector2(110,110);touch_stick.mouse_filter=Control.MOUSE_FILTER_IGNORE;touch_stick.visible=false
 	var ring:=StyleBoxFlat.new();ring.bg_color=Color(0.08,0.12,0.12,0.32);ring.border_color=Color(1,1,1,0.45);ring.set_border_width_all(2);ring.set_corner_radius_all(55);touch_stick.add_theme_stylebox_override("panel",ring);bar.add_child(touch_stick)
 	touch_knob=Panel.new();touch_knob.size=Vector2(38,38);touch_knob.position=Vector2(36,36);touch_knob.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var knob_style:=StyleBoxFlat.new();knob_style.bg_color=Color(1,1,1,0.5);knob_style.set_corner_radius_all(19);touch_knob.add_theme_stylebox_override("panel",knob_style);touch_stick.add_child(touch_knob)
+
+func walking_button(parent: Control,icon: String,description: String,action: Callable) -> TextureButton:
+	var texture: Texture2D=load("res://assets/ui/ui-art-v303_"+icon+".webp")
+	var button:=InterfaceTheme.icon_button(texture,description,action)
+	button.custom_minimum_size=Vector2(47,47)
+	parent.add_child(button)
+	return button
+
+func update_names_icon() -> void:
+	names_button.tooltip_text="Peida üksuste nimed" if host.graphics_soldier_names else "Näita üksuste nimesid"
+	names_button.accessibility_name=names_button.tooltip_text
+	names_button.modulate=Color.WHITE if host.graphics_soldier_names else Color(0.76,0.76,0.76)
 
 func start() -> void:
 	if not host.detail_mode:host.update_status("Ava esmalt detailkaart.");return
@@ -107,7 +122,7 @@ func place_at(x: float,z: float) -> bool:
 func enter() -> void:
 	if not placed:return
 	active=true;velocity=Vector3.ZERO;vertical_speed=0;airborne=false;model.visible=false;bar.visible=true
-	if names_button!=null:names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
+	update_names_icon()
 	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far,"environment":host.camera.environment}
 	host.camera.fov=68.0;host.camera.near=0.12;host.camera.far=720.0
 	host.update_daylight()
@@ -325,4 +340,3 @@ func on_detail_closed() -> void:
 	cancel_placing()
 	if active:exit_walking(false)
 	model.visible=false
-

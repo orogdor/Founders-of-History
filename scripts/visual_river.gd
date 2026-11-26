@@ -167,10 +167,10 @@ static func color_heights(cells: Array,heights: PackedFloat32Array,c: int,r: int
 			var dry:=smoothstep(0.85,2.7,color_height)
 			var river_clearance:=1.0
 			if not near.is_empty():river_clearance=smoothstep(float(near.width)*2.1+4.0,float(near.width)*2.1+16.0,float(near.distance))
-			var broad:=Terrain.seeded_smooth(x/22.0+37.2,z/22.0+15.9,seed)
-			var rolling:=Terrain.seeded_smooth(x/9.5+19.3,z/9.5+83.1,seed)
-			var fine:=Terrain.seeded_smooth(x/4.5+72.4,z/4.5+29.8,seed)
-			var relief:=(broad-0.5)*3.4+(rolling-0.5)*1.55+(fine-0.5)*0.35
+			var broad:=Terrain.seeded_smooth(x/31.0+37.2,z/31.0+15.9,seed)
+			var rolling:=Terrain.seeded_smooth(x/13.0+19.3,z/13.0+83.1,seed)
+			var fine:=Terrain.seeded_smooth(x/6.0+72.4,z/6.0+29.8,seed)
+			var relief:=(broad-0.5)*8.2+(rolling-0.5)*2.65+(fine-0.5)*0.55
 			relief=maxf(relief,0.35-color_height)
 			geometry_height+=relief*dry*river_clearance
 			var sea_height:=color_height

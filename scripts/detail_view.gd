@@ -18,7 +18,7 @@ const HUMAN = preload("res://assets/people/human_far.glb")
 const OAK = preload("res://assets/world/oak_high.glb")
 const PINE = preload("res://assets/world/pine_high.glb")
 const PALM = preload("res://assets/world/palm_high.glb")
-const ROCK = preload("res://assets/world/rock_high.glb")
+const NatureProps=preload("res://scripts/detail_nature_props.gd")
 const HouseEras=preload("res://scripts/house_eras.gd")
 const BuildingModels=preload("res://scripts/building_models.gd")
 const Placement=preload("res://scripts/building_placement.gd")
@@ -161,13 +161,17 @@ func add_ground_cover(biome: String,share:=1.0,walking:=false) -> void:
 	ground_cover.setup(tree_cell.x,tree_cell.y,biome,heights,river_segments,share,visual_heights)
 
 func add_village_life(host: Node,id: String,team: int,nearby:=false) -> void:
-	if village_life!=null:village_life.queue_free()
-	if city_lights!=null:city_lights.queue_free();city_lights=null
-	village_life=Node3D.new();village_life.set_script(VillageLife);add_child(village_life)
+	if village_life!=null:village_life.hide();village_life.queue_free();village_life=null
+	if city_lights!=null:city_lights.hide();city_lights.queue_free();city_lights=null
+	var is_city:=id.begins_with("city:")
+	var city_id:=int(id.trim_prefix("city:")) if is_city else -1
+	if is_city:
+		city_lights=Node3D.new();city_lights.name="LocalBuildingLights";city_lights.set_script(CityLights);add_child(city_lights)
+		city_lights.setup(host,city_id,tree_cell,heights,visual_heights)
+		var context:=CityLights.local_context(host.game.get("cities",[]),city_id,tree_cell)
+		if context.is_empty() or context.has("districtOf"):return
+	village_life=Node3D.new();village_life.name="LocalResidents";village_life.set_script(VillageLife);add_child(village_life)
 	village_life.setup(host,id,tree_cell,heights,team,nearby,visual_heights)
-	if id.begins_with("city:"):
-		city_lights=Node3D.new();city_lights.set_script(CityLights);add_child(city_lights)
-		city_lights.setup(host,int(id.trim_prefix("city:")),heights,visual_heights)
 
 
 func first_mesh(node: Node) -> MeshInstance3D:
@@ -201,7 +205,7 @@ func conform_designed_yard(model: Node3D) -> void:
 		candidate.mesh=adjusted
 
 func add_nature(biome: String) -> void:
-	var rocks: Array[Transform3D] = []
+	var rocks: Array[Transform3D]=[]
 	for resource in resources:
 		if resource.kind=="fish":
 			ensure_fish(resource)
@@ -211,23 +215,38 @@ func add_nature(biome: String) -> void:
 			continue
 		if resource.get("removed",false) or float(resource.get("amount",0))<=0:continue
 		if resource.get("depositSite",false):
-			var file: String="res://assets/world/deposit_"+str(resource.kind)+".glb"
-			if ResourceLoader.exists(file):
-				var deposit: Node3D=load(file).instantiate()
+			var kind: String=resource.kind
+			var deposit: Node3D
+			if NatureProps.PALETTES.has(kind):
+				var model:=MeshInstance3D.new();model.mesh=NatureProps.deposit(kind)
+				deposit=model
+			else:
+				var file: String="res://assets/world/deposit_"+kind+".glb"
+				if not ResourceLoader.exists(file):continue
+				deposit=load(file).instantiate()
 				apply_vertex_colors(deposit)
-				deposit.position=Vector3(resource.x,display_height(resource.x,resource.z),resource.z)
-				add_child(deposit);deposit_models[resource.id]=deposit
-				continue
+			var roll:=float(posmod(int(resource.id),97))/96.0
+			deposit.name="Deposit_"+kind
+			deposit.position=Vector3(resource.x,display_height(resource.x,resource.z),resource.z)
+			deposit.rotation.y=roll*TAU;deposit.scale=Vector3.ONE*lerpf(0.78,1.23,roll)*(0.58 if kind=="oil" else 1.0)
+			add_child(deposit);deposit_models[resource.id]=deposit
+			continue
 		if resource.kind=="game":
 			ensure_animal(resource)
 			continue
 		if resource.kind not in ["tree","stone","ore","copper","tin","clay","gems","oil"]:continue
 		var x: float=resource.x;var z: float=resource.z
 		var y:=display_height(x,z)
-		var t:=Transform3D(Basis.IDENTITY,Vector3(x,y,z))
 		if resource.kind=="tree":register_tree(resource)
-		else:rocks.append(t)
-	add_instances(ROCK,rocks)
+		else:
+			var roll:=float(posmod(int(resource.id)*29,101))/100.0
+			var shape:=Basis(Vector3.UP,roll*TAU).scaled(Vector3.ONE*lerpf(0.46,1.08,roll))
+			rocks.append(Transform3D(shape,Vector3(x,y,z)))
+	if not rocks.is_empty():
+		var multi:=MultiMesh.new()
+		multi.transform_format=MultiMesh.TRANSFORM_3D;multi.mesh=NatureProps.deposit("stone");multi.instance_count=rocks.size()
+		for i in rocks.size():multi.set_instance_transform(i,rocks[i])
+		var cluster:=MultiMeshInstance3D.new();cluster.name="LooseStones";cluster.multimesh=multi;add_child(cluster)
 	sync_tree_instances(0.0)
 	start_forest_fill()
 
@@ -868,7 +887,8 @@ func sync_tree_instances(now: float,buildings: Array=[]) -> void:
 		var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
 		var transform:=tree_transform(resource,heights,now,visual_heights)
 		if tree_mountain or display_height(resource.x,resource.z)<0.5 or Landscape.near_water(Vector2(resource.x,resource.z),river_segments,1.55):transform=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
-		transform.basis=Basis(Vector3.UP,float(resource.id)*0.39)*transform.basis.scaled(Vector3.ONE*(0.9*height/float(TREE_REFERENCE_HEIGHTS[kind])))
+		var varied_size:=tree_proportions(hash([tree_cell,resource.id]))*(0.9*height/float(TREE_REFERENCE_HEIGHTS[kind]))
+		transform.basis=Basis(Vector3.UP,float(resource.id)*0.39)*transform.basis.scaled(varied_size)
 		set_tree_transform(key,int(tree_indices[resource.id]),transform)
 		if not tree_companions.has(resource.id):continue
 		var companion: Dictionary=tree_companions[resource.id];var companion_key: String=companion.key
@@ -885,9 +905,16 @@ func sync_tree_instances(now: float,buildings: Array=[]) -> void:
 			var companion_height:=9.0 if companion_kind in ["pine","spruce"] else 10.0 if companion_kind=="palm" else 7.0
 			var growth: float=tree_transform(resource,heights,now,visual_heights).basis.get_scale().x
 			var size: float=float(companion.scale)*growth*companion_height/float(TREE_REFERENCE_HEIGHTS[companion_kind])
-			companion_transform=Transform3D(Basis(Vector3.UP,float(companion.seed)*0.39).scaled(Vector3.ONE*size),Vector3(companion.x,companion.y,companion.z))
+			var proportions:=tree_proportions(hash([tree_cell,resource.id,19]))
+			companion_transform=Transform3D(Basis(Vector3.UP,float(companion.seed)*0.39).scaled(proportions*size),Vector3(companion.x,companion.y,companion.z))
 		set_tree_transform(companion_key,int(companion.index),companion_transform)
 	if not fill_trees.is_empty():sync_forest_fill(buildings,resized)
+
+static func tree_proportions(seed: int) -> Vector3:
+	var roll:=float(posmod(seed,1024))/1023.0
+	var height:=lerpf(0.55,1.4,smoothstep(0.0,1.0,roll))
+	var width:=lerpf(0.58,1.18,pow(roll,0.62))
+	return Vector3(width,height,width)
 
 func sync_forest_fill(buildings: Array,force:=false) -> void:
 	var footprints: Array=[];var stamp:=str(world_data.get("revision",0))
@@ -912,7 +939,7 @@ func sync_forest_fill(buildings: Array,force:=false) -> void:
 			var kind: String=key.split(":")[0]
 			var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
 			var scale:=0.9*height*float(entry.scale)/float(TREE_REFERENCE_HEIGHTS[kind])
-			transform=Transform3D(Basis(Vector3.UP,float(entry.id)*0.39).scaled(Vector3.ONE*scale),Vector3(entry.x,display_height(entry.x,entry.z),entry.z))
+			transform=Transform3D(Basis(Vector3.UP,float(entry.id)*0.39).scaled(tree_proportions(int(entry.id))*scale),Vector3(entry.x,display_height(entry.x,entry.z),entry.z))
 		set_tree_transform(key,int(entry.index),transform)
 
 func sync_removed_resources(world_resources: Array,now: float=0.0,buildings: Array=[]) -> void:

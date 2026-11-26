@@ -83,8 +83,19 @@ func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dic
  if kind=="army" and unit.get("kind","")=="scout":
   var label:=Label3D.new();label.name="ScoutName";label.text="Avastaja";label.position.y=2.8;label.billboard=BaseMaterial3D.BILLBOARD_ENABLED;label.font_size=44;label.pixel_size=0.018
   label.modulate=Color(["f6d88b","dca58a","c4aff5","d7be73"][clampi(team,0,3)]);label.outline_size=8;root.add_child(label)
-  var ring:=MeshInstance3D.new();ring.name="ScoutRing";var ring_mesh:=TorusMesh.new();ring_mesh.inner_radius=1.25;ring_mesh.outer_radius=1.55;ring_mesh.rings=24;ring.mesh=ring_mesh;ring.position.y=0.13
-  var material:=StandardMaterial3D.new();material.albedo_color=label.modulate;material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=material;root.add_child(ring)
+  var marker:=MeshInstance3D.new();marker.name="ScoutMarker"
+  var glyph:=ImmediateMesh.new()
+  var ink:=StandardMaterial3D.new()
+  ink.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+  ink.albedo_color=Color(0.78,0.69,0.45,0.76);ink.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+  ink.cull_mode=BaseMaterial3D.CULL_DISABLED
+  glyph.surface_begin(Mesh.PRIMITIVE_TRIANGLES,ink)
+  for side: float in [-1.0,1.0]:
+   for point: Vector2 in [Vector2(0.47,-0.22),Vector2(0.65,0.0),Vector2(0.47,0.22)]:
+    glyph.surface_add_vertex(Vector3(side*point.x,0.06,point.y))
+  glyph.surface_end()
+  marker.mesh=glyph;marker.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+  marker.visible=false;root.add_child(marker)
  var entry={"root":root,"people":people,"kind":kind,"team":team,"stamp":str(unit.get("kind",""))+":"+str(Battle.living(unit)) if kind=="army" else kind};entries[key]=entry;return entry
 
 func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictionary={},heading:=0.0) -> void:
@@ -105,6 +116,9 @@ func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictio
  if label!=null:
   var near_camera:bool=is_instance_valid(host.fpv_walker) and host.fpv_walker.active and host.camera.global_position.distance_to(entry.root.global_position)<9
   label.visible=host.graphics_soldier_names and not near_camera
+  var marker: MeshInstance3D=entry.root.get_node("ScoutMarker")
+  var walking: bool=is_instance_valid(host.fpv_walker) and host.fpv_walker.active
+  marker.visible=not walking and key=="unit:%d" % host.detail_unit_source and host.selected_entity=="detail_unit"
  for person in entry.people:
   var motion:Variant=person.get_meta("traveller_motion") if person.has_meta("traveller_motion") else null
   if motion!=null:motion.apply(person,float(host.elapsed),bool(pose.moving))

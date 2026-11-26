@@ -1,5 +1,17 @@
 extends RefCounted
 
+static func icon_button(image: Texture2D,description: String,action: Callable) -> TextureButton:
+	var button:=TextureButton.new()
+	button.texture_normal=image
+	button.ignore_texture_size=true
+	button.stretch_mode=TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	button.tooltip_text=description
+	button.accessibility_name=description
+	button.pressed.connect(action)
+	button.mouse_entered.connect(func():button.self_modulate=Color(1.14,1.14,1.14))
+	button.mouse_exited.connect(func():button.self_modulate=Color.WHITE)
+	return button
+
 const INK := Color("101e2b")
 const BORDER := Color("a0824b")
 const TEXT := Color("f0e1bf")

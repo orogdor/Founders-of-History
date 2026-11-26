@@ -46,10 +46,11 @@ vec4 sample_ground(sampler2D image, vec2 uv, vec2 wide, vec2 dx, vec2 dy, vec2 w
 
 void fragment(){
  vec2 q=shifted_uv;
- vec2 uv=terrain_primary_uv(q);
- vec2 dx=dFdx(uv)*1.08,dy=dFdy(uv)*1.08;
- vec2 wide=terrain_secondary_uv(q);
- vec2 wx=dFdx(wide)*1.08,wy=dFdy(wide)*1.08;
+ vec2 organic_uv=q+terrain_bend(q*0.17,vec2(17.1,49.0))*1.68;
+ vec2 uv=terrain_primary_uv(organic_uv);
+ vec2 dx=dFdx(uv)*1.12,dy=dFdy(uv)*1.12;
+ vec2 wide=terrain_secondary_uv(organic_uv);
+ vec2 wx=dFdx(wide)*1.12,wy=dFdy(wide)*1.12;
  float distance_to_camera=length(VERTEX);
  vec4 local_ground=vec4(base_color.rgb,forest_factor);
  if(blend_neighbours){
@@ -85,14 +86,16 @@ void fragment(){
  if(photo_strength>0.0){
   float clearings=fractal(q*0.090+vec2(13.0,29.0));
   float dirt=smoothstep(0.49,0.76,clearings+(drainage-0.5)*0.18+(n(q*0.92)-0.5)*0.08);
-  float forest=local_ground.a*(0.68+0.25*n(q*0.13));
-  vec3 coverage=vec3((1.0-dirt)*(1.0-forest),dirt*(1.0-forest),forest);
-  float scale_blend=terrain_layer_mix(q);
+  float moss=fractal(patch*0.147+vec2(37.0,55.4));
+  float forest=local_ground.a*mix(0.40,0.88,smoothstep(0.22,0.73,moss));
+  float bare=max(dirt*0.85,smoothstep(0.49,0.79,fractal(patch*0.21+vec2(87.0)))*0.72);
+  vec3 coverage=vec3((1.0-bare)*(1.0-forest),bare*(1.0-forest),forest);
+  float scale_blend=terrain_layer_mix(organic_uv);
   vec3 heights=sample_ground(ground_height_maps,uv,wide,dx,dy,wx,wy,scale_blend).rgb;
-  vec3 weights=mix(coverage,height_blend_weights(coverage,heights),0.74);
+  vec3 weights=mix(coverage,height_blend_weights(coverage,heights),0.43);
   float height=dot(heights,weights);
   float relief=(1.0-smoothstep(16.0,52.0,distance_to_camera))*photo_strength;
-  vec2 parallax=relief_direction(VIEW,TANGENT,BINORMAL,NORMAL)*(1.0-height)*0.027*relief;
+  vec2 parallax=relief_direction(VIEW,TANGENT,BINORMAL,NORMAL)*(1.0-height)*0.012*relief;
   vec2 shifted=uv-TERRAIN_ROTATION*parallax;
   vec2 shifted_wide=wide-TERRAIN_SECONDARY_ROTATION*parallax*(TERRAIN_SECONDARY_SCALE/0.51);
   vec3 grass=sample_ground(grass_color,shifted,shifted_wide,dx,dy,wx,wy,scale_blend).rgb;
@@ -102,10 +105,11 @@ void fragment(){
   grass*=mix(vec3(0.71,0.91,0.83),vec3(1.28,1.18,0.88),growth);
   soil*=mix(vec3(0.79,0.66,0.56),vec3(1.22,1.02,0.86),smoothstep(0.27,0.69,heights.y));
   soil=mix(soil,grass*vec3(1.20,0.99,0.75),0.18);
-  litter*=mix(vec3(0.75,0.74,0.64),vec3(1.17,1.01,0.79),smoothstep(0.29,0.72,heights.z));
+  litter*=mix(vec3(1.32,1.11,0.86),vec3(0.97,1.24,0.88),moss);
+  litter=mix(litter,grass*vec3(0.86,1.0,0.66),smoothstep(0.46,0.74,drainage)*0.31);
   vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.87+0.13*growth);
   photo=mix(photo,photo*local_ground.rgb*2.0,0.18);
-  photo*=mix(1.0,0.77+0.36*height,relief);
+  photo*=mix(1.0,0.91+0.19*height,relief);
   vec3 surface_normal=textureGrad(grass_normal,shifted,dx,dy).xyz*weights.x
                     +textureGrad(soil_normal,shifted,dx,dy).xyz*weights.y
                     +textureGrad(forest_normal,shifted,dx,dy).xyz*weights.z;
@@ -131,7 +135,7 @@ void fragment(){
   }
   surface=mix(distant,photo,photo_strength);
   NORMAL_MAP=clamp(surface_normal,vec3(0.0),vec3(1.0));
-  NORMAL_MAP_DEPTH=0.77*photo_strength;
+  NORMAL_MAP_DEPTH=0.46*photo_strength;
  }
  float sand=1.0-smoothstep(0.12+beach_wobble,0.83+beach_wobble,ground_height);
  if(sand>0.0){

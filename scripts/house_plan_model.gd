@@ -22,6 +22,7 @@ var materials:Dictionary={}
 var reed_surface: ShaderMaterial
 var simplified:=false
 var settlement_detail:=false
+var early_round_hut:=false
 const LOD_COLORS={
  "limestone":"b4ac90","cutstone":"a8a38c","cyclopean":"80766b","marble":"dad2bc",
  "fresco":"b18c62","brick":"985746","romanbrick":"a35f49","reticulatum":"9b8c69",
@@ -89,6 +90,7 @@ func rebuild(design: Dictionary) -> void:
  var definition:Dictionary=HouseEras.definition(str(design.get("id","")));var era:=int(definition.get("era",0))
  floor_material=["floor","floor","cutstone","plank","terracotta","industrialBrick","modernConcrete"][era]
  frame_material="industrialIron" if era>=5 else "wood"
+ early_round_hut=era==0 and design.get("rooms",[]).any(func(room):return room.type=="round") and roof_material=="reed"
  var height:=Plan.wall_height(design,era)
  var lift:=height-0.88
  if not simplified and not design.get("upperLevel",false):
@@ -323,7 +325,7 @@ func add_opening(frame: Dictionary,era: int,wall_height: float) -> void:
   elif style=="hole":span+=Vector2(0.08,-0.08)
   bottom=span.x;top=span.y
  if top<=bottom:return
- if settlement_detail:
+ if settlement_detail or (early_round_hut and bool(frame.curved) and door):
   add_settlement_opening(first,last,opening,era,bottom,top,bool(frame.curved))
   return
  var radius:=0.049 if door else 0.032
@@ -671,8 +673,8 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var surface:=SurfaceTool.new();surface.create_from(source_mesh,0);surface.generate_tangents()
  var wall_mesh:=surface.commit()
  var node:=MeshInstance3D.new();node.name="HouseWall";node.mesh=wall_mesh;node.material_override=wall_material;node.position=(a+b)/2+Vector3(0,(low+high)/2,0);node.rotation.y=-atan2(delta.z,delta.x);add_child(node)
- if settlement_detail and span.group=="outer" and low<=0.0:
-  var footing:=0.16 if style in ["stone","cutstone","limestone","medievalRubble"] else 0.11
+ if (settlement_detail or early_round_hut) and span.group=="outer" and low<=0.0:
+  var footing:=0.20 if early_round_hut and style=="weave" else 0.16 if style in ["stone","cutstone","limestone","medievalRubble"] else 0.11
   fence_box(a,b,low-0.065,footing,width*1.42,"stone" if style in ["wood","stave","weave","bamboo"] else style)
  if simplified and style!="halftimber" and not (settlement_detail and style in ["wood","stave"]):return
  if style=="wood":
@@ -688,7 +690,8 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
    var p:=a.lerp(b,(i+0.5)/count)
    add_pole(p+Vector3.UP*low,p+Vector3.UP*high,radius,"bamboo" if style=="bamboo" else "wood")
    get_child(get_child_count()-1).name="HouseWallStave"
- elif style=="weave":add_woven_wall(a,b,low,high,width)
+ elif style=="weave":
+  add_woven_wall(a,b,maxf(0.11,low) if early_round_hut and span.group=="outer" else low,high,width)
  elif style=="halftimber":
   var side:=Vector3(-delta.z,0,delta.x).normalized();var posts:=maxi(1,roundi(delta.length()/(2.1 if simplified else 1.0)))
   for sign_ in [-1.0,1.0]:
@@ -709,8 +712,9 @@ func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float) -
  var length:=a.distance_to(b)
  if length<0.08 or high-low<0.09:return
  var axis:Vector3=(b-a).normalized();var side:=Vector3(-axis.z,0,axis.x)
- var bays:=maxi(1,roundi(length/0.22));var courses:=maxi(1,roundi((high-low)/0.052));var segments:=bays*8;var sides:=7
- var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("wood"))
+ var bays:=maxi(1,roundi(length/0.25));var courses:=maxi(1,roundi((high-low)/0.065))
+ var segments:=bays*5;var sides:=5
+ var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("stave"))
  for course in courses:
   var y:=low+(course+0.5)*(high-low)/courses;var radius:=0.016+fence_noise(course*47+2)*0.008
   var sample=func(step: int,ring: int) -> Vector3:
@@ -760,7 +764,9 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
     roof_end(sample,along_t,inset,0.88+lift)
  elif room.type=="round":
   var outline:=Plan.room_polygon(room);var center:=Plan.point(room.a);var radius:float=float(room.r)/Plan.PX_PER_M
-  var peak:=1.75+(maxf(2.70,2.15+radius*0.92)-1.75)*rise;var seat:=0.27
+  var peak:=1.75+(maxf(2.70,2.15+radius*0.92)-1.75)*rise
+  if early_round_hut:peak=1.40+(maxf(2.05,1.60+radius*0.51)-1.40)*rise
+  var seat:=0.27
   var sample=func(s: float,t: float) -> Vector3:
    t=minf(t,0.992);var index:float=s*outline.size();var k:=floori(index);var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k);var clear:=0.0
    if lift<=0:
@@ -771,8 +777,10 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
    var eave:=0.8 if lift>0 else 0.62+clear*0.95;var seat_height:=1.05+clear*0.66
    var fullness:float=1+(1-t/seat)*maxf(0.15,0.32/maxf(0.40,radius)) if t<=seat else 1-(t-seat)/(1-seat)
    var p:Vector2=center.lerp(rim,fullness)
-   var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),0.71 if settlement_detail else 0.90)
-   return local(p,y+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
+   var curve:=0.66 if early_round_hut else 0.71 if settlement_detail else 0.90
+   var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),curve)
+   var reed_edge:=(0.032*sin(s*TAU*7)+0.022*sin(s*TAU*11))*(1-t) if early_round_hut else 0.0
+   return local(p,y+reed_edge+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
   roof_grid(sample,maxi(outline.size()*3,72),38)
   roof_courses(sample,maxi(outline.size()*3,72),clampi(roundi(radius*3.2),6,11),true)
 

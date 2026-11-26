@@ -60,7 +60,7 @@ func run_test():
  assert(panel.preview.aspect_fit(600,1200)>panel.preview.aspect_fit(1200,600)*2.0,"Portrait view must fit the house to its narrower width")
  panel.preview_roof_height.value=110;assert(float(panel.canvas.current_plan().roofHeight)==110)
  panel.preview.walking=true;panel.canvas.drag=true;panel.restore_history(false)
- assert(not panel.preview.walking and not panel.canvas.drag and panel.walk_button.text=="Kõnni","Undo must end walking and unfinished edits before replacing the plan")
+ assert(not panel.preview.walking and not panel.canvas.drag and panel.walk_button is TextureButton and panel.walk_button.tooltip_text=="Kõnni","Undo must end walking and unfinished edits before replacing the plan")
  panel.preview.set_roof_visible(false)
  assert(not panel.preview.model.find_child("RoofDeck",true,false).visible and not panel.preview.model.find_child("OverlappingReedCourses",true,false).visible,"Roof toggle must hide the deck and reed courses")
  panel.preview.set_roof_visible(true)

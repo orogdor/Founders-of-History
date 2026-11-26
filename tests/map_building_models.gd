@@ -6,6 +6,8 @@ const WorldTown=preload("res://scripts/world_city_layout.gd")
 const Detail=preload("res://scripts/detail_view.gd")
 const Eras=preload("res://scripts/house_eras.gd")
 const HouseModel=preload("res://scripts/house_plan_model.gd")
+const Lights=preload("res://scripts/detail_lights.gd")
+const NatureProps=preload("res://scripts/detail_nature_props.gd")
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -37,11 +39,14 @@ func run() -> void:
 		var low:=Models.simplified_mesh("house",age)
 		assert(high!=null and low!=null)
 		assert(high.get_meta("designer_id")==Eras.project_id("house",age))
-		if age in [0,2]:
+		if age<=2:
 			var id:=Eras.fit_id("house",age)
-			var original_path:="res://assets/buildings/%s.glb" % id
-			assert(high.get_child(0).scene_file_path==original_path,"Expected the original house mesh")
 			assert(low==Models.simplified_mesh("house",age,Eras.default_plan(id)))
+		if age==2:
+			var original_path:="res://assets/buildings/%s.glb" % Eras.fit_id("house",age)
+			assert(high.get_child(0).scene_file_path==original_path,"Expected the original Iron Age house mesh")
+		if age==0:
+			assert(high.get_child(0).get_script()==HouseModel,"The close Stone Age house uses the lower thatched roof")
 		assert(low.surface_get_array_index_len(0)/3 < triangle_count(high)*0.25)
 		assert(Models.simplified_mesh("house",age)==low)
 		var middle:=Models.settlement_mesh("house",age)
@@ -50,6 +55,25 @@ func run() -> void:
 		high.free()
 		var gate_mesh:=Models.simplified_mesh("woodgate",age)
 		assert(gate_mesh!=null and gate_mesh.get_aabb().size.x>=6.4)
+	var hunter:=Models.create("hunter",0)
+	assert(hunter.get_child(0).get_script()==HouseModel)
+	assert(Models.bounds(hunter).size.y<4.6,"A hunting hut should stay close to human scale")
+	hunter.free()
+	var stump:=NatureProps.stump()
+	assert(stump.get_surface_count()==2 and stump.get_aabb().size.y<0.6)
+	for kind in NatureProps.PALETTES:
+		var deposit:=NatureProps.deposit(kind)
+		assert(deposit.get_aabb().has_volume() and deposit.get_aabb().size.y<2.0)
+		assert(NatureProps.deposit(kind)==deposit,"Resource meshes should be reused")
+	var parent:={"id":8,"team":0,"c":12,"r":15,"economy":{"buildings":[{"type":"hall","x":0,"z":0,"hp":200}]}}
+	var district:={"id":8,"team":0,"c":13,"r":15,"districtOf":8,"economy":{"buildings":[{"type":"hall","x":0,"z":0,"virtual":true,"hp":200}]}}
+	parent.districts={"13:15":district}
+	assert(is_same(Lights.local_context([parent],8,Vector2i(12,15)),parent))
+	assert(Lights.locations(Lights.local_context([parent],8,Vector2i(12,15)).economy.buildings).size()==2)
+	assert(is_same(Lights.local_context([parent],8,Vector2i(13,15)),district))
+	assert(Lights.locations(Lights.local_context([parent],8,Vector2i(13,15)).economy.buildings).is_empty())
+	assert(Lights.local_context([parent],8,Vector2i(14,15)).is_empty())
+
 	var first:=wall(-3.5,0)
 	var corner:=wall(0,3.5,-PI/2)
 	var gate:={"type":"woodgate","x":7.0,"z":0.0,"hp":100,"ready":true}
