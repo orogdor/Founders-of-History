@@ -3,6 +3,7 @@ extends Control
 const Grid = preload("res://scripts/campaign_grid.gd")
 const Roads = preload("res://scripts/world_roads.gd")
 const Geography = preload("res://scripts/world_geography.gd")
+const Palette = preload("res://scripts/faction_palette.gd")
 var host: Node
 var circular := false
 var map_texture: ImageTexture
@@ -64,7 +65,7 @@ func refresh_map() -> void:
 		var county: bool=not urban.get(str(int(city.id)),{}).has(key)
 		var colors: Array=["a1b691","b89c83","b0a1be","c4b78a"] if county else ["83b4a1","af7d62","9b82bb","c3aa62"]
 		var parts:=str(key).split(":")
-		image.fill_rect(Rect2i(int(parts[0])*2,int(parts[1])*2,2,2),Color(colors[team]))
+		image.fill_rect(Rect2i(int(parts[0])*2,int(parts[1])*2,2,2),Palette.color(team,Color(colors[team])))
 	map_texture = ImageTexture.create_from_image(image)
 
 func draw_circle_clipped_line(a: Vector2,b: Vector2,color: Color) -> void:
@@ -123,11 +124,13 @@ func _draw() -> void:
 		var key: String = str(int(city.c))+":"+str(int(city.r))
 		if int(city.team)!=0 and not host.reveal_all and not host.game.explored[0].has(key): continue
 		var p := Vector2((float(city.c)+0.5)/Grid.COLS*size.x,(float(city.r)+0.5)/Grid.ROWS*size.y)
-		if not circular or (p/size-Vector2(0.5,0.5)).length()<=0.49:draw_circle(p,3.0,Color(["e9dfad","ed9c7e","c2a4ea","f0d16f"][clampi(int(city.team),0,3)]))
+		if not circular or (p/size-Vector2(0.5,0.5)).length()<=0.49:
+			var team := clampi(int(city.team),0,3)
+			draw_circle(p,3.0,Palette.color(team,Color(["e9dfad","ed9c7e","c2a4ea","f0d16f"][team])))
 	for person in host.game.get("settlers",[]):
 		if int(person.team)!=0 or person.get("embarked")!=null: continue
 		var p := Vector2((float(person.c)+0.5)/Grid.COLS*size.x,(float(person.r)+0.5)/Grid.ROWS*size.y)
-		if not circular or (p/size-Vector2(0.5,0.5)).length()<=0.49:draw_circle(p,2.0,Color("ffe875"))
+		if not circular or (p/size-Vector2(0.5,0.5)).length()<=0.49:draw_circle(p,2.0,Palette.color(0,Color("ffe875")))
 	if host.selected.x>=0 and host.selected.y>=0:
 		var chosen:=Vector2((float(host.selected.x)+0.5)/Grid.COLS*size.x,(float(host.selected.y)+0.5)/Grid.ROWS*size.y)
 		if not circular or (chosen/size-Vector2(0.5,0.5)).length()<=0.48:draw_rect(Rect2(chosen-Vector2(2,2),Vector2(4,4)),Color("f4d488"),false,1.0)

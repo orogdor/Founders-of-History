@@ -6,7 +6,7 @@ static func height_at(heights: PackedFloat32Array, cols: int, rows: int, c: int,
 	if c < 0 or r < 0 or c >= cols or r >= rows: return -40.0
 	return heights[r*cols+c]
 
-static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred: Array, minimum_distance := 28.0) -> Array:
+static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred: Array, minimum_distance := 28.0, team_count := 4) -> Array:
 	var candidates: Array = []
 	for r in range(3, rows-3):
 		for c in range(3, cols-3):
@@ -29,9 +29,9 @@ static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred:
 					if abs(dc)+abs(dr) == 1 and y > 0: shelter += 1
 			if dry < 11 or local < 5 or shelter < 2: continue
 			candidates.append({"c":c,"r":r,"quality":dry*0.32+local*0.8+shelter*1.4-maxf(0,h-18)*0.3})
-	if candidates.size() < 4: return []
+	if candidates.size() < team_count: return []
 	var selected: Array = []
-	for team in 4:
+	for team in team_count:
 		var target: Dictionary = preferred[team] if team < preferred.size() else {"c":floori((0.77 if team%2 else 0.23)*cols+0.5),"r":floori((0.77 if team>=2 else 0.23)*rows+0.5)}
 		var best: Variant = null
 		var best_score := -INF

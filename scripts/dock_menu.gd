@@ -7,6 +7,8 @@ const CityRules=preload("res://scripts/city_build_rules.gd")
 const Research=preload("res://scripts/research_rules.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
+const Campaign=preload("res://scripts/campaign_state.gd")
+const Palette=preload("res://scripts/faction_palette.gd")
 const Availability=preload("res://scripts/era_availability.gd")
 const CityOverview=preload("res://scripts/city_overview.gd")
 const BUILD_ORDER=preload("res://data/build_catalog_order.json")
@@ -339,7 +341,12 @@ func enter_city(index: int) -> void:
 
 func populate_diplomacy() -> void:
 	var names: Array=["Eesti","Soome","Rootsi","Norra"]
-	for team in [1,2,3]:
+	var rivals := Campaign.opponents(host.game)
+	if rivals.is_empty():
+		var empty := Label.new()
+		empty.text = "Arvutivastaseid selles mängus pole."
+		row.add_child(empty)
+	for team in rivals:
 		var town_count:=0;var population:=0
 		for city in host.game.cities:
 			if int(city.team)==team:town_count+=1;population+=floori(float(city.economy.realms[team].pop))
@@ -349,6 +356,7 @@ func populate_diplomacy() -> void:
 		style.content_margin_left=12;style.content_margin_right=12;style.content_margin_top=12;style.content_margin_bottom=12;panel.add_theme_stylebox_override("panel",style)
 		var column:=VBoxContainer.new();column.add_theme_constant_override("separation",8);panel.add_child(column);row.add_child(panel)
 		var name:=Label.new();name.text=names[team];name.add_theme_font_override("font",hud.ui_bold);name.add_theme_color_override("font_color",Color("f3d997"));name.add_theme_font_size_override("font_size",maxi(13,roundi(card_size.x*0.15)));column.add_child(name)
+		name.add_theme_color_override("font_color",Palette.color(team,Color("f3d997")).lightened(0.22))
 		var divider:=HSeparator.new();column.add_child(divider)
 		var summary:=Label.new();summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 		summary.text="%d elanikku · %d linna · %s" % [population,town_count,{"friendly":"sõprus","neutral":"neutraalne","war":"sõda"}.get(current,current)];column.add_child(summary)
@@ -602,4 +610,3 @@ func choose_army(index: int) -> void:
 
 func choose_ship(id: int) -> void:
 	host.select_ship_by_id(id);close_menu()
-

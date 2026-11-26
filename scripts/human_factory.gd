@@ -165,7 +165,7 @@ static func hair_color(seed: int) -> Color:
 
 static func team_color(team: int) -> Color:
 	var colors: Array=config().get("team_colors",["276bd1","c43d43","9271ce","d2a12e"])
-	return Color(str(colors[clampi(team,0,colors.size()-1)]))
+	return preload("res://scripts/faction_palette.gd").color(team,Color(str(colors[clampi(team,0,colors.size()-1)])))
 
 ## Paneb riided selga. Kutsu uuesti ajastu või ameti vahetudes.
 static func dress(root: Node3D,era: int,job:="") -> void:

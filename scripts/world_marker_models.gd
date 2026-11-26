@@ -5,6 +5,7 @@ const HUMAN=preload("res://assets/people/human_far.glb")
 const WARRIORS=[preload("res://assets/people/spearman_v262.glb"),preload("res://assets/people/axeman_v262.glb"),preload("res://assets/people/slinger_v262.glb")]
 const Motion=preload("res://scripts/human_motion.gd")
 const Dog=preload("res://scripts/scout_dog.gd")
+const Palette=preload("res://scripts/faction_palette.gd")
 const TEAM_COLORS:=["88bdb1","d27b61","b095dc","e2c164"]
 static var materials: Dictionary={}
 static var vertex_surfaces: Dictionary={}
@@ -31,7 +32,7 @@ static func add_people(parent: Node3D,kind: String,team:=0,upgrade:=0) -> void:
 	var wood:=StandardMaterial3D.new();wood.albedo_color=Color("715a3b");pole.material_override=wood
 	pole.position=Vector3(-0.30,0.48,-0.2);parent.add_child(pole)
 	var flag:=MeshInstance3D.new();var flag_mesh:=BoxMesh.new();flag_mesh.size=Vector3(0.22,0.15,0.015);flag.mesh=flag_mesh
-	var tint:=StandardMaterial3D.new();tint.albedo_color=Color(TEAM_COLORS[clampi(team,0,3)]);flag.material_override=tint
+	var tint:=StandardMaterial3D.new();tint.albedo_color=Palette.color(team,Color(TEAM_COLORS[clampi(team,0,3)]));flag.material_override=tint
 	flag.position=Vector3(-0.19,0.85,-0.2);parent.add_child(flag)
 
 static func animate(parent: Node3D,time: float,moving: bool) -> void:
@@ -70,7 +71,7 @@ static func add_city(parent: Node3D,city_name: String,team: int) -> void:
 	flag.mesh=banner
 	flag.position=Vector3(0.11,0.36,0.02)
 	var tint:=StandardMaterial3D.new()
-	tint.albedo_color=Color(TEAM_COLORS[clampi(team,0,3)])
+	tint.albedo_color=Palette.color(team,Color(TEAM_COLORS[clampi(team,0,3)]))
 	flag.material_override=tint
 	badge.add_child(flag)
 	var label:=Label3D.new()
@@ -129,7 +130,7 @@ static func add_ship(parent: Node3D,kind: String,team: int,upgrade: int) -> void
 	ship_box(parent,Vector3(0,17,0),Vector3(0.8,25,0.8),"72563c")
 	var sail:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(18,17)*0.04;sail.mesh=plane
 	sail.rotation.x=PI/2;sail.position=Vector3(0,20*0.04,0)
-	var cloth:=StandardMaterial3D.new();cloth.albedo_color=Color(["9fbca6","c4876a","a68dc7","d3b56c"][clampi(team,0,3)]);cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;cloth.roughness=0.9
+	var cloth:=StandardMaterial3D.new();cloth.albedo_color=Palette.color(team,Color(["9fbca6","c4876a","a68dc7","d3b56c"][clampi(team,0,3)]));cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;cloth.roughness=0.9
 	sail.material_override=cloth;parent.add_child(sail)
 	if kind=="warship":
 		for x in [-7,7]:

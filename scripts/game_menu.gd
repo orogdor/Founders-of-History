@@ -4,6 +4,13 @@ const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 const MenuArt = preload("res://scripts/main_menu_art.gd")
 const Mobile = preload("res://scripts/mobile_profile.gd")
 const BuildLabel = preload("res://scripts/build_label.gd")
+const WorldSetup = preload("res://scripts/world_setup.gd")
+const MAP_DESCRIPTIONS := {
+	"tectonic": "Laamad kujundavad mandrid, mäeahelikud ja kliimavööndid.",
+	"continents": "Kaks kuni neli suuremat mandrit ja väiksemad saared.",
+	"inland": "Üks suur manner. Maismaal on rohkem ruumi laienemiseks.",
+	"archipelago": "Palju eraldi saari. Meresõit ühendab riike.",
+}
 
 var host: Node
 var hud: Control
@@ -11,6 +18,15 @@ var seed: LineEdit
 var tempo: OptionButton
 var difficulty: OptionButton
 var world_type:OptionButton
+var world_size: OptionButton
+var opponents: OptionButton
+var world_fields: GridContainer
+var faction_fields: GridContainer
+var color_fields: Array[OptionButton] = []
+var color_cells: Array[VBoxContainer] = []
+var map_description: Label
+var new_game_button: Button
+var creating_world := false
 var reveal_button: Button
 var world_body: VBoxContainer
 var saves_body: VBoxContainer
@@ -90,25 +106,7 @@ func _ready() -> void:
 	menu_status=add_label(content,"",12,Color("bfc9b8"));menu_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var updates: Node=get_node_or_null("/root/GameUpdates")
 	world_body=VBoxContainer.new();world_body.add_theme_constant_override("separation",6);content.add_child(world_body);pages["new"]=world_body
-	add_label(world_body,"Maailma tüüp",13,Color("d9e4d8"))
-	world_type=OptionButton.new();world_type.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	for entry in [["Loogiline maailm: laamad ja kliima","tectonic"],["Juhuslikud 2–4 kontinenti","continents"],["Suur manner rannikutega","inland"]]:
-		world_type.add_item(entry[0]);world_type.set_item_metadata(world_type.item_count-1,entry[1])
-	world_body.add_child(world_type)
-	add_label(world_body,"Raskus",13,Color("d9e4d8"))
-	difficulty=OptionButton.new();difficulty.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	for entry in [["Lihtne","easy"],["Tavaline","normal"],["Raske","hard"]]:
-		difficulty.add_item(entry[0]);difficulty.set_item_metadata(difficulty.item_count-1,entry[1])
-	difficulty.select(1);world_body.add_child(difficulty)
-	add_label(world_body,"Mängu tempo",13,Color("d9e4d8"))
-	tempo=OptionButton.new();tempo.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	for i in host.tempo_select.item_count:
-		tempo.add_item(host.tempo_select.get_item_text(i));tempo.set_item_metadata(i,host.tempo_select.get_item_metadata(i))
-	tempo.select(host.tempo_select.selected);world_body.add_child(tempo)
-	add_label(world_body,"Maailma seeme (soovi korral)",13,Color("d9e4d8"))
-	seed=LineEdit.new();seed.placeholder_text="Jäta tühjaks juhusliku maailma jaoks";seed.max_length=40;world_body.add_child(seed)
-	var note:=add_label(world_body,"Alustad asuniku ja kolme töölisega. Eelmisest salvestusest tehakse võimalusel varukoopia.",12,Color("adbfaf"));note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	add_button(world_body,"Loo maailm",start_new,true)
+	build_world_setup()
 	var extras:=VBoxContainer.new();extras.add_theme_constant_override("separation",8);content.add_child(extras);pages["extras"]=extras
 	var extras_note:=add_label(extras,"Kaardi nähtavus, mängu juhtpaneel ja uuendused.",13,Color("adbfaf"));extras_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var utilities:=VBoxContainer.new();utilities.add_theme_constant_override("separation",7);extras.add_child(utilities)
@@ -148,6 +146,131 @@ func _ready() -> void:
 	show_page("")
 	get_viewport().size_changed.connect(layout_menu)
 	layout_menu()
+
+func build_world_setup() -> void:
+	add_setup_heading("Maailm", preload("res://assets/ui/ui-art-v263_cmd_map.webp"))
+	world_fields = add_field_grid()
+	world_type = add_choice(world_fields, "Maailma stiil", [
+		["Laamad ja kliimavööndid", "tectonic"], ["Mandrid", "continents"],
+		["Suur manner", "inland"], ["Saarestik", "archipelago"],
+	])
+	var sizes := []
+	for entry in [["Väike", "small"], ["Tavaline", "standard"], ["Suur", "large"]]:
+		var dimensions: Vector2i = WorldSetup.SIZES[entry[1]]
+		sizes.append(["%s · %d × %d" % [entry[0], dimensions.x, dimensions.y], entry[1]])
+	world_size = add_choice(world_fields, "Kaardi suurus", sizes)
+	map_description = add_label(world_body, "", 12, Color("c5bda7"))
+	map_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	world_type.item_selected.connect(func(_index): refresh_world_setup())
+	world_size.item_selected.connect(func(_index): refresh_world_setup())
+
+	add_setup_heading("Riigid", preload("res://assets/ui/ui-art-v263_cmd_army.webp"))
+	faction_fields = add_field_grid()
+	var rival_options := [["Vastasteta", 0], ["1 vastane", 1], ["2 vastast", 2], ["3 vastast", 3]]
+	opponents = add_choice(faction_fields, "Arvutivastased", rival_options)
+	opponents.item_selected.connect(func(_index): refresh_world_setup())
+	var swatches: Dictionary = {}
+	for hex in WorldSetup.PALETTE:
+		var image := Image.create(22, 22, false, Image.FORMAT_RGBA8)
+		image.fill(Color("c7a568"))
+		image.fill_rect(Rect2i(1, 1, 20, 20), Color(hex))
+		swatches[hex] = ImageTexture.create_from_image(image)
+	for team in WorldSetup.MAX_OPPONENTS + 1:
+		var title := "Sinu värv" if team == 0 else "Vastase %d värv" % team
+		var selector := add_choice(faction_fields, title, [])
+		color_cells.append(selector.get_parent())
+		color_fields.append(selector)
+		for hex in WorldSetup.PALETTE:
+			selector.add_icon_item(swatches[hex], WorldSetup.PALETTE[hex])
+			selector.set_item_metadata(selector.item_count - 1, hex)
+		selector.item_selected.connect(func(_index): refresh_world_setup())
+
+	add_setup_heading("Mängureeglid", preload("res://assets/ui/ui-art-v263_cmd_research.webp"))
+	var rules := add_field_grid()
+	rules.name = "RuleFields"
+	difficulty = add_choice(rules, "Raskus", [["Lihtne", "easy"], ["Tavaline", "normal"], ["Raske", "hard"]])
+	var tempos := []
+	for i in host.tempo_select.item_count:
+		tempos.append([host.tempo_select.get_item_text(i), host.tempo_select.get_item_metadata(i)])
+	tempo = add_choice(rules, "Mängu tempo", tempos)
+	add_label(world_body, "Maailma seeme (valikuline)", 13, Color("d9e4d8"))
+	seed = LineEdit.new()
+	seed.placeholder_text = "Tühi väli annab juhusliku maailma"
+	seed.max_length = 40
+	seed.custom_minimum_size.y = 32
+	world_body.add_child(seed)
+	new_game_button = add_button(world_body, "Loo maailm", start_new, true)
+	use_campaign_setup(host.game)
+
+func add_setup_heading(caption: String, icon: Texture2D) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	world_body.add_child(row)
+	var badge := MenuArt.picture(icon, TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+	badge.custom_minimum_size = Vector2(26, 26)
+	row.add_child(badge)
+	add_label(row, caption, 18, MenuArt.GOLD)
+
+func add_field_grid() -> GridContainer:
+	var fields := GridContainer.new()
+	fields.columns = 2
+	fields.add_theme_constant_override("h_separation", 14)
+	fields.add_theme_constant_override("v_separation", 7)
+	world_body.add_child(fields)
+	return fields
+
+func add_choice(parent: Container, caption: String, entries: Array) -> OptionButton:
+	var field := VBoxContainer.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.add_theme_constant_override("separation", 3)
+	parent.add_child(field)
+	add_label(field, caption, 13, Color("d9e4d8"))
+	var option := OptionButton.new()
+	option.custom_minimum_size.y = 32
+	option.fit_to_longest_item = false
+	option.clip_text = true
+	option.accessibility_name = caption
+	for entry in entries:
+		option.add_item(entry[0])
+		option.set_item_metadata(option.item_count - 1, entry[1])
+	field.add_child(option)
+	return option
+
+func use_campaign_setup(state: Dictionary) -> void:
+	choose_value(world_type, state.get("type", "tectonic"))
+	choose_value(world_size, WorldSetup.size_id(state))
+	choose_value(opponents, WorldSetup.opponent_count(state))
+	choose_value(difficulty, state.get("difficulty", "normal"))
+	choose_value(tempo, state.get("tempo", "normal"))
+	var colors := WorldSetup.colors(state)
+	for team in color_fields.size():
+		choose_value(color_fields[team], colors[team])
+	refresh_world_setup()
+
+static func choose_value(option: OptionButton, value: Variant) -> void:
+	for index in option.item_count:
+		if option.get_item_metadata(index) == value:
+			option.select(index)
+			return
+
+func refresh_world_setup() -> void:
+	var count := int(opponents.get_selected_metadata())
+	var width := get_viewport_rect().size.x
+	faction_fields.columns = 1 if width < 440.0 else 3 if width >= 1000.0 and count == WorldSetup.MAX_OPPONENTS else 2
+	var colors := selected_colors()
+	for team in color_fields.size():
+		choose_value(color_fields[team], colors[team])
+		color_cells[team].visible = team <= count
+		for index in color_fields[team].item_count:
+			var color: Variant = color_fields[team].get_item_metadata(index)
+			color_fields[team].set_item_disabled(index, color != colors[team] and color in colors.slice(0,count+1))
+	map_description.text = MAP_DESCRIPTIONS.get(world_type.get_selected_metadata(), "")
+
+func selected_colors() -> Array[String]:
+	var selections: Array[String] = []
+	for field in color_fields:
+		selections.append(str(field.get_selected_metadata()))
+	return WorldSetup.colors({"factionColors": selections})
 
 func build_home() -> void:
 	home=Control.new()
@@ -249,6 +372,9 @@ func layout_menu() -> void:
 	var compact := viewport.x < 640.0
 	menu_cover.visible=not compact
 	back_compact.visible=compact
+	for fields: GridContainer in [world_fields, world_body.get_node("RuleFields")]:
+		fields.columns=1 if viewport.x<440.0 else 2
+	refresh_world_setup()
 	var frame_style: StyleBox = menu_card.get_theme_stylebox("panel")
 	for side in [SIDE_LEFT,SIDE_TOP,SIDE_RIGHT,SIDE_BOTTOM]:
 		frame_style.set_content_margin(side,16.0 if compact else 36.0)
@@ -294,11 +420,8 @@ func add_section(parent: Node,text: String,action: Callable) -> Button:
 	return button
 
 func open_menu() -> void:
-	seed.text=host.seed_input.text;tempo.select(host.tempo_select.selected)
-	for i in world_type.item_count:
-		if world_type.get_item_metadata(i)==host.game.get("type","tectonic"):world_type.select(i);break
-	for i in difficulty.item_count:
-		if difficulty.get_item_metadata(i)==host.game.get("difficulty","normal"):difficulty.select(i);break
+	seed.text=host.seed_input.text
+	use_campaign_setup(host.game)
 	menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
 	update_reveal();refresh_slots();show_page("");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
 	performance_layer.hide()
@@ -312,12 +435,16 @@ func _process(_delta: float) -> void:
 	if not visible:return
 	var loading: bool=host.generation_thread!=null
 	continue_button.disabled=loading
+	new_game_button.disabled=loading
 	if home_continue.disabled!=loading:
 		home_continue.disabled=loading
 		var refresh: Callable=home_continue.get_meta("refresh")
 		refresh.call()
 	if loading:menu_status.text="Salvestatud maailma laadimine käib…" if not host.pending_load.is_empty() else "Maailma loomine käib…"
-	elif was_loading:menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""));seed.text=host.seed_input.text
+	elif was_loading and not creating_world and not menu_status.has_meta("generation_error"):
+		menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
+		seed.text=host.seed_input.text
+		use_campaign_setup(host.game)
 	home_status.text=menu_status.text if loading or host.autosave_suspended else ""
 	was_loading=loading
 
@@ -333,10 +460,29 @@ func update_reveal() -> void:
 
 func start_new() -> void:
 	if host.generation_thread!=null:menu_status.text="Oota, kuni maailma laadimine lõpeb.";return
+	if menu_status.has_meta("generation_error"):
+		menu_status.remove_meta("generation_error")
+	creating_world=true
 	host.seed_input.text=seed.text;host.tempo_select.select(tempo.selected)
 	host.pending_difficulty=str(difficulty.get_item_metadata(difficulty.selected))
 	host.pending_world_type=str(world_type.get_item_metadata(world_type.selected))
-	close_menu();host.start_generation()
+	host.pending_world_settings={
+		"worldSize": world_size.get_selected_metadata(),
+		"opponentCount": opponents.get_selected_metadata(),
+		"factionColors": selected_colors(),
+	}
+	host.start_generation()
+
+func finish_new_game(error: String) -> void:
+	if not creating_world:
+		return
+	creating_world=false
+	if error.is_empty():
+		close_menu()
+		return
+	menu_status.set_meta("generation_error",true)
+	menu_status.text=error
+	show_page("new")
 
 func save_game() -> void:
 	menu_status.text="Mäng salvestatud." if host.save_partial() else "Salvestamine ebaõnnestus."

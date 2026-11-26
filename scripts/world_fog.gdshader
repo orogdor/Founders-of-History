@@ -37,9 +37,9 @@ float symbol_ink(vec2 p,float kind) {
 }
 void vertex() { map_pos=(MODEL_MATRIX*vec4(VERTEX,1.0)).xz; }
 void fragment() {
- vec2 w=vec2(-650.0,-550.0)+(map_pos+vec2(220.0,165.0))*25.0;
+ vec2 cells=vec2(textureSize(seen_exact,0)),origin=vec2(-650.0,-550.0),extent=cells*50.0;
+ vec2 w=origin+(map_pos+cells)*25.0;
  vec2 fw=w+vec2(fog_noise(w*.021)-.5,fog_noise(w*.021+17.0)-.5)*38.0+vec2(fog_noise(w*.08+3.0)-.5,fog_noise(w*.08+9.0)-.5)*10.0;
- vec2 cells=vec2(220.0,165.0),origin=vec2(-650.0,-550.0),extent=cells*50.0;
  vec2 base=(w-origin)/extent,su=(fw-origin)/extent;
  float exact=1.0-texture(seen_exact,(floor(base*cells)+.5)/cells).a;
  float seen=max(1.0-texture(seen_linear,su).a,exact);

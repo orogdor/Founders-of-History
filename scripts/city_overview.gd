@@ -4,6 +4,7 @@ const Economy=preload("res://scripts/economy_rules.gd")
 const Needs=preload("res://scripts/city_needs.gd")
 const Territory=preload("res://scripts/city_territory.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
+const Setup=preload("res://scripts/world_setup.gd")
 var host: Node
 var scroll: ScrollContainer
 var grid: GridContainer
@@ -91,6 +92,7 @@ func refresh() -> void:
  trade_button.text="Kaubavedu: "+("peatatud" if city.get("tradeDisabled",false) else "lubatud")
  for i in merchant_buttons.size():
   var team:=i+1;var blocked: bool=city.get("blockedMerchants",{}).get(str(team),false)
+  merchant_buttons[i].visible=team<=Setup.opponent_count(host.game)
   merchant_buttons[i].text=["Soome","Rootsi","Norra"][i]+": "+("ei" if blocked else "jah")
  var buildings: Array=city.economy.buildings;var pop:=float(realm.pop);var capacity:=Economy.housing_capacity(buildings);var food:=Needs.food_total(stock);var water:=float(stock.get("water",0))
  var food_need:=pop*0.6;var water_need:=pop*0.45;var growth:=float(realm.get("growthProgress",0))/maxf(1,float(realm.get("growthNeed",4)))

@@ -2,16 +2,39 @@ class_name CampaignGrid
 extends RefCounted
 
 # Port of campaign.js, lines 11-15 (source revision recorded in PORT_STATUS.md).
-const COLS := 220
-const ROWS := 165
+const DEFAULT_SIZE := Vector2i(220, 165)
 const TILE := 50
 const ORIGIN_X := -650
 const ORIGIN_Z := -550
-const WORLD_WIDTH := COLS * TILE
-const WORLD_DEPTH := ROWS * TILE
-const WORLD_CENTER_X := ORIGIN_X + WORLD_WIDTH / 2.0
-const WORLD_CENTER_Z := ORIGIN_Z + WORLD_DEPTH / 2.0
 const DIRECTIONS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+static var active_size := DEFAULT_SIZE
+static var worker_size := DEFAULT_SIZE
+static var worker_id := 0
+static var COLS: int:
+	get:
+		return worker_size.x if worker_id != 0 and OS.get_thread_caller_id() == worker_id else active_size.x
+static var ROWS: int:
+	get:
+		return worker_size.y if worker_id != 0 and OS.get_thread_caller_id() == worker_id else active_size.y
+static var WORLD_WIDTH: int:
+	get: return COLS * TILE
+static var WORLD_DEPTH: int:
+	get: return ROWS * TILE
+static var WORLD_CENTER_X: float:
+	get: return ORIGIN_X + COLS * TILE / 2.0
+static var WORLD_CENTER_Z: float:
+	get: return ORIGIN_Z + ROWS * TILE / 2.0
+
+# The generation thread works on the next map while consumers still use the live map.
+static func stage_size(size: Vector2i) -> void:
+	if size == active_size:
+		return
+	worker_size = size
+	worker_id = OS.get_thread_caller_id()
+
+static func finish_staging() -> void:
+	worker_id = 0
 
 static func center(c: int, r: int) -> Vector2:
 	return Vector2(ORIGIN_X + (c + 0.5) * TILE, ORIGIN_Z + (r + 0.5) * TILE)

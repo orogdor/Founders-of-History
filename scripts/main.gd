@@ -1,6 +1,8 @@
 extends Node3D
 
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+const WorldSetup = preload("res://scripts/world_setup.gd")
+const FactionPalette = preload("res://scripts/faction_palette.gd")
 
 const Grid = preload("res://scripts/campaign_grid.gd")
 const MobileProfile = preload("res://scripts/mobile_profile.gd")
@@ -162,6 +164,7 @@ var tempo_select: OptionButton
 var pending_tempo := "normal"
 var pending_difficulty := "normal"
 var pending_world_type := "tectonic"
+var pending_world_settings: Dictionary = {}
 var generate_button: Button
 var generation_thread: Thread
 var battle_nav: Variant=null
@@ -286,6 +289,8 @@ var detail_ocean_cache: Dictionary={}
 var map_touch := MapTouch.new()
 
 func _ready() -> void:
+	Grid.active_size = Grid.DEFAULT_SIZE
+	FactionPalette.use_campaign({})
 	DetailView.request_nature_assets()
 	DetailGroundMaterial.request_assets()
 	var settings:=ConfigFile.new()
@@ -545,6 +550,22 @@ func build_marker() -> void:
 	army_root=Node3D.new()
 	add_child(army_root)
 	update_marker()
+
+func apply_faction_palette(state: Dictionary) -> void:
+	if not FactionPalette.use_campaign(state):
+		return
+	if is_instance_valid(marker):
+		for part in marker.get_children():
+			marker.remove_child(part)
+			part.queue_free()
+		WorldMarkerModels.add_people(marker,"settler",0)
+		var ring_material := marker.material_override as StandardMaterial3D
+		ring_material.albedo_color = FactionPalette.color(0,Color("f4cb64"))
+	for collection: Dictionary in [other_settler_markers,city_markers,ship_markers,merchant_markers,raid_markers,army_markers]:
+		for icon in collection.values():
+			icon.hide()
+			icon.queue_free()
+		collection.clear()
 
 func refresh_visibility() -> void:
 	var previous_revision:=int(game.get("visionRevision",0))
@@ -2291,7 +2312,7 @@ func _process(delta: float) -> void:
 	# During the migration rival settlers must plan before any city exists.
 	if game.cities.is_empty() and float(game.time)-float(game.get("lastAIResearchPlan",0))>=12.0:
 		game.lastAIResearchPlan=game.time
-		for team in [1,2,3]:manage_ai_settlers(team)
+		for team in Campaign.opponents(game):manage_ai_settlers(team)
 	if not game.cities.is_empty():
 		for city in game.cities:
 			var runtime:=ensure_city_runtime(city)
@@ -2392,7 +2413,7 @@ func _process(delta: float) -> void:
 		ArmyRecovery.tick(game,delta)
 		if float(game.time)-float(game.get("lastAIResearchPlan",0))>=12.0:
 			game.lastAIResearchPlan=game.time
-			for team in [1,2,3]:
+			for team in Campaign.opponents(game):
 				var coastal:=ai_has_coastal_county(team)
 				AIResearch.plan(game,team,coastal)
 				manage_ai_settlers(team)
@@ -2477,30 +2498,68 @@ func start_generation() -> void:
 	generate_button.disabled = true
 	update_status("Maailma loomine käib…")
 	generation_thread = Thread.new()
-	generation_thread.start(Callable(self, "generate_worker").bind(world_seed,{},pending_world_type))
+	var options := pending_world_settings.duplicate(true)
+	pending_world_settings.clear()
+	var error := generation_thread.start(generate_worker.bind(world_seed, {}, pending_world_type, options))
+	if error != OK:
+		generation_failed("Maailma loomist ei saanud käivitada.")
 
-func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic") -> void:
+func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic", options: Dictionary={}) -> void:
+	var settings := restored if not restored.is_empty() else options
+	var size := WorldSetup.dimensions(settings)
+	Grid.stage_size(size)
 	if restored.get("generatedWorldV331") is Dictionary and restored.generatedWorldV331.get("payload") is String:
 		var imported:=WebSave.world(restored)
 		if imported.has("error"):call_deferred("generation_failed",str(imported.error));return
+		imported.dimensions=size
+		imported.world_type=str(restored.get("type","tectonic"))
 		call_deferred("finish_generation",imported);return
 	if not restored.is_empty():world_type=str(restored.get("type","tectonic"))
 	var data:Dictionary
 	if world_type=="inland":data=preload("res://scripts/legacy_world.gd").new(value).generate()
-	elif world_type=="continents":data=preload("res://scripts/continent_world.gd").new(value).generate()
+	elif world_type in ["continents","archipelago"]:data=preload("res://scripts/continent_world.gd").new(value,world_type=="archipelago").generate()
 	else:data=WorldGenerator.new(value).generate()
-	data.coastal_starts = Coastal.choose(Grid.COLS,Grid.ROWS,data.heights,data.starts)
-	if data.coastal_starts.size() != 4:
-		call_deferred("generation_failed", "Selle seemnega ei leitud nelja sobivat ranniku alguskohta.")
+	var players := WorldSetup.opponent_count(settings) + 1
+	var spacing := minf(28.0, size.x * 0.18)
+	var saved_starts: Variant = restored.get("coastalStartPositions", [])
+	if valid_start_positions(saved_starts, size, players):
+		data.coastal_starts = saved_starts
+	else:
+		data.coastal_starts = Coastal.choose(size.x,size.y,data.heights,data.starts,spacing,players)
+		if data.coastal_starts.is_empty():
+			data.coastal_starts = Coastal.choose(size.x,size.y,data.heights,data.starts,spacing*0.7,players)
+	if data.coastal_starts.size() != players:
+		call_deferred("generation_failed", "Selle seemnega ei leitud piisavalt rannikualasid. Proovi teist seemet või suuremat kaarti.")
 		return
 	data.heights = preload("res://scripts/legacy_world.gd").plateau(data.heights,data.coastal_starts) if world_type=="inland" else Coastal.apply_plateaus(data.heights,Grid.COLS,Grid.ROWS,data.coastal_starts)
 	data.grid = prepare_geography(data.heights,value,data.coastal_starts,world_type)
 	data.world_type=world_type
+	data.dimensions=size
+	data.setup=settings
 	call_deferred("finish_generation", data)
+
+static func valid_start_positions(positions: Variant, size: Vector2i, players: int) -> bool:
+	if not positions is Array or positions.size() != players:
+		return false
+	var used := {}
+	for entry in positions:
+		if not entry is Dictionary or not entry.has("c") or not entry.has("r"):
+			return false
+		if not (entry.c is int or entry.c is float) or not (entry.r is int or entry.r is float):
+			return false
+		var cell := Vector2i(int(entry.c), int(entry.r))
+		if not Rect2i(Vector2i.ZERO, size).has_point(cell) or used.has(cell):
+			return false
+		used[cell] = true
+	return true
 
 func finish_generation(data: Dictionary) -> void:
 	generation_thread.wait_to_finish()
 	generation_thread = null
+	Grid.finish_staging()
+	var dimensions: Vector2i = data.dimensions
+	var resize := Grid.active_size != dimensions
+	Grid.active_size = dimensions
 	outer_ring_surveys.clear()
 	heights = data.heights
 	heat = data.heat
@@ -2511,7 +2570,13 @@ func finish_generation(data: Dictionary) -> void:
 	sea_distances=PackedInt32Array()
 	player = Vector2i(int(starts[0].c), int(starts[0].r))
 	selected=player;settler_command_mode=false
-	game = Campaign.create_game(int(data.seed),data.starts,str(data.get("world_type","tectonic")))
+	game = Campaign.create_game(int(data.seed),starts,str(data.get("world_type","tectonic")))
+	var options: Dictionary = data.get("setup", {})
+	game.worldSize = WorldSetup.size_id(options)
+	game.opponentCount = starts.size() - 1
+	if options.has("factionColors"):
+		game.factionColors = WorldSetup.colors(options)
+	apply_faction_palette(pending_load.game if not pending_load.is_empty() else game)
 	game.tempo=pending_tempo
 	game.difficulty=pending_difficulty
 	game.seedInputText=seed_input.text.strip_edges()
@@ -2551,8 +2616,13 @@ func finish_generation(data: Dictionary) -> void:
 	for a in game.settlers: Campaign.reveal(game,int(a.team),int(a.c),int(a.r))
 	elapsed = 0.0
 	terrain.queue_free()
+	if resize and is_instance_valid(fog):
+		fog.queue_free()
+		fog = null
 	if not pending_load.is_empty():BridgeRules.restore(grid,pending_load.game.get("cities",[]))
 	build_world()
+	if resize:
+		build_fog()
 	refresh_fog()
 	camera_target = cell_position(player)+Vector3(1,0,1)
 	update_camera()
@@ -2564,10 +2634,13 @@ func finish_generation(data: Dictionary) -> void:
 	else:
 		autosave_suspended=false
 		update_status("Uus maailm valmis; vali asunikule sihtkoht.")
+	if game_hud != null and game_hud.game_menu != null:
+		game_hud.game_menu.finish_new_game("")
 
 func _exit_tree() -> void:
 	if generation_thread != null and generation_thread.is_started():
 		generation_thread.wait_to_finish()
+		Grid.finish_staging()
 	clear_detail_landscape_cache()
 	DetailView.HousePlanModel.clear_cache()
 	DetailView.finish_asset_requests()
@@ -2581,12 +2654,12 @@ static func prepare_geography(world_heights: PackedFloat32Array, seed_value: int
 		var h: float = world_heights[i]
 		var c:=i%Grid.COLS;var r:=floori(float(i)/Grid.COLS)
 		var cell:Dictionary={"c":c,"r":r,"h":h,"land":h>=1.0,"mountain":h>30.0}
-		if world_type in ["inland","continents"]:
+		if world_type in ["inland","continents","archipelago"]:
 			cell.legacyBiomeV250=true;cell.biome="sea" if h<1 else "hills" if h>30 else "forest" if Geography.noise(c+40,r+60,seed_value)>0.55 else "plains"
 		cells.append(cell)
 	if world_type=="inland":preload("res://scripts/legacy_world.gd").legacy_rivers(cells,seed_value,world_starts)
 	else:
-		Geography.drainage(cells,seed_value,world_starts,true,world_type!="continents")
+		Geography.drainage(cells,seed_value,world_starts,true,world_type not in ["continents","archipelago"])
 		Geography.lake_outlets(cells,seed_value,world_starts)
 	Geography.open_starting_passages(cells,world_starts)
 	var deposit_kinds: Array=[]
@@ -3410,7 +3483,8 @@ func load_partial(destination: String=SAVE_FILE) -> void:
 	generate_button.disabled = true
 	update_status("Salvestatud maailma loomine käib…")
 	generation_thread = Thread.new()
-	generation_thread.start(Callable(self,"generate_worker").bind(int(data.game.seed),data.game))
+	if generation_thread.start(generate_worker.bind(int(data.game.seed),data.game)) != OK:
+		generation_failed("Salvestatud maailma laadimist ei saanud käivitada.")
 
 func apply_loaded_game() -> void:
 	var data := pending_load
@@ -3776,12 +3850,16 @@ func update_resources_status() -> void:
 
 
 func generation_failed(message: String) -> void:
-	generation_thread.wait_to_finish()
+	if generation_thread != null and generation_thread.is_started():
+		generation_thread.wait_to_finish()
+	Grid.finish_staging()
 	generation_thread = null
 	pending_load = {}
 	paused = false
 	generate_button.disabled = false
 	update_status(message)
+	if game_hud != null and game_hud.game_menu != null:
+		game_hud.game_menu.finish_new_game(message)
 
 
 func is_coast(c: int,r: int) -> bool:
@@ -3957,6 +4035,10 @@ func valid_partial_save(data: Variant) -> bool:
 	if not data is Dictionary or data.get("schema")!=1 or data.get("source")!="2d9ff3999235ba8c95afa57d0cc0a245090ffc9d":return false
 	var saved: Variant=data.get("game")
 	if not saved is Dictionary:return false
+	if saved.has("worldSize") and not WorldSetup.SIZES.has(saved.worldSize):return false
+	if saved.has("opponentCount") and not (saved.opponentCount is int or saved.opponentCount is float):return false
+	if saved.has("opponentCount") and float(saved.opponentCount)!=float(WorldSetup.opponent_count(saved)):return false
+	var saved_size := WorldSetup.dimensions(saved)
 	if not saved.get("seed") is int and not saved.get("seed") is float:return false
 	var seed_value: float=saved.seed
 	if not is_finite(seed_value) or seed_value<0 or seed_value>4294967295:return false
@@ -3975,7 +4057,7 @@ func valid_partial_save(data: Variant) -> bool:
 			if not city is Dictionary or not city.get("economy") is Dictionary or not city.get("world") is Dictionary:return false
 			if not city.has("id") or not city.has("team") or not city.has("c") or not city.has("r"):return false
 			var team:=int(city.team);var c:=int(city.c);var r:=int(city.r)
-			if team<0 or team>=4 or c<0 or c>=Grid.COLS or r<0 or r>=Grid.ROWS:return false
+			if team<0 or team>WorldSetup.opponent_count(saved) or c<0 or c>=saved_size.x or r<0 or r>=saved_size.y:return false
 			if not city.economy.get("realms") is Array or city.economy.realms.size()<=team or not city.economy.get("buildings") is Array or not city.economy.get("cargo") is Array:return false
 			if not city.world.get("resources") is Array or not city.economy.realms[team] is Dictionary:return false
 			if not city.economy.realms[team].get("resources") is Dictionary:return false

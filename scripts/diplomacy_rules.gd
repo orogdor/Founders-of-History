@@ -1,5 +1,6 @@
 class_name DiplomacyRules
 extends RefCounted
+const Setup=preload("res://scripts/world_setup.gd")
 
 static func pair(a: int,b: int) -> String:
 	return "%d:%d" % [mini(a,b),maxi(a,b)]
@@ -19,7 +20,7 @@ static func set_relation(state: Dictionary,a: int,b: int,status: String) -> void
 	var description: String="sõda" if status=="war" else "sõprus" if status=="friendly" else "neutraalne"
 	state.events.append({"time":state.time,"text":"Riigid %d / %d: %s" % [a+1,b+1,description]})
 static func change_player_relation(state: Dictionary,team: int,status: String) -> Dictionary:
-	if team<1 or team>3 or status not in ["neutral","friendly","war"]:return {"error":"Vigane diplomaatiline käsk"}
+	if team<1 or team>Setup.opponent_count(state) or status not in ["neutral","friendly","war"]:return {"error":"Vigane diplomaatiline käsk"}
 	if status=="war" and peace(state):return {"error":"Algne rahuperiood pole veel lõppenud"}
 	set_relation(state,0,team,status);return {"ok":true}
 static func merchant_access(state: Dictionary,team: int,city: Dictionary) -> bool:

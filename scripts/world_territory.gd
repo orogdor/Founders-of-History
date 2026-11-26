@@ -2,6 +2,7 @@ class_name WorldTerritory
 extends RefCounted
 
 const Grid=preload("res://scripts/campaign_grid.gd")
+const Palette=preload("res://scripts/faction_palette.gd")
 const Terrain=preload("res://scripts/world_terrain.gd")
 const TEAM_COLORS=["69d4c3","e77e64","ac87e2","ead06b"]
 const COUNTY_COLORS=["b6ce75","dba082","bca3d6","dfcc87"]
@@ -65,8 +66,9 @@ static func rebuild(parent: Node3D,owned: Dictionary,urban: Dictionary,explored:
 		groups[name][key]=true
 	for name in groups:
 		var parts:=str(name).split(":");var team:=int(parts[0]);var rural:=int(parts[1])==1
-		fill(parent,groups[name],heights,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team]),0.07 if rural else 0.11,mesh_samples)
-	for team in teams:border(parent,teams[team],heights,Color(TEAM_COLORS[team]),mesh_samples)
+		fill(parent,groups[name],heights,Palette.color(team,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team])),0.07 if rural else 0.11,mesh_samples)
+	for team in teams:
+		border(parent,teams[team],heights,Palette.color(team,Color(TEAM_COLORS[team])),mesh_samples)
 
 static func contour_edge(points: Array,a: Vector2,b: Vector2,va: float,vb: float) -> void:
 	if (va>0.0)==(vb>0.0):return

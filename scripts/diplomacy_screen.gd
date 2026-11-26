@@ -1,6 +1,8 @@
 extends AcceptDialog
 
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+const Campaign = preload("res://scripts/campaign_state.gd")
+const Palette = preload("res://scripts/faction_palette.gd")
 var host: Node
 var body: VBoxContainer
 var feedback: Label
@@ -19,8 +21,9 @@ func rebuild(message: String="") -> void:
  for child in body.get_children():body.remove_child(child);child.queue_free()
  var image:=TextureRect.new();image.texture=load("res://assets/ui/ui-art-v306_card_diplomacy.webp")
  image.custom_minimum_size=Vector2(0,100);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;body.add_child(image)
- var intro:=Label.new();intro.text="Sinu kuningriigi suhted teiste rahvastega.";body.add_child(intro)
- for team in [1,2,3]:
+ var rivals:=Campaign.opponents(host.game)
+ var intro:=Label.new();intro.text="Arvutivastaseid selles mängus pole." if rivals.is_empty() else "Sinu kuningriigi suhted teiste rahvastega.";body.add_child(intro)
+ for team in rivals:
   var cities:=0;var population:=0
   for city in host.game.cities:
    if int(city.team)==team:cities+=1;population+=floori(float(city.economy.realms[team].pop))
@@ -28,6 +31,7 @@ func rebuild(message: String="") -> void:
   var name: String=names[team]
   var current:=Rules.relation(host.game,0,team)
   var label:=Label.new();label.text="%s · %d elanikku · %d linna · %s" % [name,population,cities,{"friendly":"sõprus","neutral":"neutraalne","war":"sõda"}.get(current,current)]
+  label.add_theme_color_override("font_color",Palette.color(team,Color("f0e1bf")).lightened(0.22))
   body.add_child(label)
   var row:=HBoxContainer.new();row.add_theme_constant_override("separation",6);body.add_child(row)
   for entry in [["friendly","Sõprus"],["neutral","Neutraalne"],["war","Sõda"]]:

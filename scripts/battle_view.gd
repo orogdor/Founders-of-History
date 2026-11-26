@@ -1,6 +1,7 @@
 extends Node3D
 
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+const Palette = preload("res://scripts/faction_palette.gd")
 const Districts=preload("res://scripts/district_context.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const Grid=preload("res://scripts/campaign_grid.gd")
@@ -264,7 +265,7 @@ func correct_soldier_materials(node: Node,team: int) -> void:
    if not soldier_materials.has(key):
     var material: BaseMaterial3D=original.duplicate()
     if soldier_color_surfaces[mesh_key]:material.vertex_color_use_as_albedo=true
-    if faction:material.albedo_color=FACTION_COLORS[clampi(team,0,3)]
+    if faction:material.albedo_color=Palette.color(team,FACTION_COLORS[clampi(team,0,3)])
     soldier_materials[key]=material
    node.set_surface_override_material(surface,soldier_materials[key])
  for child in node.get_children():correct_soldier_materials(child,team)
@@ -275,7 +276,7 @@ func add_faction_strip(model: Node3D,team: int) -> void:
  var attachment:=BoneAttachment3D.new();attachment.bone_name="chest";skeleton.add_child(attachment)
  var ribbon:=MeshInstance3D.new();var shape:=BoxMesh.new();shape.size=Vector3(0.11,0.14,0.012);ribbon.mesh=shape;ribbon.position=Vector3(0.10,-0.09,0.125);ribbon.rotation.z=-0.12
  if not faction_materials.has(team):
-  var material:=StandardMaterial3D.new();material.albedo_color=FACTION_COLORS[clampi(team,0,3)];material.roughness=0.9;faction_materials[team]=material
+  var material:=StandardMaterial3D.new();material.albedo_color=Palette.color(team,FACTION_COLORS[clampi(team,0,3)]);material.roughness=0.9;faction_materials[team]=material
  ribbon.material_override=faction_materials[team];attachment.add_child(ribbon)
 
 func sync_siege_models() -> void:
@@ -347,7 +348,7 @@ func sync_models() -> void:
   var id: String=str(int(unit.team))+":"+str(int(unit.source));visible_markers[id]=true
   if not markers.has(id):
    var ring:=MeshInstance3D.new();var mesh:=TorusMesh.new();mesh.inner_radius=2.4;mesh.outer_radius=2.7;ring.mesh=mesh
-   var mat:=StandardMaterial3D.new();mat.albedo_color=TEAM_COLORS[clampi(int(unit.team),0,3)];mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=mat;add_child(ring);markers[id]=ring
+   var mat:=StandardMaterial3D.new();mat.albedo_color=Palette.color(int(unit.team),TEAM_COLORS[clampi(int(unit.team),0,3)]);mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=mat;add_child(ring);markers[id]=ring
   markers[id].position=Vector3(unit.x,ground(unit.x,unit.z)+0.15,unit.z)
   markers[id].visible=float(unit.hp)>0
   markers[id].scale=Vector3.ONE*(1.35 if int(unit.team)==0 and int(unit.source)==selected_source else 1.0)

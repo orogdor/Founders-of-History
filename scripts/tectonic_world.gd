@@ -3,10 +3,11 @@ extends RefCounted
 # Port in progress of world-tectonic-v248.js, source revision 2d9ff399.
 const NoiseUtil = preload("res://scripts/tectonic_noise.gd")
 const Heap = preload("res://scripts/min_priority_queue.gd")
-const COLS := 220
-const ROWS := 165
-const N := COLS * ROWS
-const ASPECT := float(COLS) / ROWS
+const Grid = preload("res://scripts/campaign_grid.gd")
+var COLS := Grid.COLS
+var ROWS := Grid.ROWS
+var N := COLS * ROWS
+var ASPECT := float(COLS) / ROWS
 const DIR4 := [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
 const DIR8 := [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1), Vector2i(1,1), Vector2i(1,-1), Vector2i(-1,1), Vector2i(-1,-1)]
 var seed: int
@@ -22,22 +23,22 @@ func _init(seed_value: int) -> void:
 	warp_seed = (seed ^ 0x5bd1e995) & 0xffffffff
 	detail_seed = (seed ^ 0x27d4eb2d) & 0xffffffff
 
-static func idx(c: int, r: int) -> int:
+func idx(c: int, r: int) -> int:
 	return r * COLS + c
 
-static func floats(value := 0.0) -> PackedFloat32Array:
+func floats(value := 0.0) -> PackedFloat32Array:
 	var result := PackedFloat32Array()
 	result.resize(N)
 	result.fill(value)
 	return result
 
-static func ints(value := 0) -> PackedInt32Array:
+func ints(value := 0) -> PackedInt32Array:
 	var result := PackedInt32Array()
 	result.resize(N)
 	result.fill(value)
 	return result
 
-static func blur(source: PackedFloat32Array, times: int) -> PackedFloat32Array:
+func blur(source: PackedFloat32Array, times: int) -> PackedFloat32Array:
 	var a := source.duplicate()
 	var b := floats()
 	for pass_index in times:
@@ -231,7 +232,7 @@ func create_elevation(plate_data: Dictionary) -> PackedFloat32Array:
 			height[i] = h
 	return height
 
-static func erode(height: PackedFloat32Array, iterations: int) -> void:
+func erode(height: PackedFloat32Array, iterations: int) -> void:
 	var filled := floats()
 	var down := ints()
 	var order := ints()
@@ -299,7 +300,7 @@ static func erode(height: PackedFloat32Array, iterations: int) -> void:
 					height[i] -= m
 					height[j] += m
 
-static func scale_heights(height: PackedFloat32Array) -> PackedFloat32Array:
+func scale_heights(height: PackedFloat32Array) -> PackedFloat32Array:
 	var sea := percentile(height,0.64)
 	var land := PackedFloat32Array()
 	for h in height:
@@ -393,7 +394,7 @@ func climate(out: PackedFloat32Array) -> Dictionary:
 		moisture[land_idx[k]] = m0+(m1-m0)*(t-t0)/maxf(0.000001,t1-t0)
 	return {"heat": heat, "moisture": moisture, "lat": lat_eff}
 
-static func starts_for(out: PackedFloat32Array, moisture: PackedFloat32Array) -> Array:
+func starts_for(out: PackedFloat32Array, moisture: PackedFloat32Array) -> Array:
 	var region := ints(-1)
 	var region_sizes: Array[int] = []
 	for i in N:
