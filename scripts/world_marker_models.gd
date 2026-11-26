@@ -5,7 +5,7 @@ const HUMAN=preload("res://assets/people/human_far.glb")
 const WARRIORS=[preload("res://assets/people/spearman_v262.glb"),preload("res://assets/people/axeman_v262.glb"),preload("res://assets/people/slinger_v262.glb")]
 const Motion=preload("res://scripts/human_motion.gd")
 const Dog=preload("res://scripts/scout_dog.gd")
-const Fits=preload("res://data/building_fits.json")
+const Palette=preload("res://scripts/faction_palette.gd")
 const TEAM_COLORS:=["88bdb1","d27b61","b095dc","e2c164"]
 static var materials: Dictionary={}
 static var vertex_surfaces: Dictionary={}
@@ -32,7 +32,7 @@ static func add_people(parent: Node3D,kind: String,team:=0,upgrade:=0) -> void:
 	var wood:=StandardMaterial3D.new();wood.albedo_color=Color("715a3b");pole.material_override=wood
 	pole.position=Vector3(-0.30,0.48,-0.2);parent.add_child(pole)
 	var flag:=MeshInstance3D.new();var flag_mesh:=BoxMesh.new();flag_mesh.size=Vector3(0.22,0.15,0.015);flag.mesh=flag_mesh
-	var tint:=StandardMaterial3D.new();tint.albedo_color=Color(TEAM_COLORS[clampi(team,0,3)]);flag.material_override=tint
+	var tint:=StandardMaterial3D.new();tint.albedo_color=Palette.color(team,Color(TEAM_COLORS[clampi(team,0,3)]));flag.material_override=tint
 	flag.position=Vector3(-0.19,0.85,-0.2);parent.add_child(flag)
 
 static func animate(parent: Node3D,time: float,moving: bool) -> void:
@@ -56,40 +56,38 @@ static func apply_colors(node: Node) -> void:
 			node.set_surface_override_material(surface,materials[id])
 	for child in node.get_children():apply_colors(child)
 
-static func add_building(parent: Node3D,type: String,age: int,position: Vector3,scale_factor: float) -> void:
-	var id:=type
-	for tier in range(clampi(age,0,2),0,-1):
-		if Fits.data.has(type+"@"+str(tier)):id=type+"@"+str(tier);break
-	if not Fits.data.has(id):return
-	var path: String="res://assets/buildings/"+id+".glb"
-	if not ResourceLoader.exists(path):return
-	var model: Node3D=load(path).instantiate()
-	var fit: Dictionary=Fits.data[id]
-	var wrapper:=Node3D.new();wrapper.position=position;wrapper.scale=Vector3.ONE*scale_factor
-	model.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
-	model.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
-	apply_colors(model);wrapper.add_child(model);parent.add_child(wrapper)
+static func add_city(parent: Node3D,city_name: String,team: int) -> void:
+	var badge:=Node3D.new()
+	badge.name="CityBadge"
+	var pole:=MeshInstance3D.new()
+	var shaft:=BoxMesh.new()
+	shaft.size=Vector3(0.015,0.37,0.015)
+	pole.mesh=shaft
+	pole.position=Vector3(0.03,0.24,0.02)
+	badge.add_child(pole)
+	var flag:=MeshInstance3D.new()
+	var banner:=BoxMesh.new()
+	banner.size=Vector3(0.16,0.09,0.014)
+	flag.mesh=banner
+	flag.position=Vector3(0.11,0.36,0.02)
+	var tint:=StandardMaterial3D.new()
+	tint.albedo_color=Palette.color(team,Color(TEAM_COLORS[clampi(team,0,3)]))
+	flag.material_override=tint
+	badge.add_child(flag)
+	var label:=Label3D.new()
+	label.name="CityName"
+	label.text=city_name
+	label.font_size=28
+	label.pixel_size=0.008
+	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test=true
+	label.position=Vector3(0,1.3,-0.5)
+	label.visible=false
+	badge.add_child(label)
+	parent.add_child(badge)
 
-static func add_city(parent: Node3D,name: String,team: int,age: int) -> void:
-	var path: String="res://assets/world/settlements/settlement_%d_%d.glb" % [clampi(team,0,3),clampi(age,0,6)]
-	if ResourceLoader.exists(path):
-		var source: Node=load(path).instantiate();var original:=find_mesh(source)
-		if original!=null:
-			var model:=MeshInstance3D.new();model.name="CityModel";model.mesh=original.mesh
-			var material:=StandardMaterial3D.new();material.vertex_color_use_as_albedo=true;material.roughness=0.95;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-			model.material_override=material;model.scale=Vector3.ONE*0.04;parent.add_child(model)
-		source.free()
-	var label:=Label3D.new();label.name="CityName";label.text=name;label.font_size=28;label.pixel_size=0.008
-	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED;label.no_depth_test=true
-	label.position=Vector3(0,1.3,-0.5);label.visible=false;parent.add_child(label)
-
-static func add_landmark(parent: Node3D,landmark: Dictionary,show_buildings:=true) -> void:
-	if landmark.kind=="village" and show_buildings:
-		add_building(parent,"hall",0,Vector3.ZERO,0.07)
-		add_building(parent,"house",0,Vector3(-0.55,0,-0.35),0.045)
-		add_building(parent,"house",0,Vector3(0.50,0,0.32),0.045)
-		if WorldDiscoveries.village_type(landmark)=="raiders":add_building(parent,"watchtower",0,Vector3(0.5,0,-0.50),0.045)
-	elif landmark.kind!="village":
+static func add_landmark(parent: Node3D,landmark: Dictionary) -> void:
+	if landmark.kind!="village":
 		var rock:=MeshInstance3D.new()
 		var rock_model: Node=load("res://assets/world/rock_low.glb").instantiate()
 		var mesh:=find_mesh(rock_model)
@@ -132,7 +130,7 @@ static func add_ship(parent: Node3D,kind: String,team: int,upgrade: int) -> void
 	ship_box(parent,Vector3(0,17,0),Vector3(0.8,25,0.8),"72563c")
 	var sail:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(18,17)*0.04;sail.mesh=plane
 	sail.rotation.x=PI/2;sail.position=Vector3(0,20*0.04,0)
-	var cloth:=StandardMaterial3D.new();cloth.albedo_color=Color(["9fbca6","c4876a","a68dc7","d3b56c"][clampi(team,0,3)]);cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;cloth.roughness=0.9
+	var cloth:=StandardMaterial3D.new();cloth.albedo_color=Palette.color(team,Color(["9fbca6","c4876a","a68dc7","d3b56c"][clampi(team,0,3)]));cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;cloth.roughness=0.9
 	sail.material_override=cloth;parent.add_child(sail)
 	if kind=="warship":
 		for x in [-7,7]:

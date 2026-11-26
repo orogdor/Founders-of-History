@@ -1,5 +1,7 @@
 extends Control
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
 const UI := "res://assets/ui/"
 const ResearchScreen = preload("res://scripts/research_screen.gd")
 const DockMenu = preload("res://scripts/dock_menu.gd")
@@ -10,6 +12,8 @@ const BuildingInspector = preload("res://scripts/building_inspector.gd")
 const WorldResourceOverlay = preload("res://scripts/world_resource_overlay.gd")
 const Economy = preload("res://scripts/economy_rules.gd")
 const Campaign = preload("res://scripts/campaign_state.gd")
+const Mobile = preload("res://scripts/mobile_profile.gd")
+const BuildLabel = preload("res://scripts/build_label.gd")
 var host: Node
 var legacy_panel: Control
 var minimap: Control
@@ -42,16 +46,22 @@ var resource_details_open:=false
 var tile_clock:=0.0
 var ui_font: SystemFont
 var ui_bold: SystemFont
+var mobile_placing:=false
 
 func _ready() -> void:
-	ui_font=SystemFont.new();ui_font.font_names=PackedStringArray(["Georgia","Times New Roman","serif"])
+	theme=InterfaceTheme.get_theme()
+	ui_font=theme.default_font
 	ui_bold=SystemFont.new();ui_bold.font_names=ui_font.font_names;ui_bold.font_weight=700
-	var hud_theme:=Theme.new();hud_theme.default_font=ui_font;theme=hud_theme
 	var settings:=ConfigFile.new()
-	if settings.load(SETTINGS_PATH)==OK:user_ui_scale=clampf(float(settings.get_value("interface","scale",1.0)),0.7,1.5)
+	var default_scale:=0.9 if Mobile.active else 1.0
+	user_ui_scale=default_scale
+	if settings.load(SETTINGS_PATH)==OK:user_ui_scale=clampf(float(settings.get_value("interface","scale",default_scale)),0.7,1.5)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	build_hud()
+	if Mobile.active:
+		image_button("settle_touch","ui-art-v263_cmd_city","Vali linnakoht",host.select_city_site).hide()
+		image_button("cancel_build_touch","ui-art-v303_action_stop","Tühista ehitus",host.cancel_build_placement).hide()
 	resource_overlay=Control.new()
 	resource_overlay.set_script(WorldResourceOverlay)
 	resource_overlay.host=host
@@ -76,24 +86,16 @@ func _ready() -> void:
 	journal_dialog=AcceptDialog.new();journal_dialog.title="Kuningriigi päevik";journal_dialog.theme=legacy_panel.theme
 	journal_dialog.size=Vector2i(560,500);add_child(journal_dialog)
 	journal_dialog.get_ok_button().text="Sulge"
-	var journal_panel:=StyleBoxTexture.new();journal_panel.texture=art("ui-art-v304_panel")
-	journal_panel.texture_margin_left=70;journal_panel.texture_margin_right=70;journal_panel.texture_margin_top=50;journal_panel.texture_margin_bottom=50
-	journal_panel.content_margin_left=18;journal_panel.content_margin_right=18;journal_panel.content_margin_top=18;journal_panel.content_margin_bottom=18
-	journal_dialog.add_theme_stylebox_override("panel",journal_panel)
+	journal_dialog.add_theme_stylebox_override("panel",InterfaceTheme.panel(18))
 	journal_text=RichTextLabel.new();journal_text.fit_content=false
 	journal_text.bbcode_enabled=false;journal_dialog.add_child(journal_text)
 	diplomacy_screen=AcceptDialog.new();diplomacy_screen.set_script(DiplomacyScreen);diplomacy_screen.host=host;diplomacy_screen.theme=legacy_panel.theme;add_child(diplomacy_screen)
 	city_overview=AcceptDialog.new();city_overview.set_script(CityOverview);city_overview.host=host;add_child(city_overview)
 	stores_panel=PanelContainer.new();stores_panel.visible=false;stores_panel.mouse_filter=Control.MOUSE_FILTER_STOP
-	var stores_style:=StyleBoxTexture.new();stores_style.texture=art("ui-art-v304_panel")
-	stores_style.texture_margin_left=70;stores_style.texture_margin_right=70;stores_style.texture_margin_top=50;stores_style.texture_margin_bottom=50
-	stores_style.content_margin_left=18;stores_style.content_margin_right=18;stores_style.content_margin_top=14;stores_style.content_margin_bottom=18
-	stores_panel.add_theme_stylebox_override("panel",stores_style);stores_panel.theme=legacy_panel.theme;add_child(stores_panel)
+	stores_panel.add_theme_stylebox_override("panel",InterfaceTheme.panel(18));add_child(stores_panel)
 	stores_body=VBoxContainer.new();stores_panel.add_child(stores_body)
 	tile_panel=PanelContainer.new();tile_panel.visible=false;tile_panel.mouse_filter=Control.MOUSE_FILTER_STOP
-	var tile_style:=StyleBoxFlat.new();tile_style.bg_color=Color(0.04,0.12,0.17,0.95);tile_style.border_color=Color("b38e4c");tile_style.set_border_width_all(1);tile_style.set_corner_radius_all(8)
-	tile_style.content_margin_left=12;tile_style.content_margin_right=12;tile_style.content_margin_top=10;tile_style.content_margin_bottom=10
-	tile_panel.add_theme_stylebox_override("panel",tile_style);tile_panel.theme=legacy_panel.theme;add_child(tile_panel)
+	tile_panel.add_theme_stylebox_override("panel",InterfaceTheme.box(Color("122435f5"),InterfaceTheme.BORDER));add_child(tile_panel)
 	var tile_body:=VBoxContainer.new();tile_body.add_theme_constant_override("separation",5);tile_panel.add_child(tile_body)
 	tile_title=Label.new();tile_body.add_child(tile_title)
 	tile_present=Label.new();tile_present.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tile_present.add_theme_color_override("font_color",Color("a8d9a7"));tile_body.add_child(tile_present)
@@ -127,14 +129,11 @@ func text_item(name: String, content: String, font_size: int, color := Color("f5
 	return node
 
 func image_button(name: String, asset: String, description: String, action: Callable, enabled := true) -> TextureButton:
-	var node := TextureButton.new()
-	node.texture_normal = art(asset)
-	node.ignore_texture_size = true
-	node.stretch_mode = TextureButton.STRETCH_SCALE
-	node.tooltip_text = description
-	node.disabled = not enabled
-	if enabled:node.pressed.connect(action)
-	else:node.modulate=Color(0.58,0.58,0.58,1);node.tooltip_text += " · pole veel saadaval"
+	var node:=InterfaceTheme.icon_button(art(asset),description,action)
+	node.name=name.to_pascal_case()
+	node.stretch_mode=TextureButton.STRETCH_SCALE
+	node.disabled=not enabled
+	if not enabled:node.modulate=Color(0.58,0.58,0.58,1);node.tooltip_text += " · pole veel saadaval"
 	add_child(node);elements[name] = node
 	return node
 
@@ -147,30 +146,9 @@ func menu_box(color: Color, border: Color) -> StyleBoxFlat:
 	return box
 
 func style_menu() -> void:
-	var panel:=StyleBoxTexture.new()
-	panel.texture=art("ui-art-v304_panel")
-	panel.texture_margin_left=70;panel.texture_margin_right=70
-	panel.texture_margin_top=50;panel.texture_margin_bottom=50
-	panel.content_margin_left=14;panel.content_margin_right=14
-	panel.content_margin_top=14;panel.content_margin_bottom=14
-	legacy_panel.add_theme_stylebox_override("panel",panel)
-	var theme:=Theme.new()
-	theme.default_font=ui_font
-	theme.default_font_size=14
-	var normal:=menu_box(Color("172b38"),Color("9c7b43"))
-	var hovered:=menu_box(Color("30485a"),Color("f2d184"))
-	var pressed:=menu_box(Color("544b35"),Color("edce87"))
-	for kind in ["Button","OptionButton"]:
-		theme.set_stylebox("normal",kind,normal)
-		theme.set_stylebox("hover",kind,hovered)
-		theme.set_stylebox("pressed",kind,pressed)
-		theme.set_stylebox("focus",kind,StyleBoxEmpty.new())
-		theme.set_color("font_color",kind,Color("f3deb1"))
-		theme.set_color("font_hover_color",kind,Color("fff0cc"))
-	theme.set_color("font_color","Label",Color("f3deb1"))
-	theme.set_stylebox("normal","LineEdit",normal)
-	theme.set_color("font_color","LineEdit",Color("f3deb1"))
+	legacy_panel.add_theme_stylebox_override("panel",InterfaceTheme.panel(14))
 	legacy_panel.theme=theme
+
 func hotspot(name: String, description: String, action: Callable) -> void:
 	var node:=Button.new()
 	node.flat=true
@@ -181,14 +159,17 @@ func hotspot(name: String, description: String, action: Callable) -> void:
 
 func build_hud() -> void:
 	picture("header","ui-art-v302_header")
-	picture("brand","ui-art-v291_header_brand")
 	for pair in [["gold","res_gold"],["food","res_food"],["stone","res_stone"],["population","res_population"],["science","cmd_research"]]:
 		picture(pair[0]+"_icon","ui-art-v263_"+pair[1])
 		text_item(pair[0]+"_value","0",18)
 	text_item("world_title","Maailmakaart",26)
 	text_item("clock","08:00",16)
+	var version:=text_item("game_version",BuildLabel.short_text(get_tree()),20)
+	version.name="GameVersion";version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.clip_text=true
+	version.add_theme_color_override("font_outline_color",Color("101820"));version.add_theme_constant_override("outline_size",4)
 	var hint:=text_item("status_line","",15)
 	hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_color_override("font_outline_color",Color("101820"));hint.add_theme_constant_override("outline_size",4)
 	hotspot("world_toggle","Vaheta kaardivaadet",func():host.toggle_detail())
 	for key in ["gold","food","stone"]:hotspot(key+"_button","Kuningriigi varud",open_stores.bind(key))
 	hotspot("population_button","Linnad ja asunikud",func():stores_panel.visible=false;dock_menu.open_menu("cities"))
@@ -197,9 +178,11 @@ func build_hud() -> void:
 	image_button("settings","ui-art-v306_settings","Menüü ja mängu seaded",toggle_menu)
 	picture("research_frame","ui-art-v302_research")
 	image_button("research_icon","ui-art-v263_cmd_research","Uurimine",open_research)
-	text_item("research_title","Avastus:",14,Color("24170c"))
-	var research_name:=text_item("research_name","Vali uurimus",15,Color("24170c"))
+	var research_name:=text_item("research_name","Vali uurimus",16,Color("432916"))
 	research_name.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	research_name.max_lines_visible=2
+	research_name.clip_text=true
+	research_name.add_theme_constant_override("line_spacing",-1)
 	var progress:=ProgressBar.new()
 	progress.show_percentage=false;progress.min_value=0;progress.max_value=100
 	progress.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -216,8 +199,19 @@ func build_hud() -> void:
 		plus.add_theme_color_override("font_color",Color("f5d790"));plus.add_theme_color_override("font_shadow_color",Color.BLACK);plus.add_theme_constant_override("shadow_offset_y",1)
 		plus.set_meta("base_font_size",25);plus.add_theme_font_size_override("font_size",25);slot.add_child(plus);elements["research_queue_plus_"+str(i)]=plus
 	image_button("research_all","ui-art-v291_research_city","Kõik avastused",open_research)
-	picture("footer","ui-art-v291_footer_wood")
-	picture("dock_background","ui-art-v304_panel")
+	var dock_background:=picture("dock_background","ui-art-v304_panel")
+	var dock_shader:=Shader.new()
+	dock_shader.code="""shader_type canvas_item;
+void fragment() {
+	vec2 artwork_uv = vec2(mix(0.086, 0.914, UV.x), UV.y);
+	float taper = 0.077 * smoothstep(0.68, 1.0, UV.y);
+	float distance_from_end = min(UV.x, 1.0 - UV.x);
+	COLOR = texture(TEXTURE, artwork_uv);
+	COLOR.a *= smoothstep(taper, taper + 0.008, distance_from_end);
+}"""
+	var dock_paint:=ShaderMaterial.new()
+	dock_paint.shader=dock_shader
+	dock_background.material=dock_paint
 	picture("map_frame","ui-art-v302_minimap")
 	minimap.get_parent().remove_child(minimap)
 	add_child(minimap);elements["minimap"]=minimap
@@ -228,15 +222,14 @@ func build_hud() -> void:
 	image_button("layers","ui-art-v303_map_layers","Kaardi tegevused",show_map_actions)
 	image_button("resource_layer","ui-art-v291_map_show","Näita või peida maardlaid",toggle_resource_layer)
 	image_button("map_switch","ui-art-v263_cmd_map","Vaheta kaardivaadet",func():host.toggle_detail())
-	var walk:=Button.new();walk.text="Kõnni";walk.tooltip_text="Kõnni detailkaardil esimese isiku vaates";walk.pressed.connect(func():host.fpv_walker.start());add_child(walk);elements.walk=walk
-	var wall_shape:=Button.new();wall_shape.tooltip_text="Sirge või kumer müür (C)";wall_shape.pressed.connect(host.toggle_wall_shape);add_child(wall_shape);elements.wall_shape=wall_shape
-	var wall_tier:=Button.new();wall_tier.tooltip_text="Palissaadi kõrgus (T)";wall_tier.pressed.connect(host.toggle_wall_tier);add_child(wall_tier);elements.wall_tier=wall_tier
+	image_button("walk","ui-art-v303_action_move","Kõnni detailkaardil esimese isiku vaates",func():host.fpv_walker.start())
+	image_button("wall_shape","ui-art-v263_bld_stonewall","Müüri kuju (C)",host.toggle_wall_shape)
+	image_button("wall_tier","ui-art-v263_cmd_build","Palissaadi kõrgus (T)",host.toggle_wall_tier)
 	for item in [["cities","Linnad","card_cities"],["build","Ehitamine","card_build"],["armies","Armeed","card_armies"],["trade","Kaubandus","card_trade"],["diplomacy","Diplomaatia","card_diplomacy"],["journal","Päevik","card_journal"]]:
 		var available: bool=item[0] in ["cities","build","armies","trade","journal","diplomacy"]
 		image_button("card_"+item[0],"ui-art-v306_"+item[2],item[1],open_card.bind(item[0]),available)
 	picture("selection_frame","ui-art-v302_selection")
-	var info:=Button.new();info.flat=true;info.text="i";info.tooltip_text="Valitud üksuse käsud";info.add_theme_font_size_override("font_size",25)
-	info.add_theme_color_override("font_color",Color("e4c477"));info.pressed.connect(show_selection_actions);add_child(info);elements.selection_info=info
+	image_button("selection_info","ui-art-v303_action_focus","Valitud üksuse käsud",show_selection_actions)
 	image_button("selection_menu","ui-art-v306_settings","Menüü ja mängu seaded",toggle_menu)
 	var portrait:=picture("portrait","ui-art-v263_unit_settler")
 	var mask:=Shader.new()
@@ -250,64 +243,85 @@ func place(name: String, x: float, y: float, w: float, h: float) -> void:
 	node.position=Vector2(x,y)*ui_scale
 	node.size=Vector2(w,h)*ui_scale
 
+func place_in_frame(name: String,frame: Rect2,center: Vector2,diameter: float) -> void:
+	var point:=frame.position+frame.size*center
+	place(name,point.x-diameter*0.5,point.y-diameter*0.5,diameter,diameter)
+
 func layout() -> void:
 	if elements.is_empty():return
 	var viewport := get_viewport_rect().size
-	ui_scale=minf(viewport.x/1672.0,viewport.y/941.0)*user_ui_scale
+	if viewport.x<=0 or viewport.y<=0:return
+	var fit:=minf(viewport.x/1672.0,viewport.y/941.0)
+	ui_scale=minf(fit*user_ui_scale,minf(viewport.x/1240.0,viewport.y/660.0))
+	for label in labels.values():
+		label.add_theme_font_size_override("font_size",maxi(9,roundi(float(label.get_meta("base_font_size"))*ui_scale)))
 	var bottom:=viewport.y/ui_scale
 	var right:=viewport.x/ui_scale
 	place("header",0,-13,right,78)
-	place("brand",0,-2,263,65)
-	for row in [["gold",right*0.1663],["food",right*0.2542],["stone",right*0.3337],["population",right*0.6280],["science",right*0.7195]]:
+	var resource_slots: Array=[["gold",right*0.072],["food",right*0.200],["stone",right*0.306],["population",right*0.6280],["science",right*0.7195]]
+	for row in resource_slots:
 		place(row[0]+"_icon",row[1],6,30,32)
 		place(row[0]+"_value",row[1]+34,6,80,40)
 	place("world_title",right*0.396,2,right*0.211,45)
 	place("world_toggle",right*0.396,2,right*0.211,45)
-	for row in [["gold",right*0.1663],["food",right*0.2542],["stone",right*0.3337],["population",right*0.6280],["science",right*0.7195]]:place(row[0]+"_button",row[1],6,115,40)
+	for row in resource_slots:place(row[0]+"_button",row[1],6,96,40)
 	place("clock",right*0.824,5,100,40)
 	place("status_line",right*0.30,62,right*0.40,42)
-	place("walk",265,60,90,36)
-	place("wall_shape",360,60,100,36)
-	place("wall_tier",465,60,105,36)
+	place("game_version",right-194,60,172,32)
+	if Mobile.active:
+		place("settle_touch",right*0.5-31,112,62,62)
+		place("cancel_build_touch",right*0.5-31,bottom-66,62,62)
+	place("walk",251,62,53,53)
+	place("wall_shape",311,62,53,53)
+	place("wall_tier",371,62,53,53)
 	place("pause",right*0.91,4,48,45)
 	place("settings",right*0.952,4,42,43)
 	place("research_frame",7,54,248,356)
-	place("research_icon",65,80,135,135)
-	place("research_title",46,177,170,20)
-	place("research_name",42,196,178,35)
+	place("research_icon",77,78,108,108)
+	place("research_name",49,190,165,42)
 	place("research_progress",69,253,124,4)
 	for i in 4:place("research_queue_"+str(i),[5.0,45.0,101.0,160.0][i],[225.0,257.0,268.0,257.0][i],54,53)
 	place("research_all",205,228,47,53)
 	for i in 4:
 		var plus: Label=elements["research_queue_plus_"+str(i)]
 		plus.add_theme_font_size_override("font_size",maxi(10,roundi(25*ui_scale)))
-	place("footer",0,bottom-44,right,44)
-	place("map_frame",0,bottom-401,344,376)
-	place("minimap",28.2,bottom-307.4,232,232)
-	place("zoom_in",115,bottom-378,62,64)
-	place("zoom_out",172,bottom-367,62,64)
-	place("center",230,bottom-341,62,64)
-	place("layers",267,bottom-281,62,64)
-	place("resource_layer",267,bottom-209,62,64)
-	place("map_switch",26,bottom-375,73,72)
-	var left:=354.0;var available:=maxf(0.0,right-354.0-374.0);var gap:=8.0
-	var card_width: float=maxf(1.0,(available-gap*5.0)/6.0)
-	place("dock_background",312,bottom-70-card_width*1.5,maxf(0,right-649),card_width*1.5+28)
+	var map_frame:=Rect2(0,bottom-308,282,308)
+	var selection_frame:=Rect2(right-309,bottom-311,309,311)
+	place("map_frame",map_frame.position.x,map_frame.position.y,map_frame.size.x,map_frame.size.y)
+	place("selection_frame",selection_frame.position.x,selection_frame.position.y,selection_frame.size.x,selection_frame.size.y)
+	place_in_frame("minimap",map_frame,Vector2(0.421,0.548),191)
+	place_in_frame("map_switch",map_frame,Vector2(0.195,0.191),66)
+	place_in_frame("zoom_in",map_frame,Vector2(0.418,0.141),43)
+	place_in_frame("zoom_out",map_frame,Vector2(0.591,0.179),43)
+	place_in_frame("center",map_frame,Vector2(0.765,0.259),47)
+	place_in_frame("layers",map_frame,Vector2(0.856,0.438),47)
+	place_in_frame("resource_layer",map_frame,Vector2(0.856,0.612),48)
+	place_in_frame("portrait",selection_frame,Vector2(0.59,0.54),165)
+	place("selection_name",selection_frame.position.x+100,bottom-96,165,43)
+	place_in_frame("selection_info",selection_frame,Vector2(0.615,0.133),53)
+	place_in_frame("selection_menu",selection_frame,Vector2(0.809,0.145),54)
+	place_in_frame("action_0",selection_frame,Vector2(0.255,0.245),56)
+	place_in_frame("action_1",selection_frame,Vector2(0.424,0.171),50)
+	place_in_frame("action_2",selection_frame,Vector2(0.168,0.431),58)
+	place_in_frame("action_3",selection_frame,Vector2(0.168,0.652),58)
+	# The center panel extends under both frames. The card lane starts outside the frames.
+	var dock_left:=map_frame.position.x+map_frame.size.x*0.52
+	var dock_right:=selection_frame.end.x-selection_frame.size.x*0.52
+	var lane_left:=map_frame.end.x+4.0
+	var lane_width:=selection_frame.position.x-lane_left-4.0
+	var gap:=9.0
+	var card_width:=maxf(1.0,minf((lane_width-gap*5.0)/6.0,minf(145.0,bottom*0.143)))
+	var cards_width:=card_width*6.0+gap*5.0
+	var left:=lane_left+(lane_width-cards_width)*0.5
+	var card_height:=card_width*1.5
+	var card_top:=bottom-23.0-card_height
+	var dock_top:=card_top-16.0
+	place("dock_background",dock_left,dock_top,dock_right-dock_left,bottom-dock_top)
 	for i in 6:
 		var key: String=["cities","build","armies","trade","diplomacy","journal"][i]
-		place("card_"+key,left+i*(card_width+gap),bottom-56-card_width*1.5,card_width,card_width*1.5)
-	place("selection_frame",right-384,bottom-408,384,386)
-	place("selection_info",right-180,bottom-385,63,62)
-	place("selection_menu",right-111,bottom-389,65,69)
-	place("portrait",right-273,bottom-311,226,185)
-	place("selection_name",right-273,bottom-128,226,47)
-	place("action_0",right-363,bottom-281,77,77)
-	place("action_1",right-323,bottom-343,77,77)
-	place("action_2",right-259,bottom-383,77,77)
-	place("action_3",right-363,bottom-200,77,77)
-	for label in labels.values():
-		label.add_theme_font_size_override("font_size",maxi(9,roundi(float(label.get_meta("base_font_size"))*ui_scale)))
-	if dock_menu!=null:dock_menu.set_geometry(Vector2(left,bottom-56-card_width*1.5)*ui_scale,Vector2(available,card_width*1.5)*ui_scale,Vector2(card_width,card_width*1.5)*ui_scale)
+		place("card_"+key,left+i*(card_width+gap),card_top,card_width,card_height)
+	if dock_menu!=null:
+		dock_menu.set_geometry(Vector2(left,card_top)*ui_scale,Vector2(cards_width,card_height)*ui_scale,Vector2(card_width,card_height)*ui_scale)
 	if stores_panel!=null and stores_panel.visible:position_stores()
 	if tile_panel!=null:
 		var tile_width:=minf(340.0*ui_scale,maxf(180.0,viewport.x*0.40))
@@ -463,6 +477,7 @@ func update_context_actions() -> void:
 		var path: String=UI+str(specs[i][0])+".webp"
 		if button.texture_normal.resource_path!=path:button.texture_normal=load(path)
 		button.tooltip_text=str(specs[i][1])+(" · pole veel saadaval" if not specs[i][2] else "")
+		button.accessibility_name=str(specs[i][1])
 		button.disabled=not specs[i][2]
 		button.modulate=Color.WHITE if specs[i][2] else Color(0.58,0.58,0.58,1)
 func show_map_actions() -> void:
@@ -543,7 +558,7 @@ func show_journal() -> void:
 	for i in mini(60,events.size()):lines.append("Käik %d · %s" % [floori(float(events[i].get("time",0))/60.0)+1,str(events[i].get("text",""))])
 	journal_text.text="\n\n".join(lines) if not lines.is_empty() else "Sündmusi veel ei ole."
 	var viewport_size:=get_viewport_rect().size
-	journal_text.custom_minimum_size=Vector2(maxf(180,minf(500,viewport_size.x-90)),maxf(150,minf(420,viewport_size.y-120)))
+	journal_text.custom_minimum_size=Vector2(maxf(180,minf(500,viewport_size.x-90)),maxf(100,minf(390,viewport_size.y-150)))
 	journal_dialog.popup_centered();host.fit_game_dialog(journal_dialog,Vector2i(560,500))
 
 func change_zoom(factor: float) -> void:
@@ -552,9 +567,18 @@ func change_zoom(factor: float) -> void:
 
 func _process(delta: float) -> void:
 	if host==null or host.game.is_empty() or labels.is_empty():return
+	if Mobile.active:
+		elements.settle_touch.visible=host.detail_mode and not host.detail_inspection and host.battle_view==null and (not host.city_created or host.settler_mode)
+		if mobile_placing!=host.build_placement_mode:
+			mobile_placing=host.build_placement_mode
+			elements.cancel_build_touch.visible=mobile_placing
+			elements.dock_background.visible=not mobile_placing
+			set_main_cards_visible(not mobile_placing and not dock_menu.visible)
 	elements.walk.visible=host.detail_mode and host.battle_view==null
-	elements.wall_shape.visible=host.wall_drawing_active();elements.wall_shape.text="Kumer" if host.wall_shape=="curved" else "Sirge"
-	elements.wall_tier.visible=host.wall_drawing_active() and host.build_select.get_item_metadata(host.build_select.selected)=="palisade";elements.wall_tier.text="Tase %d" % host.wall_tier
+	elements.wall_shape.visible=host.wall_drawing_active()
+	elements.wall_shape.tooltip_text="Müüri kuju: %s (C)" % ("kumer" if host.wall_shape=="curved" else "sirge")
+	elements.wall_tier.visible=host.wall_drawing_active() and host.build_select.get_item_metadata(host.build_select.selected)=="palisade"
+	elements.wall_tier.tooltip_text="Palissaadi kõrgus: tase %d (T)" % host.wall_tier
 	tile_clock+=delta
 	if tile_clock>=0.4:tile_clock=0.0;refresh_tile_resources()
 	if stores_panel!=null and stores_panel.visible:
@@ -586,8 +610,12 @@ func _process(delta: float) -> void:
 		last_research_art=stamp
 		var tech_path: String=UI+"tech/"+active+".webp"
 		var icon: TextureButton=elements.research_icon
+		icon.tooltip_text=labels.research_name.text
 		var selected_path: String=tech_path if ResourceLoader.exists(tech_path) else UI+"ui-art-v263_cmd_research.webp"
 		if icon.texture_normal.resource_path != selected_path:icon.texture_normal=load(selected_path)
+		if selected_path==tech_path:
+			var mask:=ShaderMaterial.new();mask.shader=preload("res://scripts/house_ui_circle.gdshader");icon.material=mask
+		else:icon.material=null
 		for i in 4:
 			var button: TextureButton=elements["research_queue_"+str(i)]
 			var id: String=str(queue[i]) if i<queue.size() else ""

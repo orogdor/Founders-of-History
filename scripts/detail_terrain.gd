@@ -55,6 +55,16 @@ static func tile_heights(cells: Array, c: int, r: int) -> Array:
 			result.append(floor((sampled-0.7)*30+0.5)/100.0)
 	return result
 
+static func tile_straddles_shore(cells: Array,c: int,r: int) -> bool:
+	# A 50 m tile plus the maximum 11 m shore warp only reaches the
+	# neighbouring samples. All-land samples are at least 4 m high.
+	for dz in range(-1,2):
+		for dx in range(-1,2):
+			if sample(cells,c+dx,r+dz)>=4.0:continue
+			var heights:=tile_heights(cells,c,r)
+			return heights.min()<0 and heights.max()>0
+	return false
+
 static func detail_height(heights: Array, x: float, z: float) -> float:
 	if heights.size() != 81: return 0.3
 	var fx := clampf((x/225.0+0.5)*8,0,8)
@@ -90,6 +100,11 @@ static func visual_rendered_height(heights: Array,values: PackedVector4Array,x: 
 	return a+u*(b-a)+v*(c-a) if u+v<=1.0 else d+(1-u)*(c-d)+(1-v)*(b-d)
 
 static func build_mesh(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=PackedVector4Array()) -> ArrayMesh:
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,mesh_arrays(heights,uv_offset,color_heights))
+	return mesh
+
+static func mesh_arrays(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=PackedVector4Array()) -> Array:
 	var size:=MESH_DIVISIONS+1;var points:=PackedVector3Array();points.resize(size*size)
 	for j in size:
 		for i in size:
@@ -109,7 +124,7 @@ static func build_mesh(heights: Array,uv_offset:=Vector2.ZERO,color_heights:=Pac
 					color_data=Vector2(sample.x,sample.y)
 				surface.set_uv2(color_data);surface.add_vertex(vertex)
 	surface.index();surface.generate_normals();surface.generate_tangents()
-	return surface.commit()
+	return surface.commit_to_arrays()
 
 const TREE_COUNTS := {"forest":300,"jungle":320,"taiga":290,"lush_river":110,"grassland":75,"steppe":24,"tundra":10,"mesa":3,"desert":0,"snow":0,"snow_mountain":0,"mountain":30}
 
@@ -135,4 +150,3 @@ static func raw_resources(c: int, r: int, biome: String, heights: Array, seed: i
 		if detail_height(heights,x,z) > 0.4 and absf(z) > 16:
 			resources.append([1 if i%5 == 0 else 0,x,z])
 	return resources
-

@@ -6,7 +6,7 @@ static func height_at(heights: PackedFloat32Array, cols: int, rows: int, c: int,
 	if c < 0 or r < 0 or c >= cols or r >= rows: return -40.0
 	return heights[r*cols+c]
 
-static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred: Array, minimum_distance := 28.0) -> Array:
+static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred: Array, minimum_distance := 28.0, team_count := 4) -> Array:
 	var candidates: Array = []
 	for r in range(3, rows-3):
 		for c in range(3, cols-3):
@@ -29,10 +29,12 @@ static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred:
 					if abs(dc)+abs(dr) == 1 and y > 0: shelter += 1
 			if dry < 11 or local < 5 or shelter < 2: continue
 			candidates.append({"c":c,"r":r,"quality":dry*0.32+local*0.8+shelter*1.4-maxf(0,h-18)*0.3})
-	if candidates.size() < 4: return []
+	if candidates.size() < team_count: return []
 	var selected: Array = []
-	for team in 4:
-		var target: Dictionary = preferred[team] if team < preferred.size() else {"c":floori((0.77 if team%2 else 0.23)*cols+0.5),"r":floori((0.77 if team>=2 else 0.23)*rows+0.5)}
+	for team in team_count:
+		var target: Dictionary = preferred[team] if team < preferred.size() else {}
+		if target.is_empty() and team < 4:
+			target = {"c":floori((0.77 if team%2 else 0.23)*cols+0.5),"r":floori((0.77 if team>=2 else 0.23)*rows+0.5)}
 		var best: Variant = null
 		var best_score := -INF
 		for p in candidates:
@@ -42,9 +44,13 @@ static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred:
 				var dr: float = q.r-p.r
 				nearest = minf(nearest,sqrt(dc*dc+dr*dr))
 			if nearest < minimum_distance: continue
-			var dc: float = target.c-p.c
-			var dr: float = target.r-p.r
-			var score: float = -sqrt(dc*dc+dr*dr)*1.15+p.quality+(minf(nearest,70)*0.38 if is_finite(nearest) else 0.0)
+			var score: float = p.quality + (minf(nearest,70)*0.38 if is_finite(nearest) else 0.0)
+			if not target.is_empty():
+				var dc: float = target.c-p.c
+				var dr: float = target.r-p.r
+				score = -sqrt(dc*dc+dr*dr)*1.15 + score
+			else:
+				score += nearest*1.2
 			if score > best_score:
 				best_score = score
 				best = p

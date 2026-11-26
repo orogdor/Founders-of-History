@@ -1,5 +1,8 @@
 shader_type spatial;
 render_mode cull_disabled;
+#include "res://scripts/material_relief.gdshaderinc"
+
+uniform bool close_detail = true;
 varying vec3 local_pos;
 varying vec3 local_normal;
 float h154(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
@@ -21,5 +24,25 @@ void fragment(){
  else if(m==12){k=0.84+0.24*n154(p.xz*1.4)+0.06*n154(p.xz*9.0);}
  else if(m==13){k=0.75+0.35*n154(p.xz*3.0+p.y*2.0);}
  else if(m==14){k=0.95+0.05*n154(vec2(u*12.0,v*12.0));}
- ALBEDO=col*k;ROUGHNESS=rough;METALLIC=metal;
+ // Retain the original board and masonry spacing. Add a finer scale of
+ // directional grain on wood and more isotropic grain on mineral surfaces.
+ float micro=0.0;
+ float relief=0.0;
+ float closeness=close_detail ? 1.0-smoothstep(29.0,90.0,length(VERTEX)) : 0.0;
+ if(m!=9 && m!=10 && m!=14){
+  vec2 face=abs(n.y)>0.7?p.xz:vec2(u,v);
+  bool timber=m==2 || m==3 || m==7 || m==8 || m==11;
+  vec2 fibre=timber?vec2(73.0,7.0):vec2(38.0,46.0);
+  vec2 texel=face*fibre+vec2(9.4,13.7);
+  float footprint=max(length(dFdx(texel)),length(dFdy(texel)));
+  float resolved=1.0-smoothstep(0.25,1.4,footprint);
+  micro=(n154(texel)-0.5)*resolved;
+  relief=(k-0.85)*(timber?0.022:0.035)+micro*(timber?0.007:0.010);
+  rough=clamp(rough+0.13*(0.8-k),0.72,0.99);
+ }
+ NORMAL=material_relief_normal(VERTEX,NORMAL,relief*closeness);
+ ALBEDO=col*k*(1.0+0.22*micro*closeness);
+ ROUGHNESS=rough;
+ METALLIC=metal;
+ SPECULAR=m==9?0.47:0.22;
 }

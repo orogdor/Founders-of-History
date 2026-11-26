@@ -8,6 +8,12 @@ const Operations=preload("res://scripts/building_operations.gd")
 
 # Builders remain owned by the parent city. They travel to the chosen depot
 # and construction site across real detail-tile edges, like builders.js.
+static func job_key(value: Variant) -> String:
+ var parts:=str(value).split(":")
+ if parts.size()<3 or not parts[0].is_valid_float() or not parts[1].is_valid_float():return ""
+ parts[0]=str(int(float(parts[0])));parts[1]=str(int(float(parts[1])))
+ return ":".join(parts)
+
 static func travel(state: Dictionary,worker: Dictionary,target: Dictionary,dt: float,context_at: Callable,nav_for: Callable,path_for: Callable) -> bool:
  if int(worker.c)==int(target.c) and int(worker.r)==int(target.r):return true
  var path:Variant=path_for.call(worker,target,int(worker.team))
@@ -16,16 +22,21 @@ static func travel(state: Dictionary,worker: Dictionary,target: Dictionary,dt: f
  var ctx:Variant=context_at.call(Vector2i(int(worker.c),int(worker.r)))
  if ctx==null:worker.status="Ootab läbipääsu";return false
  var nav:Variant=nav_for.call(ctx,worker)
- var edge:Variant=nav.nearest({"x":dc*(112.5-5),"z":dr*(97.5-5)},15)
+ var edge:Variant=nav.nearest_reachable(worker,{"x":dc*(112.5-5),"z":dr*(97.5-5)},24)
  if edge==null:worker.status="Ootab läbipääsu";return false
- worker.status="Liigub järgmisse piirkonda"
+ var dest:Variant=context_at.call(Vector2i(int(next.c),int(next.r)))
+ if dest==null:worker.status="Ootab läbipääsu";return false
+ var dest_nav:Variant=nav_for.call(dest,worker)
+ var entry:Variant=dest_nav.nearest({"x":-dc*(112.5-5) if dc!=0 else edge.x,"z":-dr*(97.5-5) if dr!=0 else edge.z},24)
+ if entry==null:worker.status="Järgmise piirkonna serv on suletud";return false
+ if int(next.c)==int(target.c) and int(next.r)==int(target.r) and target.get("entryDoor") is Dictionary:
+  entry=dest_nav.nearest_reachable(target.entryDoor,entry,26)
+  if entry==null:worker.status="Sihtruudul puudub tee ehitise ukseni";return false
+ worker.status="Materjal liigub ehitusplatsile" if float(worker.get("materialLoad",0))>0 else "Liigub järgmisse piirkonda"
  if nav.move(worker,edge,dt,3.0,true):
   var from:Dictionary={"c":worker.c,"r":worker.r};worker.c=int(next.c);worker.r=int(next.r)
   Roads.record_step(state,from,worker,"builder",float(state.get("time",0)))
-  var dest:Variant=context_at.call(Vector2i(worker.c,worker.r))
-  if dest!=null:
-   var dest_nav:Variant=nav_for.call(dest,worker);var entry:Variant=dest_nav.nearest({"x":-dc*(112.5-5),"z":-dr*(97.5-5)},20)
-   if entry!=null:worker.x=entry.x;worker.z=entry.z
+  worker.x=entry.x;worker.z=entry.z
  return false
 
 static func attach(parent: Dictionary,worker: Dictionary,context_at: Callable) -> void:
@@ -57,38 +68,61 @@ static func tick(state: Dictionary,parent: Dictionary,dt: float,context_at: Call
   var i:int=parent.builderAgents.size();var probe:Dictionary={"workerKey":"builder:%s:%s" % [parent.id,i]};var nav:Variant=nav_for.call(parent,probe);var initial:Variant=nav.nearest(Nav.door(hall))
   if initial==null:break
   parent.builderAgents.append({"x":initial.x,"z":initial.z,"c":parent.c,"r":parent.r,"team":parent.team,"kind":"builder","workerKey":probe.workerKey,"working":false,"moving":false,"visible":true})
+ var jobs_by_key:Dictionary={};var reserved:Dictionary={}
+ for task in jobs:
+  task.key="%d:%d:%d%s" % [int(task.ctx.c),int(task.ctx.r),int(task.index),":upgrade" if task.has("owner") else ""]
+  jobs_by_key[task.key]=task
+ for i in mini(count,parent.builderAgents.size()):
+  var worker:Dictionary=parent.builderAgents[i]
+  var key:=job_key(worker.get("materialJob","") if float(worker.get("materialLoad",0))>0 else worker.get("job",""))
+  if jobs_by_key.has(key):reserved[key]=int(reserved.get(key,0))+1
  var completed:=[]
  for i in parent.builderAgents.size():
   var worker:Dictionary=parent.builderAgents[i];worker.team=parent.team;worker.moving=false;worker.working=false;worker.action=null;worker.visible=true
+  worker.job=job_key(worker.get("job",""))
+  worker.materialJob=job_key(worker.get("materialJob",""))
+  if float(worker.get("materialLoad",0))>0 and jobs_by_key.has(worker.materialJob):worker.job=worker.materialJob
   var share:=clampf(assigned-i,0,1)
-  if share<=0 or jobs.is_empty():
-   worker.materialLoad=0.0;worker.carried=0.0
+  if share<=0 or jobs_by_key.is_empty():
+   if not jobs_by_key.has(worker.materialJob):worker.materialLoad=0.0;worker.carried=0.0
    if hall.is_empty():worker.visible=false;attach(parent,worker,context_at);continue
    worker.status="Naaseb linnakeskusse"
    if travel(state,worker,parent,dt,context_at,nav_for,path_for):
     var idle_nav:Variant=nav_for.call(parent,worker)
     if idle_nav.move(worker,Nav.door(hall),dt,3.0,true):worker.status="Ootab järgmist ehitust";worker.visible=i<count
    attach(parent,worker,context_at);continue
-  var task:Dictionary=jobs[i%jobs.size()];var ctx:Dictionary=task.ctx;var job:Dictionary=task.building
-  worker.job="%s:%s:%s%s" % [ctx.c,ctx.r,task.index,":upgrade" if task.has("owner") else ""];job.assigned=float(job.assigned)+share;job.efficiency=float(job.efficiency)+share
+  var task:Dictionary=jobs_by_key.get(worker.job,{})
+  if task.is_empty():
+   var best:=INF
+   for candidate in jobs_by_key.values():
+    var distance:=absi(int(candidate.ctx.c)-int(worker.c))+absi(int(candidate.ctx.r)-int(worker.r))
+    var score:=float(reserved.get(candidate.key,0))*10000.0+distance
+    if score>=best:continue
+    if distance>0 and path_for.call(worker,candidate.ctx,int(worker.team))==null:continue
+    best=score;task=candidate
+   if task.is_empty():worker.status="Ehitusplatsile puudub tee";attach(parent,worker,context_at);continue
+   reserved[task.key]=int(reserved.get(task.key,0))+1
+  var ctx:Dictionary=task.ctx;var job:Dictionary=task.building
+  var site:Dictionary={"c":ctx.c,"r":ctx.r,"entryDoor":Nav.door(job)}
+  worker.job=task.key;job.assigned=float(job.assigned)+share;job.efficiency=float(job.efficiency)+share
   attach(parent,worker,context_at)
   if float(job.get("materialsRemaining",0))>0:
    if worker.get("materialJob")!=worker.job:worker.materialJob=worker.job;worker.materialLoad=0.0;worker.carried=0.0;worker.materialDepot=null
-   var depot:Variant=find_depot(contexts,ctx,worker,path_for)
-   if depot==null:worker.status="Puudub ligipääsetav ladu";continue
    if float(worker.get("materialLoad",0))<=0:
+    var depot:Variant=find_depot(contexts,ctx,worker,path_for)
+    if depot==null:worker.status="Puudub ligipääsetav ladu";continue
     worker.status="Läheb materjalilattu"
     if not travel(state,worker,depot.ctx,dt*share,context_at,nav_for,path_for):attach(parent,worker,context_at);continue
     var nav:Variant=nav_for.call(depot.ctx,worker)
     if nav.move(worker,Nav.door(depot.building),dt*share,3.0,true):worker.materialLoad=minf(24.0,float(job.materialsRemaining));worker.carried=worker.materialLoad;worker.status="Võttis ehitusmaterjalid"
     continue
    worker.status="Viib materjali ehitusplatsile"
-   if not travel(state,worker,ctx,dt*share,context_at,nav_for,path_for):attach(parent,worker,context_at);continue
+   if not travel(state,worker,site,dt*share,context_at,nav_for,path_for):attach(parent,worker,context_at);continue
    var nav:Variant=nav_for.call(ctx,worker)
    if nav.move(worker,Nav.door(job),dt*share,3.0,true):
     job.materialsRemaining=maxf(0,float(job.materialsRemaining)-float(worker.materialLoad));worker.materialLoad=0.0;worker.carried=0.0
    continue
-  if not travel(state,worker,ctx,dt*share,context_at,nav_for,path_for):attach(parent,worker,context_at);continue
+  if not travel(state,worker,site,dt*share,context_at,nav_for,path_for):attach(parent,worker,context_at);continue
   var nav:Variant=nav_for.call(ctx,worker)
   if not nav.move(worker,Nav.door(job),dt*share,3.0,true):worker.status="Läheb ehitusplatsile";continue
   worker.status="Ehitab";worker.working=true;worker.action="build";worker.builderArrived=true
@@ -97,11 +131,11 @@ static func tick(state: Dictionary,parent: Dictionary,dt: float,context_at: Call
   job.workThisTick=float(job.workThisTick)+work;job.progress=float(job.get("progress",0))+work
   if task.has("owner"):
    if job.progress+0.00000001>=float(job.total):
-    Operations.finish_wall_upgrade(task.owner);ctx.world.revision=int(ctx.world.get("revision",0))+1;completed.append(task)
+    jobs_by_key.erase(task.key);Operations.finish_wall_upgrade(task.owner);ctx.world.revision=int(ctx.world.get("revision",0))+1;completed.append(task)
   else:
    var definition:Dictionary=Econ.DATA.data.buildings[job.type]
    if job.progress+0.00000001>=float(job.get("buildTimeV1757",definition.time))*Econ.tempo_factor(state):
-    job.ready=true;job.status="Valmis";parent.economy.realms[parent.team].log.append({"time":floori(parent.economy.time),"text":"Valmis: "+str(definition.name)});completed.append(task)
+    jobs_by_key.erase(task.key);job.ready=true;job.status="Valmis";parent.economy.realms[parent.team].log.append({"time":floori(parent.economy.time),"text":"Valmis: "+str(definition.name)});completed.append(task)
   attach(parent,worker,context_at)
  return {"district_completed":completed} if not completed.is_empty() else {}
 

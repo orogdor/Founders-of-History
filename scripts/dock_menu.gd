@@ -1,10 +1,15 @@
 extends Control
 
+const Mobile = preload("res://scripts/mobile_profile.gd")
+
 const Economy=preload("res://scripts/economy_rules.gd")
 const CityRules=preload("res://scripts/city_build_rules.gd")
 const Research=preload("res://scripts/research_rules.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
+const Campaign=preload("res://scripts/campaign_state.gd")
+const Palette=preload("res://scripts/faction_palette.gd")
+const Setup=preload("res://scripts/world_setup.gd")
 const Availability=preload("res://scripts/era_availability.gd")
 const CityOverview=preload("res://scripts/city_overview.gd")
 const BUILD_ORDER=preload("res://data/build_catalog_order.json")
@@ -123,11 +128,18 @@ func set_geometry(pos: Vector2,dimensions: Vector2,card: Vector2) -> void:
 	if visible:rebuild()
 
 func open_menu(mode: String) -> void:
+	if Mobile.active and mode=="build" and not host.city_created:
+		if host.detail_inspection:host.toggle_detail()
+		if not host.detail_mode:host.toggle_detail()
+		if host.detail_mode:host.update_status("Vali linnakoht ja puuduta nuppu „Vali linnakoht”, kui asunik on kohale jõudnud.")
+		return
 	if not host.city_created and mode not in ["armies","cities","diplomacy","journal","trade"]:
 		host.update_status("Raja esmalt linn.");return
 	if mode=="build":
-		if host.detail_inspection and host.detail_district.is_empty():host.update_status("Ava ehitamiseks oma linn.");return
 		if host.settler_mode:host.update_status("Vali esmalt linn.");return
+		if host.detail_inspection and host.detail_district.is_empty():
+			if Mobile.active:host.toggle_detail()
+			else:host.update_status("Ava ehitamiseks oma linn.");return
 	if mode!=kind and search!=null:search.text=""
 	if mode=="diplomacy" and kind!="diplomacy":diplomacy_feedback=""
 	kind=mode;visible=true;last_stamp=""
@@ -135,9 +147,10 @@ func open_menu(mode: String) -> void:
 	hud.legacy_panel.visible=false
 	set_geometry(base_position,base_dimensions,card_size)
 
-func close_menu() -> void:
+func close_menu(cancel_placement:=true) -> void:
 	release_labor()
-	visible=false;kind="";host.cancel_build_placement()
+	visible=false;kind=""
+	if cancel_placement:host.cancel_build_placement()
 	update_paging()
 	hud.set_main_cards_visible(true)
 
@@ -328,8 +341,12 @@ func enter_city(index: int) -> void:
 	if not host.detail_mode:host.toggle_detail()
 
 func populate_diplomacy() -> void:
-	var names: Array=["Eesti","Soome","Rootsi","Norra"]
-	for team in [1,2,3]:
+	var rivals := Campaign.opponents(host.game)
+	if rivals.is_empty():
+		var empty := Label.new()
+		empty.text = "Arvutivastaseid selles mängus pole."
+		row.add_child(empty)
+	for team in rivals:
 		var town_count:=0;var population:=0
 		for city in host.game.cities:
 			if int(city.team)==team:town_count+=1;population+=floori(float(city.economy.realms[team].pop))
@@ -338,7 +355,8 @@ func populate_diplomacy() -> void:
 		var style:=StyleBoxFlat.new();style.bg_color=Color("182f40");style.border_color=Color("b38e4c");style.set_border_width_all(1);style.set_corner_radius_all(7)
 		style.content_margin_left=12;style.content_margin_right=12;style.content_margin_top=12;style.content_margin_bottom=12;panel.add_theme_stylebox_override("panel",style)
 		var column:=VBoxContainer.new();column.add_theme_constant_override("separation",8);panel.add_child(column);row.add_child(panel)
-		var name:=Label.new();name.text=names[team];name.add_theme_font_override("font",hud.ui_bold);name.add_theme_color_override("font_color",Color("f3d997"));name.add_theme_font_size_override("font_size",maxi(13,roundi(card_size.x*0.15)));column.add_child(name)
+		var name:=Label.new();name.text=Setup.faction_name(team);name.add_theme_font_override("font",hud.ui_bold);name.add_theme_color_override("font_color",Color("f3d997"));name.add_theme_font_size_override("font_size",maxi(13,roundi(card_size.x*0.15)));column.add_child(name)
+		name.add_theme_color_override("font_color",Palette.color(team,Color("f3d997")).lightened(0.22))
 		var divider:=HSeparator.new();column.add_child(divider)
 		var summary:=Label.new();summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 		summary.text="%d elanikku · %d linna · %s" % [population,town_count,{"friendly":"sõprus","neutral":"neutraalne","war":"sõda"}.get(current,current)];column.add_child(summary)
@@ -477,13 +495,18 @@ func choose_building(index: int) -> void:
 		if not host.can_build_on_detail():return
 	host.build_select.select(index);host.update_field_controls(index)
 	host.clear_building_preview();host.build_angle=null;host.build_placement_mode=true
+	if Mobile.active:
+		close_menu(false)
+		host.update_status("Lohista kaardil põllu ala." if type=="field" else "Lohista müür kaardile." if host.wall_drawing_active() else "Puuduta kaardil kohta, kuhu hoone ehitada.")
+		return
 	host.update_status("Lohista müür kaardile · C sirge/kumer · T kõrgus · Ctrl + hiireratas pöörab." if type in ["palisade","stonewall","reinforced_wall"] else "Vali detailkaardil ehituskoht · Ctrl + hiireratas pöörab." if type!="field" else "Lohista detailkaardile põllu ala · Ctrl + hiireratas pöörab.")
 
 func populate_villages() -> void:
 	var research: Dictionary=host.game.research[0]
 	var topic: String=str(Research.DATA.data.techs.get(str(research.active),{}).get("name","Ühtegi uuringut pole käimas"))
 	var treasury:=make_trade_group("Kuningriigi kassa",topic,"cmd_research")
-	var boost:=Button.new();boost.text="Kiirenda uuringut\n40 kulda → +12 punkti";boost.disabled=research.active==null;boost.pressed.connect(boost_research);treasury.add_child(boost)
+	var points:=Research.purchasable_points(host.game,0)
+	var boost:=Button.new();boost.text="Kiirenda uuringut\n40 kulda → +%.1f punkti" % points if points>0.000001 else "Uuringut ei saa praegu kiirendada";boost.disabled=points<=0.000001;boost.pressed.connect(boost_research);treasury.add_child(boost)
 	var count:=0
 	for landmark in host.game.get("landmarks",[]):
 		if Discoveries.village_type(landmark)!="traders":continue
@@ -529,7 +552,7 @@ func trade_from_group(id: String,offer_id: String) -> void:
 func boost_research() -> void:
 	var result:=Research.buy_research(host.game,0)
 	if result.has("error"):host.update_status(result.error)
-	else:host.update_status("Kassa: 40 kulda → uuring kiirenes (+12 punkti), "+str(result.town))
+	else:host.update_status("Kassa: 40 kulda → +%.1f teaduspunkti · %s" % [result.points,result.town])
 	rebuild()
 
 func open_village(id: String) -> void:
@@ -587,4 +610,3 @@ func choose_army(index: int) -> void:
 
 func choose_ship(id: int) -> void:
 	host.select_ship_by_id(id);close_menu()
-

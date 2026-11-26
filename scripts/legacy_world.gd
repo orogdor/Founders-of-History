@@ -25,7 +25,10 @@ func generate()->Dictionary:
    lat[i]=absf((r+0.5)/Grid.ROWS-0.5)*2
    heat[i]=clampf(1-float(lat[i])*0.92+(Geography.noise(c+417,r+73,seed)-0.5)*0.18,0,1)
    moisture[i]=clampf(smooth(c/13.0+17,r/13.0+71)*0.6+smooth(c/41.0+53,r/41.0+11)*0.4,0,1)
- return {"seed":seed,"heights":heights,"lat":lat,"heat":heat,"moisture":moisture,"starts":STARTS.duplicate(true),"world_type":"inland"}
+ var preferred := []
+ for location in STARTS:
+  preferred.append({"c":roundi(float(location.c)*Grid.COLS/Grid.DEFAULT_SIZE.x),"r":roundi(float(location.r)*Grid.ROWS/Grid.DEFAULT_SIZE.y)})
+ return {"seed":seed,"heights":heights,"lat":lat,"heat":heat,"moisture":moisture,"starts":preferred,"world_type":"inland"}
 static func plateau(heights:PackedFloat32Array,starts:Array)->PackedFloat32Array:
  var result:=heights.duplicate()
  for r in Grid.ROWS:

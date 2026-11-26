@@ -1,19 +1,19 @@
 extends Node3D
 
 const Grid=preload("res://scripts/campaign_grid.gd")
-const Terrain=preload("res://scripts/detail_terrain.gd")
-const Roads=preload("res://scripts/world_roads.gd")
 const Landscape=preload("res://scripts/detail_landscape.gd")
 const LocalNav=preload("res://scripts/local_navigation.gd")
-const WIDTHS:=[0.0,0.78,0.9,1.05,1.575]
-const COLORS:=["","716147","7e6b50","817767","8b8170","9a9182","858682","545a5a"]
-const APPEARANCES:=[[1,1,1,1],[1,2,2,2],[2,3,3,3],[2,3,4,4],[2,3,4,5],[3,6,6,5],[3,6,7,7]]
+const RoadSurface=preload("res://scripts/road_surface.gd")
 var host: Node
 var center:=Vector2i.ZERO
 var stamp: String=""
+var refresh_time:=0.0
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if host==null:return
+	refresh_time+=delta
+	if not stamp.is_empty() and refresh_time<1.0:return
+	refresh_time=0.0
 	var building_stamp: Array=[]
 	for city in host.game.get("cities",[]):
 		if absi(int(city.c)-center.x)>1 or absi(int(city.r)-center.y)>1:continue
@@ -24,52 +24,51 @@ func _process(_delta: float) -> void:
 
 func rebuild() -> void:
 	for child in get_children():child.queue_free()
-	var surfaces: Dictionary={};var heights: Dictionary={};var road_segments: Dictionary={}
-	var edges:=Roads.visual_network(host.game,host.game.explored[0],host.reveal_all)
+	if not host.reveal_all and not host.game.explored[0].has(str(center.x)+":"+str(center.y)):return
+	var surfaces: Dictionary={}
+	var road_segments: Array=[]
+	var tile:=get_parent() as Node3D
+	var height_at:=func(x: float,z: float) -> float:
+		return host.detail_rendered_height(x+tile.position.x,z+tile.position.z)
+	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+	if neighbors==null:return
+	var edges: Array=neighbors.visible_roads()
 	for edge in edges:
+		if absi(center.x-edge.a.x)>2 and absi(center.x-edge.b.x)>2:continue
+		if absi(center.y-edge.a.y)>2 and absi(center.y-edge.b.y)>2:continue
 		var level:=int(edge.level);var owner: Variant=host.territory_allocation.get("territory",{}).get(str(edge.a.x)+":"+str(edge.a.y))
 		if owner==null:owner=host.territory_allocation.get("territory",{}).get(str(edge.b.x)+":"+str(edge.b.y))
 		var team:=int(owner.team) if owner is Dictionary else 0
-		var appearance: int=APPEARANCES[clampi(int(host.game.ages[team]),0,6)][level-1]
-		for dr in range(-1,2):
-			for dc in range(-1,2):
-				var at:=center+Vector2i(dc,dr)
-				if at.x<0 or at.y<0 or at.x>=Grid.COLS or at.y>=Grid.ROWS:continue
-				if not host.reveal_all and not host.game.explored[0].has(str(at.x)+":"+str(at.y)):continue
-				if absi(at.x-edge.a.x)>2 and absi(at.x-edge.b.x)>2:continue
-				if absi(at.y-edge.a.y)>2 and absi(at.y-edge.b.y)>2:continue
-				var tile_center:=Grid.center(at.x,at.y);var key:=str(at.x)+":"+str(at.y)
-				var obstacles:=tile_obstacles(at);var local_points:=local_road(edge.points,tile_center,obstacles,level)
-				for i in range(local_points.size()-1):
-					var a: Vector2=local_points[i];var b: Vector2=local_points[i+1]
-					var part:=Landscape.clip(Vector3(a.x,0,a.y),Vector3(b.x,0,b.y))
-					if part.is_empty():continue
-					if not heights.has(key):heights[key]=Terrain.tile_heights(host.grid,at.x,at.y)
-					if not surfaces.has(appearance):
-						var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surfaces[appearance]=surface
-					var left: Vector3=part[0];var right: Vector3=part[1]
-					var direction:=Vector2(right.x-left.x,right.z-left.z).normalized()
-					var normal: Vector2=Vector2(-direction.y,direction.x)*1.19*float(WIDTHS[level])*0.86
-					if not clear_segment(Vector2(left.x,left.z),Vector2(right.x,right.z),obstacles,normal.length()):continue
-					if not road_segments.has(key):road_segments[key]=[]
-					road_segments[key].append([Vector2(left.x,left.z),Vector2(right.x,right.z),normal.length()+2.0])
-					var vertices: Array=[Vector2(left.x,left.z)-normal,Vector2(left.x,left.z)+normal,Vector2(right.x,right.z)+normal,Vector2(left.x,left.z)-normal,Vector2(right.x,right.z)+normal,Vector2(right.x,right.z)-normal]
-					for v in vertices:
-						var p: Vector2=v
-						surfaces[appearance].add_vertex(Vector3(p.x+dc*225,host.detail_rendered_height(p.x+dc*225,p.y+dr*195)+0.045,p.y+dr*195))
+		var appearance := RoadSurface.appearance_for(int(host.game.ages[team]),level)
+		var tile_center:=Grid.center(center.x,center.y)
+		var obstacles:=tile_obstacles(center);var local_points:=local_road(edge.points,tile_center,obstacles,level)
+		for i in range(local_points.size()-1):
+			var a: Vector2=local_points[i];var b: Vector2=local_points[i+1]
+			var part:=Landscape.clip(Vector3(a.x,0,a.y),Vector3(b.x,0,b.y))
+			if part.is_empty():continue
+			var left: Vector3=part[0];var right: Vector3=part[1]
+			var start := Vector2(left.x,left.z)
+			var end := Vector2(right.x,right.z)
+			if start.is_equal_approx(end):continue
+			var half_width := 1.19 * float(RoadSurface.WIDTHS[level]) * 0.86
+			var start_side := RoadSurface.road_side(local_points,i,half_width)
+			var end_side := RoadSurface.road_side(local_points,i+1,half_width)
+			var segment_length := a.distance_to(b)
+			var side_at_start := start_side.lerp(end_side,a.distance_to(start)/segment_length)
+			var side_at_end := start_side.lerp(end_side,a.distance_to(end)/segment_length)
+			var clearance := maxf(side_at_start.length(),side_at_end.length())
+			if not clear_segment(start,end,obstacles,clearance):continue
+			road_segments.append([start,end,clearance+2.0])
+			if not surfaces.has(appearance):
+				var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surfaces[appearance]=surface
+			var steps := maxi(1,ceili(start.distance_to(end)/1.15))
+			RoadSurface.add_strip(surfaces[appearance],start,end,
+				side_at_start,side_at_end,height_at,0.045,steps)
 	for appearance in surfaces:
-		var node:=MeshInstance3D.new();node.mesh=surfaces[appearance].commit()
-		var material:=StandardMaterial3D.new();material.albedo_color=Color(COLORS[appearance]);material.cull_mode=BaseMaterial3D.CULL_DISABLED
-		node.material_override=material;add_child(node)
-	if host.get("detail_root")==null:return
-	if host.detail_root.ground_cover!=null:host.detail_root.ground_cover.set_roads(road_segments.get(str(center.x)+":"+str(center.y),[]))
-	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
-	if neighbors!=null:
-		for tile in neighbors.get_children():
-			var at: Vector2i=tile.get_meta("coords",Vector2i(-1,-1));var segments: Array=road_segments.get(str(at.x)+":"+str(at.y),[])
-			tile.set_meta("road_segments",segments)
-			var nature: Node=tile.get_node_or_null("Nature")
-			if nature!=null and nature.ground_cover!=null:nature.ground_cover.set_roads(segments)
+		add_child(RoadSurface.make_mesh(surfaces[appearance],center,appearance))
+	tile.set_meta("road_segments",road_segments)
+	var nature: Node=tile if tile==host.detail_root else tile.get_node_or_null("Nature")
+	if nature!=null and nature.ground_cover!=null:nature.ground_cover.set_roads(road_segments)
 
 func tile_obstacles(at: Vector2i) -> Array:
 	var result: Array=[]
@@ -95,7 +94,7 @@ static func local_road(points: Array,tile_center: Vector2,obstacles: Array,level
 			var p:=a.lerp(b,float(k)/steps)-tile_center
 			result.append(Vector2(p.x*4.5,p.y*3.9))
 	if obstacles.is_empty():return result
-	var margin: float=2.0*1.19*float(WIDTHS[level])*0.8+1.2
+	var margin: float=2.0*1.19*float(RoadSurface.WIDTHS[level])*0.8+1.2
 	for round_index in 8:
 		var moved:=false
 		for i in range(1,result.size()-1):

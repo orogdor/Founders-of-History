@@ -1,34 +1,101 @@
 extends Node3D
+
+const HouseEras=preload("res://scripts/house_eras.gd")
+const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const PlanCollision=preload("res://scripts/house_plan_collision.gd")
 const Fence=preload("res://scripts/house_fence.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
+const WINDOWS:=[Vector2(0.76,1.44),Vector2(0.87,1.53),Vector2(0.92,1.64),Vector2(0.92,1.74),Vector2(0.88,1.86),Vector2(0.83,2.04),Vector2(0.68,2.16)]
 const ReedShader=preload("res://scripts/house_reed.gdshader")
-const PALETTE={"clay":"c18b54","weave":"a18353","stone":"a4a292","wood":"986741","bamboo":"9a805d","mudbrick":"c99b63","cutstone":"d3cab2","plank":"b5895a","brick":"b8573c","plaster":"efe7d3","halftimber":"ece2c9","hide":"b58d65","turf":"9a9462","stave":"c09872","minoanRed":"8e2a1d","minoanBlack":"1d1b1b"}
-const TEXTURES={"hide":"land-hide","clay":"atlas-clay","weave":"atlas-weave","stone":"proc-stone","wood":"atlas-wood","bamboo":"atlas-wood","mudbrick":"proc-mudbrick","cutstone":"proc-cutstone","plank":"proc-plank","brick":"proc-brick","plaster":"proc-plaster","halftimber":"proc-plaster","cyclopean":"proc-cyclopean","fresco":"proc-fresco","limestone":"proc-limestone","stave":"atlas-wood","turf":"land-earth","prestigePlaster":"proc-plaster","marble":"proc-marble","reticulatum":"proc-reticulatum","romanbrick":"proc-romanbrick","floor":"land-dirt","reed":"atlas-straw","thatch":"atlas-straw","sod":"proc-sod","bark":"proc-bark","shingle":"proc-shingle","tile":"proc-tile","earth":"proc-clayroof","roofplank":"proc-roofplank"}
+const DaubShader=preload("res://scripts/house_daub.gdshader")
+const PALETTE={"clay":"c18b54","weave":"a18353","stone":"a4a292","hutStone":"8d8777","wood":"986741","bamboo":"9a805d","mudbrick":"c99b63","cutstone":"d3cab2","plank":"b5895a","brick":"b8573c","plaster":"efe7d3","halftimber":"ece2c9","hide":"b58d65","turf":"9a9462","stave":"c09872","minoanRed":"8e2a1d","minoanBlack":"1d1b1b"}
+const TEXTURES={"hide":"land-hide","clay":"atlas-clay","weave":"atlas-weave","stone":"proc-stone","hutStone":"proc-stone","wood":"atlas-wood","bamboo":"atlas-wood","mudbrick":"proc-mudbrick","cutstone":"proc-cutstone","plank":"proc-plank","brick":"proc-brick","plaster":"proc-plaster","halftimber":"proc-plaster","cyclopean":"proc-cyclopean","fresco":"proc-fresco","limestone":"proc-limestone","stave":"atlas-wood","turf":"land-earth","prestigePlaster":"proc-plaster","marble":"proc-marble","reticulatum":"proc-reticulatum","romanbrick":"proc-romanbrick","floor":"land-dirt","reed":"atlas-straw","thatch":"atlas-straw","sod":"proc-sod","bark":"proc-bark","shingle":"proc-shingle","tile":"proc-tile","earth":"proc-clayroof","roofplank":"proc-roofplank"}
 static var model_cache:Dictionary={}
 static var cache_order:Array[String]=[]
 var roof_material:="reed"
+var floor_material:="floor"
+var frame_material:="wood"
 var roof_vents:Array[Vector2]=[]
 var origin:=Vector2(480,312)
 var materials:Dictionary={}
 var reed_surface: ShaderMaterial
+var simplified:=false
+var settlement_detail:=false
+var early_round_hut:=false
+var daub_material: ShaderMaterial
+var hut_reed_surface: ShaderMaterial
+const LOD_COLORS={
+ "limestone":"b4ac90","cutstone":"a8a38c","cyclopean":"80766b","marble":"dad2bc",
+ "fresco":"b18c62","brick":"985746","romanbrick":"a35f49","reticulatum":"9b8c69",
+ "prestigePlaster":"bea084","floor":"817054","reed":"705740","thatch":"705740",
+ "plank":"8e6b49","sod":"6c734b","bark":"6a5141","shingle":"62564c",
+ "tile":"a9654c","earth":"a3714e","roofplank":"765941","medievalRubble":"827c71",
+ "renaissanceLime":"c9bd9e","renaissanceAshlar":"b0a18a","industrialBrick":"965547",
+ "industrialIron":"596568","modernConcrete":"a3a197","modernPanel":"9ea4a1",
+ "slate":"525963","terracotta":"a35e47","seamMetal":"576c6c","membrane":"666c6c",
+ "glass":"566d73"
+}
 
 func material_for(style: String) -> StandardMaterial3D:
  if materials.has(style):return materials[style]
  var material:=StandardMaterial3D.new();material.albedo_color=Color(str(PALETTE.get(style,"ffffff")));material.roughness=1.0;material.cull_mode=BaseMaterial3D.CULL_DISABLED
+ if simplified and not settlement_detail:
+  material.albedo_color=Color(str(LOD_COLORS.get(style,PALETTE.get(style,"a69679"))))
+  materials[style]=material
+  return material
  if style in ["reed","thatch"]:material.albedo_color=Color("756b5c")
- var key:=str(TEXTURES.get(style,""));var file:="res://assets/house_designer/"+key+".webp"
- if key.begins_with("proc-"):material.albedo_color=Color.WHITE
+ var key:=str(TEXTURES.get(style,""))
+ var relief:="res://assets/house_designer/walls/"+style
+ var file:=relief+".webp" if ResourceLoader.exists(relief+".webp") else "res://assets/house_designer/"+key+".webp"
+ if file.begins_with("res://assets/house_designer/walls/"):
+  material.albedo_color=Color.WHITE
+  material.albedo_texture=load(file)
+  material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+  if settlement_detail:
+   materials[style]=material
+   return material
+  material.normal_enabled=true;material.normal_texture=load(relief+"-normal.webp");material.normal_scale=0.8
+  material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+  material.roughness=0.7 if style in ["industrialIron","seamMetal"] else 0.91
+  if style in ["industrialIron","seamMetal"]:material.metallic=0.36
+  if not Mobile.active:
+   material.heightmap_enabled=true;material.heightmap_texture=load(relief+"-height.webp");material.heightmap_scale=0.75
+  SurfaceDetail.refine_architecture(material,style,not Mobile.active)
+  materials[style]=material
+  return material
+ if style=="glass":
+  material.albedo_color=Color(0.37,0.58,0.65,0.54);material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+  material.roughness=0.24;materials[style]=material;return material
+ if key.begins_with("proc-") and style!="hutStone":material.albedo_color=Color.WHITE
  if not key.is_empty() and ResourceLoader.exists(file):material.albedo_texture=load(file);material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;material.uv1_scale=Vector3(2,2,1)
  if style in ["reed","thatch"]:material.uv1_scale=Vector3(0.2,1,1)
+ if not settlement_detail:SurfaceDetail.refine_architecture(material,style,not Mobile.active)
  materials[style]=material;return material
 
+func hut_daub_material() -> Material:
+ if simplified and not settlement_detail:return material_for("clay")
+ if daub_material==null:
+  daub_material=ShaderMaterial.new()
+  daub_material.shader=DaubShader
+  daub_material.set_shader_parameter("clay_atlas",preload("res://assets/house_designer/atlas-clay.webp"))
+  daub_material.set_shader_parameter("wattle_atlas",preload("res://assets/house_designer/atlas-weave.webp"))
+ return daub_material
+
 func roof_surface_material() -> Material:
- if roof_material not in ["reed","thatch"]:return material_for(roof_material)
+ if (simplified and not settlement_detail) or roof_material not in ["reed","thatch"]:return material_for(roof_material)
+ if early_round_hut:
+  if hut_reed_surface==null:
+   hut_reed_surface=ShaderMaterial.new()
+   hut_reed_surface.shader=ReedShader
+   hut_reed_surface.set_shader_parameter("reed_atlas",preload("res://assets/house_designer/atlas-straw.webp"))
+   hut_reed_surface.set_shader_parameter("hut_thatch",true)
+  return hut_reed_surface
  if reed_surface==null:
   reed_surface=ShaderMaterial.new();reed_surface.shader=ReedShader
   reed_surface.set_shader_parameter("reed_atlas",load("res://assets/house_designer/atlas-straw.webp"))
+  reed_surface.set_shader_parameter("settlement_detail",settlement_detail)
  return reed_surface
 
 func local(p: Vector2,height:=0.0) -> Vector3:
@@ -39,21 +106,31 @@ func rebuild(design: Dictionary) -> void:
  roof_material=str(design.get("roofMat","reed"))
  if roof_material=="plank":roof_material="roofplank"
  var geometry:=Plan.plan_geometry(design);origin=PlanCollision.origin(design)
- var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{});var era:=clampi(int(definition.get("era",0)),0,2)
- var lifts:=[0.0,0.67,0.87];var doors:=[1.32,1.45,1.60];var curved_doors:=[1.53,1.50,1.62];var windows:=[Vector2(0.73,1.33),Vector2(0.86,1.30),Vector2(0.96,1.45)]
- var lift:float=lifts[era];lift+=(0.88+lift)*(float(design.get("wallScale",100))/100-1.0)
- var height:=0.88+lift
- if not design.get("upperLevel",false):
+ var definition:Dictionary=HouseEras.definition(str(design.get("id","")));var era:=int(definition.get("era",0))
+ floor_material=["floor","floor","cutstone","plank","terracotta","industrialBrick","modernConcrete"][era]
+ frame_material="industrialIron" if era>=5 else "wood"
+ early_round_hut=era==0 and design.get("rooms",[]).any(func(room):return room.type=="round") and roof_material=="reed"
+ var height:=Plan.wall_height(design,era)
+ var lift:=height-0.88
+ if not simplified and not design.get("upperLevel",false):
   if design.get("yard") is Array:add_yard(design.yard,design,era)
   if design.get("plot") is Array and not design.get("field") is Dictionary and not design.get("yard") is Array:add_yard(design.plot,design,era)
  for floor in geometry.floors:add_floor(floor)
- if design.get("field") is Dictionary and design.get("plot") is Array:add_field(design.plot,design.field)
+ if design.get("field") is Dictionary and design.get("plot") is Array:
+  if simplified:
+   var field_outline:=PackedVector2Array()
+   for point in design.plot:field_outline.append(Plan.point(point))
+   floor_material="floor"
+   add_floor(field_outline)
+  else:
+   add_field(design.plot,design.field)
  var fence_index:=0;var stair:=Fence.wall_stair_plan(design)
  for fence in Fence.layout(design):add_fence(fence,fence_index,stair);fence_index+=1
  if not stair.is_empty():add_defense_stair(stair)
  if design.get("pier") is Dictionary:add_pier(design.pier,str(design.get("id",""))=="harbor" and design.get("bronzeStyle",false))
  var opening_frames: Dictionary={}
  for wall in geometry.walls:
+  if simplified and wall.group=="inner":continue
   for span in Plan.split_wall(wall,design):
    var top:float=height if span.group=="outer" else 1.23+lift
    if span.group=="outer" and design.get("build","wall")=="open":
@@ -66,17 +143,17 @@ func rebuild(design: Dictionary) -> void:
      if not opening_frames.has(key):opening_frames[key]={"opening":span.opening,"points":[],"curved":span.get("curved",false)}
      opening_frames[key].points.append(span.a);opening_frames[key].points.append(span.b)
    if span.get("type","")=="door":
-    var door_top:float=curved_doors[era] if span.get("curved",false) else doors[era]
-    door_top+=0.10 if style=="arched" else 0.08 if style=="double" else 0.0
+    var door_top:=Plan.door_height(era,style)
     add_wall(span,door_top,top)
    elif span.get("type","")=="window":
-    var win:Vector2=windows[era]
+    var win:Vector2=WINDOWS[era]
     if style=="slit":win+=Vector2(-0.12,0.14)
     elif style=="hole":win+=Vector2(0.08,-0.08)
     add_wall(span,0,win.x);add_wall(span,win.y,top)
    else:add_wall(span,0,top)
- for frame in opening_frames.values():add_opening(frame,era,height)
- if str(design.get("roofForm","")) in ["flat","pediment"] and design.get("build","wall")!="tower":add_classical_features(design,height)
+ if not simplified or settlement_detail:
+  for frame in opening_frames.values():add_opening(frame,era,height)
+ if era<=2 and str(design.get("roofForm","")) in ["flat","pediment"] and design.get("build","wall")!="tower":add_classical_features(design,height)
  var upper:Variant=design.get("upper")
  var upper_polys:=[]
  if upper is Dictionary:
@@ -90,7 +167,7 @@ func rebuild(design: Dictionary) -> void:
    var low:=Vector2(INF,INF);var high:=Vector2(-INF,-INF)
    for p in lower_poly:
     var at:=local(p);low=low.min(Vector2(at.x,at.z));high=high.max(Vector2(at.x,at.z))
-   for item in design.get("items",[]):
+   for item in ([] if simplified else design.get("items",[])):
     if item.get("type","")!="fire":continue
     var fire:=Plan.point(item.point);var inside:=false
     for floor in geometry.floors:
@@ -102,6 +179,7 @@ func rebuild(design: Dictionary) -> void:
  var towers:=Fence.tower_positions(design)
  for item in design.get("items",[]):
   var type:=str(item.type);var tower: Variant=null
+  if simplified and type not in ["tower","workShelter","stockShelter","longShelter","sideShelter","sideStockShelter","kiln","forge","furnace","well","millstone","quarrySite","shaft","claySite","bridgeSpan"]:continue
   if type=="tower":
    for candidate in towers:
     if candidate.point.distance_to(Plan.point(item.point))<0.001:tower=candidate;break
@@ -115,7 +193,7 @@ func rebuild(design: Dictionary) -> void:
   plan.plot=null;plan.yard=null;plan.pier=null;plan.openSite=false;plan.upperLevel=true
   var upper_start:=get_child_count();add_floor_link(design,plan,geometry.floors,height+0.145)
   for index in range(upper_start,get_child_count()):get_child(index).set_meta("house_upper",true)
-  var second:Node3D=load("res://scripts/house_plan_model.gd").new();second.name="SecondStorey";second.set_meta("house_upper",true);second.rebuild(plan)
+  var second:Node3D=load("res://scripts/house_plan_model.gd").new();second.name="SecondStorey";second.set_meta("house_upper",true);second.simplified=simplified;second.settlement_detail=settlement_detail;second.rebuild(plan)
   second.position=Vector3((second.origin.x-origin.x)/Plan.PX_PER_M,height+0.145,(second.origin.y-origin.y)/Plan.PX_PER_M);add_child(second)
 
 # The web designer blends a packed-earth compound into the surrounding meadow.
@@ -136,7 +214,7 @@ func add_yard(boundary: Array,design: Dictionary,era: int) -> void:
   var polygon:=PackedVector2Array()
   for point in verts:polygon.append(Vector2(point.x,point.z))
   var triangles:=Geometry2D.triangulate_polygon(polygon);var paved:=SurfaceTool.new();paved.begin(Mesh.PRIMITIVE_TRIANGLES)
-  var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/proc-flags.webp");material.roughness=1;material.cull_mode=BaseMaterial3D.CULL_DISABLED;paved.set_material(material)
+  var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/proc-flags.webp");material.roughness=1;material.cull_mode=BaseMaterial3D.CULL_DISABLED;SurfaceDetail.apply(material,not Mobile.active);paved.set_material(material)
   for index in triangles:paved.set_uv(Vector2(verts[index].x,verts[index].z)*0.81);paved.add_vertex(verts[index])
   paved.generate_normals();var node:=MeshInstance3D.new();node.name="CourtyardPaving";node.mesh=paved.commit();add_child(node);return
  var rim:Array[Vector3]=[]
@@ -163,7 +241,7 @@ func add_yard(boundary: Array,design: Dictionary,era: int) -> void:
    else:indices.append_array(PackedInt32Array([j-cols,k-cols,j,k-cols,k,j]))
  var arrays:=[];arrays.resize(Mesh.ARRAY_MAX);arrays[Mesh.ARRAY_VERTEX]=points;var normals:=PackedVector3Array();normals.resize(points.size());normals.fill(Vector3.UP);arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=uvs;arrays[Mesh.ARRAY_COLOR]=colors;arrays[Mesh.ARRAY_INDEX]=indices
  var mesh:=ArrayMesh.new();mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
- var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/land-dirt.webp");material.vertex_color_use_as_albedo=true;material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED;material.cull_mode=BaseMaterial3D.CULL_DISABLED;material.roughness=0.98;mesh.surface_set_material(0,material)
+ var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/house_designer/land-dirt.webp");material.vertex_color_use_as_albedo=true;material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED;material.cull_mode=BaseMaterial3D.CULL_DISABLED;material.roughness=0.98;SurfaceDetail.apply(material,not Mobile.active);mesh.surface_set_material(0,material)
  var node:=MeshInstance3D.new();node.name="WeatheredYard";node.mesh=mesh;add_child(node)
 
 func classical_bounds(room: Dictionary,design: Dictionary) -> Dictionary:
@@ -259,16 +337,19 @@ func add_opening(frame: Dictionary,era: int,wall_height: float) -> void:
  if width<0.05:return
  var opening: Dictionary=frame.opening;var door: bool=opening.type=="door";var style:=str(opening.get("style",""));var bottom:=0.0;var top:=wall_height
  if door:
-  var doors:=[1.32,1.45,1.60];var curved:=[1.53,1.50,1.62];top=float(curved[era] if frame.get("curved",false) else doors[era])+(0.10 if style=="arched" else 0.08 if style=="double" else 0.0)
+  top=Plan.door_height(era,style)
  else:
-  var windows:=[Vector2(0.73,1.33),Vector2(0.86,1.30),Vector2(0.96,1.45)];var span:Vector2=windows[era]
+  var span:Vector2=WINDOWS[era]
   if style=="slit":span+=Vector2(-0.12,0.14)
   elif style=="hole":span+=Vector2(0.08,-0.08)
   bottom=span.x;top=span.y
  if top<=bottom:return
+ if settlement_detail or (early_round_hut and bool(frame.curved) and door):
+  add_settlement_opening(first,last,opening,era,bottom,top,bool(frame.curved))
+  return
  var radius:=0.049 if door else 0.032
- for endpoint in [first,last]:add_pole(endpoint+Vector3.UP*bottom,endpoint+Vector3.UP*top,radius,"wood")
- add_pole(first+Vector3.UP*top,last+Vector3.UP*top,radius,"wood")
+ for endpoint in [first,last]:add_pole(endpoint+Vector3.UP*bottom,endpoint+Vector3.UP*top,radius,frame_material)
+ add_pole(first+Vector3.UP*top,last+Vector3.UP*top,radius,frame_material)
  var axis: Vector3=(last-first).normalized();var side:=Vector3(-axis.z,0,axis.x);var leaf_height:=top-bottom-0.04
  if door:
   if style=="hide":add_pole(first+Vector3.UP*(top-0.09),last+Vector3.UP*(top-0.09),0.055,"hide");return
@@ -289,13 +370,92 @@ func add_opening(frame: Dictionary,era: int,wall_height: float) -> void:
  if style=="shutter":
   add_open_leaf(first,-axis,-side,width/2,bottom,top,0.45,false)
   add_open_leaf(last,axis,side,width/2,bottom,top,-0.45,false)
+ elif style=="glazed":
+  fence_box(first,last,bottom,top-bottom,0.018,"glass")
+  var center:=(first+last)/2
+  add_pole(center+Vector3.UP*bottom,center+Vector3.UP*top,0.018,frame_material)
+  var y:=(bottom+top)/2
+  add_pole(first+Vector3.UP*y,last+Vector3.UP*y,0.018,frame_material)
  elif style in ["lattice","archwin"]:
   for i in range(1,4):
    var point:=first.lerp(last,float(i)/4);add_pole(point+Vector3.UP*bottom,point+Vector3.UP*top,0.009,"wood")
    var y:=lerpf(bottom,top,float(i)/4);add_pole(first+Vector3.UP*y,last+Vector3.UP*y,0.009,"wood")
 
+func add_settlement_opening(a: Vector3,b: Vector3,opening: Dictionary,era: int,bottom: float,top: float,curved: bool) -> void:
+ var door:bool=opening.type=="door"
+ var axis:Vector3=(b-a).normalized()
+ var trim:=0.12 if door else 0.073
+ var face:=frame_material if era<2 or era>3 else "cutstone"
+ for jamb in [a,b]:
+  fence_box(jamb-axis*trim*0.5,jamb+axis*trim*0.5,bottom,top-bottom,trim*1.8,face)
+ fence_box(a-axis*trim,b+axis*trim,top-trim*0.26,trim,trim*2.0,face)
+ fence_box(a-axis*trim,b+axis*trim,bottom-trim*0.27,trim*0.55,trim*2.7,"stone" if door else face)
+ if door and curved and era==0 and roof_material in ["reed","thatch"]:
+  if early_round_hut:add_hut_entrance(a,b,top)
+  else:add_reed_door_hood(a,b,top)
+ if not door and str(opening.get("style","")) in ["glazed","lattice","archwin"]:
+  var middle:=(a+b)*0.5
+  fence_box(middle-axis*0.035,middle+axis*0.035,bottom,top-bottom,0.09,face)
+
+func add_hut_entrance(a: Vector3,b: Vector3,top: float) -> void:
+ var axis:Vector3=(b-a).normalized()
+ var center:Vector3=(a+b)*0.5
+ var front:=Vector3(-axis.z,0,axis.x)
+ if front.dot(center)<0.0:front=-front
+ var half_width:=a.distance_to(b)*0.5
+ var roof:=SurfaceTool.new()
+ roof.begin(Mesh.PRIMITIVE_TRIANGLES);roof.set_material(roof_surface_material())
+ var peak:=center-front*0.08+Vector3.UP*(top+0.46)
+ var tip:=center+front*0.64+Vector3.UP*(top+0.29)
+ for side:float in [-1.0,1.0]:
+  var eave:=center+axis*side*(half_width+0.26)+Vector3.UP*(top+0.02)
+  var lip:=eave+front*0.72+Vector3.DOWN*0.095
+  var points:=[peak,eave,tip,lip,lip+Vector3.DOWN*0.13,eave+Vector3.DOWN*0.095]
+  var uv:=[Vector2(0,1.15),Vector2(0.9,0.0),Vector2(0,0.96),Vector2(0.9,0.01),Vector2(0.91,-0.11),Vector2(0.91,-0.10)]
+  for index in [0,1,2,2,1,3,1,5,3,3,5,4]:
+   roof.set_uv(uv[index]);roof.add_vertex(points[index])
+  var post:Vector3=center+axis*side*(half_width+0.075)+front*0.42
+  add_pole(post-axis*side*0.045,post+Vector3.UP*(top-0.02)+axis*side*0.045,0.069,"wood")
+  add_pole(post+Vector3.UP*(top-0.28),eave+Vector3.UP*0.10,0.043,"wood")
+ roof.generate_normals()
+ var canopy:=MeshInstance3D.new();canopy.name="HutEntranceCanopy";canopy.mesh=roof.commit()
+ canopy.set_meta("house_roof",true);add_child(canopy)
+
+func add_reed_door_hood(a: Vector3,b: Vector3,top: float) -> void:
+ var axis: Vector3=(b-a).normalized()
+ var front:=Vector3(-axis.z,0,axis.x)
+ if front.dot((a+b)*0.5)<0.0:front=-front
+ var distance:=0.73
+ var back_left:=a-axis*0.24-front*0.10+Vector3.UP*(top+0.18)
+ var back_right:=b+axis*0.24-front*0.10+Vector3.UP*(top+0.18)
+ var lip_left:=a-axis*0.17+front*distance+Vector3.UP*(top-0.05)
+ var lip_right:=b+axis*0.17+front*distance+Vector3.UP*(top-0.05)
+ var surface:=SurfaceTool.new()
+ surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+ surface.set_material(roof_surface_material())
+ var pieces:=[back_left,back_right,lip_left,lip_right,lip_left-Vector3.UP*0.11,lip_right-Vector3.UP*0.11]
+ var uv:=[Vector2(0,0.9),Vector2(1.4,0.9),Vector2(0,0),Vector2(1.4,0),Vector2(0,0.12),Vector2(1.4,0.12)]
+ for index in [3,2,1,2,0,1,3,5,4,3,4,2]:
+  surface.set_uv(uv[index])
+  surface.add_vertex(pieces[index])
+ surface.generate_normals()
+ var canopy:=MeshInstance3D.new()
+ canopy.name="ReedDoorHood"
+ canopy.mesh=surface.commit()
+ add_child(canopy)
+ for end in [a,b]:
+  var foot: Vector3=end+front*(distance-0.10)
+  add_pole(foot,foot+Vector3.UP*(top-0.04),0.057,"wood")
+  add_pole(foot+Vector3.UP*(top-0.32),end+front*0.20+Vector3.UP*(top+0.01),0.04,"wood")
+
 func add_open_leaf(hinge: Vector3,axis: Vector3,side: Vector3,width: float,bottom: float,top: float,angle: float,door: bool) -> void:
  var direction: Vector3=axis*cos(angle)+side*sin(angle);var end: Vector3=hinge+direction*width;var height:=top-bottom-0.04
+ if frame_material=="industrialIron":
+  fence_box(hinge,end,bottom+0.02,height,0.042,frame_material)
+  if door:
+   var handle:=hinge.lerp(end,0.86)
+   add_pole(handle+Vector3.UP*1.015,handle+Vector3.UP*1.145,0.023,frame_material)
+  return
  var boards:=maxi(2,roundi(width/0.11))
  for i in boards:
   var a:=hinge.lerp(end,float(i)/boards);var b:=hinge.lerp(end,float(i+1)/boards);fence_box(a,b,bottom+0.02,height,0.035,"wood")
@@ -513,7 +673,7 @@ func add_floor(poly: PackedVector2Array,height:=0.008,gallery:=false) -> void:
  if poly.size()<3:return
  var triangles:=Geometry2D.triangulate_polygon(poly)
  if triangles.is_empty():return
- var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("floor"))
+ var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for(floor_material))
  for i in triangles:
   var p:=poly[i];surface.set_normal(Vector3.UP);surface.set_uv(p/Plan.PX_PER_M*0.54);surface.add_vertex(local(p,height))
  var node:=MeshInstance3D.new();node.name="HouseFloor";node.mesh=surface.commit();node.set_meta("upper_gallery",gallery);add_child(node)
@@ -523,24 +683,68 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var a:=local(span.a);var b:=local(span.b);var delta:=b-a
  if delta.length()<0.016:return
  var style:=str(span.finish);var width:=0.19 if span.group=="outer" else 0.115
- var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,width*0.37 if style in ["wood","stave","bamboo","weave"] else width)
- var node:=MeshInstance3D.new();node.name="HouseWall";node.mesh=mesh;node.material_override=material_for(str(span.finish));node.position=(a+b)/2+Vector3(0,(low+high)/2,0);node.rotation.y=-atan2(delta.z,delta.x);add_child(node)
+ var round_exterior:bool=early_round_hut and span.group=="outer" and span.has("curve_center")
+ var daub:bool=round_exterior and style=="weave"
+ var depth:=width*0.37 if style in ["wood","stave","bamboo","weave"] and not daub else width
+ var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,depth)
+ var wall_material:Material=hut_daub_material() if daub else material_for(style)
+ var arrays:=mesh.get_mesh_arrays()
+ var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+ var normals:PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
+ var uv:PackedVector2Array=arrays[Mesh.ARRAY_TEX_UV]
+ var axis:=Vector2(delta.x,delta.z).normalized()
+ var align:=Vector2(a.x,a.z).dot(axis)+delta.length()/2
+ var uv_scale:=0.64
+ if span.has("curve_center"):
+  var radius:=float(span.curve_radius)/Plan.PX_PER_M
+  var perimeter:=TAU*radius
+  uv_scale=maxf(1.0,roundf(perimeter*uv_scale))/perimeter
+  var radial:Vector2=(span.a+span.b)/2-span.curve_center
+  align=fposmod(radial.angle(),TAU)*radius
+  var side:=Vector2(-axis.y,axis.x)
+  for i in vertices.size():
+   var p:=vertices[i];var rim:Vector2=span.a if p.x<0 else span.b
+   var direction:Vector2=(rim-span.curve_center).normalized()
+   var displacement:=direction*p.z*signf(direction.dot(side))
+   vertices[i]=Vector3(p.x+displacement.dot(axis),p.y,displacement.dot(side))
+   if absf(normals[i].z)>0.5:
+    var sign_:=signf(normals[i].z)*signf(direction.dot(side))
+    normals[i]=Vector3(direction.dot(axis)*sign_,0,direction.dot(side)*sign_)
+ arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_NORMAL]=normals
+ for i in vertices.size():
+  var p:=vertices[i]
+  if absf(normals[i].y)>0.5:uv[i]=Vector2(p.x+align,p.z)*uv_scale
+  elif absf(normals[i].x)>0.5:uv[i]=Vector2(p.z,(low+high)/2-p.y)*uv_scale
+  else:uv[i]=Vector2(p.x+align,(low+high)/2-p.y)*uv_scale
+ arrays[Mesh.ARRAY_TEX_UV]=uv
+ var source_mesh:=ArrayMesh.new();source_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+ var surface:=SurfaceTool.new();surface.create_from(source_mesh,0);surface.generate_tangents()
+ var wall_mesh:=surface.commit()
+ var node:=MeshInstance3D.new();node.name="HouseWall";node.mesh=wall_mesh;node.material_override=wall_material;node.position=(a+b)/2+Vector3(0,(low+high)/2,0);node.rotation.y=-atan2(delta.z,delta.x);add_child(node)
+ if round_exterior and low<=0.0:
+  add_hut_footing(a,b)
+ elif settlement_detail and span.group=="outer" and low<=0.0:
+  var footing:=0.16 if style in ["stone","cutstone","limestone","medievalRubble"] else 0.11
+  fence_box(a,b,low-0.065,footing,width*1.42,"stone" if style in ["wood","stave","weave","bamboo"] else style)
+ if daub:return
+ if simplified and style!="halftimber" and not (settlement_detail and style in ["wood","stave"]):return
  if style=="wood":
-  var rows:=maxi(1,roundi((high-low)/0.19));var row_height:float=(high-low)/rows
+  var rows:=maxi(1,roundi((high-low)/(0.28 if settlement_detail else 0.19)));var row_height:float=(high-low)/rows
   for i in rows:
    var y:=low+(i+0.5)*row_height
    add_pole(a+Vector3.UP*y,b+Vector3.UP*y,row_height*0.53,"wood")
    get_child(get_child_count()-1).name="HouseWallLog"
  elif style in ["stave","bamboo"]:
-  var count:=maxi(1,roundi(delta.length()/(0.061 if style=="bamboo" else 0.2)))
+  var count:=maxi(1,roundi(delta.length()/(0.30 if settlement_detail else 0.061 if style=="bamboo" else 0.2)))
   var radius:float=delta.length()/count*0.49
   for i in count:
    var p:=a.lerp(b,(i+0.5)/count)
    add_pole(p+Vector3.UP*low,p+Vector3.UP*high,radius,"bamboo" if style=="bamboo" else "wood")
    get_child(get_child_count()-1).name="HouseWallStave"
- elif style=="weave":add_woven_wall(a,b,low,high,width)
+ elif style=="weave":
+  add_woven_wall(a,b,maxf(0.11,low) if early_round_hut and span.group=="outer" else low,high,width)
  elif style=="halftimber":
-  var side:=Vector3(-delta.z,0,delta.x).normalized();var posts:=maxi(1,roundi(delta.length()))
+  var side:=Vector3(-delta.z,0,delta.x).normalized();var posts:=maxi(1,roundi(delta.length()/(2.1 if simplified else 1.0)))
   for sign_ in [-1.0,1.0]:
    var offset:Vector3=side*sign_*(width/2+0.012)
    for y in [low+0.03,high-0.03]:add_wall_brace(a+offset+Vector3.UP*y,b+offset+Vector3.UP*y,0.035)
@@ -551,6 +755,21 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
      var q:=a.lerp(b,float(i+1)/posts)+offset
      add_wall_brace((p if i%2==1 else q)+Vector3.UP*(low+0.05),(q if i%2==1 else p)+Vector3.UP*(high-0.05),0.028)
 
+func add_hut_footing(a: Vector3,b: Vector3) -> void:
+ if simplified and not settlement_detail:return
+ var axis:=b-a
+ var seed:=roundi((a.x+3.1*a.z)*911.0)
+ var shape:=SphereMesh.new()
+ shape.radial_segments=7;shape.rings=3
+ shape.radius=0.5;shape.height=1.0
+ var stone:=MeshInstance3D.new()
+ stone.name="HutFieldstone"
+ stone.mesh=shape;stone.material_override=material_for("hutStone")
+ stone.position=a.lerp(b,0.41+0.19*fence_noise(seed))+Vector3.UP*(0.015+0.035*fence_noise(seed+11))
+ stone.scale=Vector3(axis.length()*(1.10+0.34*fence_noise(seed+15)),0.18+0.16*fence_noise(seed+18),0.27+0.09*fence_noise(seed+12))
+ stone.rotation=Vector3((fence_noise(seed+23)-0.5)*0.31,-atan2(axis.z,axis.x),(fence_noise(seed+47)-0.5)*0.29)
+ add_child(stone)
+
 func add_wall_brace(a: Vector3,b: Vector3,radius: float) -> void:
  if a.distance_to(b)<0.001:return
  add_pole(a,b,radius,"wood");get_child(get_child_count()-1).name="HouseWallBrace"
@@ -559,8 +778,9 @@ func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float) -
  var length:=a.distance_to(b)
  if length<0.08 or high-low<0.09:return
  var axis:Vector3=(b-a).normalized();var side:=Vector3(-axis.z,0,axis.x)
- var bays:=maxi(1,roundi(length/0.22));var courses:=maxi(1,roundi((high-low)/0.052));var segments:=bays*8;var sides:=7
- var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("wood"))
+ var bays:=maxi(1,roundi(length/0.25));var courses:=maxi(1,roundi((high-low)/0.065))
+ var segments:=bays*5;var sides:=5
+ var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("stave"))
  for course in courses:
   var y:=low+(course+0.5)*(high-low)/courses;var radius:=0.016+fence_noise(course*47+2)*0.008
   var sample=func(step: int,ring: int) -> Vector3:
@@ -610,7 +830,11 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
     roof_end(sample,along_t,inset,0.88+lift)
  elif room.type=="round":
   var outline:=Plan.room_polygon(room);var center:=Plan.point(room.a);var radius:float=float(room.r)/Plan.PX_PER_M
-  var peak:=1.75+(maxf(2.70,2.15+radius*0.92)-1.75)*rise;var seat:=0.27
+  if early_round_hut:
+   add_round_thatch(outline,center,radius,rise,lift)
+   return
+  var peak:=1.75+(maxf(2.70,2.15+radius*0.92)-1.75)*rise
+  var seat:=0.27
   var sample=func(s: float,t: float) -> Vector3:
    t=minf(t,0.992);var index:float=s*outline.size();var k:=floori(index);var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k);var clear:=0.0
    if lift<=0:
@@ -621,10 +845,45 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
    var eave:=0.8 if lift>0 else 0.62+clear*0.95;var seat_height:=1.05+clear*0.66
    var fullness:float=1+(1-t/seat)*maxf(0.15,0.32/maxf(0.40,radius)) if t<=seat else 1-(t-seat)/(1-seat)
    var p:Vector2=center.lerp(rim,fullness)
-   var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),0.90)
+   var curve:=0.71 if settlement_detail else 0.90
+   var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),curve)
    return local(p,y+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
   roof_grid(sample,maxi(outline.size()*3,72),38)
   roof_courses(sample,maxi(outline.size()*3,72),clampi(roundi(radius*3.2),6,11),true)
+
+func add_round_thatch(outline: PackedVector2Array,center: Vector2,radius: float,rise: float,lift: float) -> void:
+ var ridge:=center+Vector2(-0.12,0.09)*Plan.PX_PER_M
+ var eave:=lift+0.89
+ var height:=(1.38+0.27*radius)*clampf(rise,0.22,1.85)
+ var sample:=func(s: float,t: float) -> Vector3:
+  var around:=s*TAU
+  var index:=s*outline.size();var k:=floori(index)
+  var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k)
+  var overhang:=0.43+0.050*sin(around*3.0)+0.035*cos(around*7.0)
+  var edge:=rim+(rim-center).normalized()*overhang*Plan.PX_PER_M
+  var radius_curve:=1.0-t+sin(t*PI)*0.085
+  var p:=ridge.lerp(edge,radius_curve)
+  var wobble:=0.027*sin(around*7.0)+0.017*sin(around*15.0+1.7)
+  var y:=eave+height*(t+0.15*sin(t*PI))+wobble*pow(1.0-t,1.9)
+  return local(p,y)
+ var columns:=outline.size()*3
+ roof_grid(sample,columns,25)
+ if simplified and not settlement_detail:return
+ var edge:=SurfaceTool.new()
+ edge.begin(Mesh.PRIMITIVE_TRIANGLES);edge.set_material(roof_surface_material())
+ var steps:=columns if not settlement_detail else 32
+ for i in steps:
+  var u:=float(i)/steps;var v:=float(i+1)/steps
+  var top_a:Vector3=sample.call(u,0.0);var top_b:Vector3=sample.call(v,0.0)
+  var bottom_a:Vector3=top_a.lerp(local(center,top_a.y),0.055)-Vector3.UP*(0.118+0.031*fence_noise(i))
+  var bottom_b:Vector3=top_b.lerp(local(center,top_b.y),0.055)-Vector3.UP*(0.118+0.031*fence_noise((i+1)%steps))
+  var vertices:=[top_a,top_b,bottom_a,bottom_b]
+  var uv:=[Vector2(u*3.8,0.0),Vector2(v*3.8,0.0),Vector2(u*3.8,-0.12),Vector2(v*3.8,-0.12)]
+  for index in [0,2,1,1,2,3]:
+   edge.set_uv(uv[index]);edge.add_vertex(vertices[index])
+ edge.generate_normals()
+ var mesh:=MeshInstance3D.new();mesh.name="ThatchEave";mesh.mesh=edge.commit();add_child(mesh)
+ if not settlement_detail:add_reed_fringe(sample,columns,1)
 
 func add_terrace_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
  var floor:=Plan.room_polygon(room)
@@ -688,6 +947,12 @@ func add_classical_roof(room: Dictionary,design: Dictionary,lift: float,form: St
   surface.generate_normals();var node:=MeshInstance3D.new();node.name="RoofDeckPediment";node.mesh=surface.commit();add_child(node)
 
 func roof_grid(sample: Callable,columns: int,rows: int) -> void:
+ if settlement_detail:
+  columns=clampi(columns/3,9,30)
+  rows=clampi(rows/4,6,14)
+ elif simplified:
+  columns=mini(columns,maxi(1,columns/6))
+  rows=mini(rows,maxi(1,rows/8))
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
  for row in rows:
   for col in columns:
@@ -700,22 +965,28 @@ func roof_grid(sample: Callable,columns: int,rows: int) -> void:
 
 # Each overlapping course is raised at its lower edge, as in the web roof.
 func roof_courses(sample: Callable,columns: int,count: int,perimeter: bool) -> void:
- if roof_material not in ["reed","thatch"]:return
+ if (simplified and not settlement_detail) or roof_material not in ["reed","thatch"]:return
+ var rows:=3
+ if settlement_detail:
+  # A few thick laps keep the roof profile readable from above.
+  columns=clampi(columns/3,10,26)
+  count=clampi(count/2,3,5)
+  rows=2
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
  for layer in count:
-  for row in 3:
+  for row in rows:
    for col in columns:
     var points:Array=[];var uvs:Array=[]
     for corner in [Vector2i(0,0),Vector2i(1,0),Vector2i(0,1),Vector2i(1,1)]:
-     var i:int=col+corner.x;var along:=float(row+corner.y)/3.0
+     var i:int=col+corner.x;var along:=float(row+corner.y)/rows
      var index:int=i%columns if perimeter else i
      var point:Vector3=sample.call(float(index)/columns,(layer+along*1.07)/count)
-     point.y+=(1.0-along)*(0.057+(fence_noise(index+layer*383)-0.5)*0.102)
+     point.y+=(1.0-along)*((0.137 if settlement_detail else 0.057)+(fence_noise(index+layer*383)-0.5)*0.102)
      points.append(point);uvs.append(Vector2(float(i)/columns*(5.2 if perimeter else 2.6),along*0.26+layer*0.231))
     emit_roof_triangle(surface,[points[3],points[2],points[1]],[uvs[3],uvs[2],uvs[1]])
     emit_roof_triangle(surface,[points[2],points[0],points[1]],[uvs[2],uvs[0],uvs[1]])
  surface.generate_normals();var node:=MeshInstance3D.new();node.name="OverlappingReedCourses";node.mesh=surface.commit();add_child(node)
- add_reed_fringe(sample,columns,count)
+ if not settlement_detail:add_reed_fringe(sample,columns,count)
 
 func add_reed_fringe(sample: Callable,columns: int,count: int) -> void:
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -772,15 +1043,43 @@ func split_roof_polygon(polygon: Array,axis: int,limit: float,sign_: float) -> A
  return [inside,outside]
 
 static func from_design(design: Dictionary) -> Node3D:
- var key:=JSON.stringify(design)
+ var id:=str(design.get("id",""))
+ var key:=id if is_same(design,HouseEras.default_plan(id)) else JSON.stringify(design)
  if model_cache.has(key):
   cache_order.erase(key);cache_order.append(key)
   return model_cache[key].duplicate()
- var source:Node3D=load("res://scripts/house_plan_model.gd").new();source.rebuild(design)
+ var source:Node3D=load("res://scripts/house_plan_model.gd").new();source.rebuild(design);source.combine_static_meshes()
  model_cache[key]=source;cache_order.append(key)
  while cache_order.size()>24:
   var oldest:String=cache_order.pop_front();model_cache[oldest].free();model_cache.erase(oldest)
  return source.duplicate()
+
+# Combine static pieces per material for in-game copies. The editor keeps
+# individual pieces so it can hide roofs, storeys and furnishings.
+func combine_static_meshes() -> void:
+ var groups:Dictionary={}
+ for child in get_children():
+  if not child is MeshInstance3D or child.mesh==null or child.mesh.get_surface_count()!=1:continue
+  if child.name in ["WeatheredYard","CourtyardPaving","FieldPlants","FieldEars"]:continue
+  var material:Material=child.get_active_material(0)
+  if material==null:continue
+  var arrays:Array=child.mesh.surface_get_arrays(0)
+  var format:=0
+  for i in arrays.size():
+   if arrays[i]!=null:format|=1<<i
+  var group:="%d:%d:%d" % [material.get_instance_id(),format,int(child.cast_shadow)]
+  if not groups.has(group):
+   var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material)
+   groups[group]={"mesh":surface,"nodes":[]}
+  groups[group].nodes.append(child)
+ for entry in groups.values():
+  if entry.nodes.size()<2:continue
+  var surface:SurfaceTool=entry.mesh
+  for child in entry.nodes:surface.append_from(child.mesh,0,child.transform)
+  var instance:=MeshInstance3D.new();instance.name="HouseShell";instance.mesh=surface.commit()
+  instance.cast_shadow=entry.nodes[0].cast_shadow
+  add_child(instance)
+  for child in entry.nodes:child.free()
 
 static func clear_cache() -> void:
  for model in model_cache.values():
@@ -789,8 +1088,9 @@ static func clear_cache() -> void:
 
 func roof_end(sample: Callable,along: float,inset: float,base: float) -> void:
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(roof_surface_material())
- for i in 24:
-  var t0:=lerpf(inset,1.0,float(i)/24);var t1:=lerpf(inset,1.0,float(i+1)/24)
+ var steps:=4 if simplified else 24
+ for i in steps:
+  var t0:=lerpf(inset,1.0,float(i)/steps);var t1:=lerpf(inset,1.0,float(i+1)/steps)
   var a:Vector3=sample.call(along,t0);var b:Vector3=sample.call(along,t1);var c:=Vector3(a.x,minf(a.y,base),a.z);var d:=Vector3(b.x,minf(b.y,base),b.z)
   var quad:=[a,b,c,d];var uv:=[Vector2(t0,a.y),Vector2(t1,b.y),Vector2(t0,c.y),Vector2(t1,d.y)]
   for idx in [0,1,2,1,3,2]:surface.set_uv(uv[idx]);surface.add_vertex(quad[idx])
@@ -823,7 +1123,11 @@ func add_floor_link(ground: Dictionary,upper: Dictionary,under: Array,y: float) 
  for gallery in upper.get("gallery",[]):
   var floor:=Plan.room_polygon({"type":"rect","a":gallery.a,"b":gallery.b});solid.append(floor);add_floor(floor,y,true)
  if solid.is_empty():return
- var posts:Dictionary={};var stone:bool=ground.get("courtyardStyle",false) or ground.get("bronzePrestige",false)
+ var posts:Dictionary={}
+ var age:=int(HouseEras.definition(str(ground.get("id",""))).get("era",0))
+ var stone:bool=age==4 or age>=6 or ground.get("courtyardStyle",false) or ground.get("bronzePrestige",false)
+ var tread_style: String=["wood","wood","cutstone","wood","renaissanceAshlar","industrialIron","modernConcrete"][age]
+ var support_style:=tread_style if age>=3 else ("cutstone" if stone else "wood")
  for floor in solid:
   for p in floor:
    var supported:=false
@@ -832,7 +1136,7 @@ func add_floor_link(ground: Dictionary,upper: Dictionary,under: Array,y: float) 
    if supported:continue
    var key:="%s:%s" % [p.x,p.y]
    if posts.has(key):continue
-   posts[key]=true;add_column(local(p),y-0.13,0.095,"cutstone" if stone else "wood")
+   posts[key]=true;add_column(local(p),y-0.13,0.095,support_style)
  var front:Dictionary={};var best:=-INF
  for floor in solid:
   for edge in Plan.edges(floor):
@@ -854,10 +1158,10 @@ func add_floor_link(ground: Dictionary,upper: Dictionary,under: Array,y: float) 
  axis/=length;var risers:=maxi(5,ceili(y/0.18));var tread:=length/risers;var step:=y/risers
  for i in risers:
   var height:float=(i+1)*step;var depth:float=height if stone else minf(0.12,step);var at:=from+axis*((i+0.5)*tread);at.y=height-depth/2
-  var block:=BoxMesh.new();block.size=Vector3(0.70,depth,tread+0.024);var node:=MeshInstance3D.new();node.name="SecondFloorStair";node.mesh=block;node.material_override=material_for("cutstone" if stone else "wood");node.position=at;node.rotation.y=atan2(axis.x,axis.z);add_child(node)
+  var block:=BoxMesh.new();block.size=Vector3(0.70,depth,tread+0.024);var node:=MeshInstance3D.new();node.name="SecondFloorStair";node.mesh=block;node.material_override=material_for(support_style);node.position=at;node.rotation.y=atan2(axis.x,axis.z);add_child(node)
  var side:=Vector3(axis.z,0,-axis.x);var rail_from:=from+side*0.33;var rail_to:=to+side*0.33
- for t in [0.0,0.33,0.66,1.0]:add_column(rail_from.lerp(rail_to,t),0.67,0.033,"wood")
- add_pole(rail_from+Vector3.UP*0.67,rail_to+Vector3.UP*0.67,0.041,"wood")
+ for t in [0.0,0.33,0.66,1.0]:add_column(rail_from.lerp(rail_to,t),0.67,0.033,frame_material)
+ add_pole(rail_from+Vector3.UP*0.67,rail_to+Vector3.UP*0.67,0.041,frame_material)
 
 func add_column(base: Vector3,height: float,radius: float,style: String) -> void:
  if height<=0:return
@@ -866,7 +1170,8 @@ func add_column(base: Vector3,height: float,radius: float,style: String) -> void
 func add_pole(a: Vector3,b: Vector3,radius: float,style: String) -> void:
  var direction:=b-a;var length:=direction.length()
  if length<0.001:return
- var mesh:=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=length;mesh.radial_segments=8
+ var mesh:=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=length;mesh.radial_segments=4 if simplified else 8
+ if simplified:mesh.rings=0
  var node:=MeshInstance3D.new();node.name="SecondFloorSupport";node.mesh=mesh;node.material_override=material_for(style);node.position=(a+b)/2;node.quaternion=Quaternion(Vector3.UP,direction.normalized());add_child(node)
 
 

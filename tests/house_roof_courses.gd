@@ -6,9 +6,10 @@ func _initialize() -> void:
  var model=Model.new();root.add_child(model)
  var design:Dictionary=Defaults.data.house.duplicate(true);design.roofMat="reed"
  model.rebuild(design)
- var course=model.find_child("OverlappingReedCourses",true,false)
- assert(course is MeshInstance3D and course.mesh.get_surface_count()>0,"Reed roof must have overlapping courses")
- assert(course.mesh.surface_get_material(0) is ShaderMaterial,"Reed courses must use the varied reed material")
+ var eave=model.find_child("ThatchEave",true,false)
+ assert(eave is MeshInstance3D and eave.mesh.get_surface_count()>0,"Round thatch needs a thick, irregular eave")
+ assert(eave.mesh.surface_get_material(0) is ShaderMaterial,"The round eave should share the thatch material")
+ assert(model.find_child("OverlappingReedCourses",true,false)==null,"Round thatch should have one continuous surface")
  assert(model.find_child("ReedEaveFringe",true,false) is MeshInstance3D,"Reed roof must include cut eave strands")
  var fires: Array=design.items.filter(func(item):return item.type=="fire")
  assert(not fires.is_empty(),"Fixture must contain a hearth")

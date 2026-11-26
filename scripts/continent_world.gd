@@ -1,7 +1,9 @@
 extends "res://scripts/legacy_world.gd"
 var random_state:int
-func _init(value:int)->void:
+var archipelago: bool
+func _init(value:int,use_islands:=false)->void:
  super(value);random_state=(value ^ 0x9e3779b9) & 0xffffffff
+ archipelago=use_islands
 func random_value()->float:
  random_state=(random_state*1664525+1013904223)&0xffffffff
  return float(random_state)/4294967296.0
@@ -15,16 +17,18 @@ static func signed_distance(u:float,v:float,poly:Array)->float:
  return minimum if inside else -minimum
 func layout()->Dictionary:
  var count:=2+floori(random_value()*3);var rotation:=random_value()*TAU;var centers:=[];var polygons:=[]
+ if archipelago:count+=4
  for i in count:
-  var angle:=rotation+i*TAU/count;var x:=0.5+cos(angle)*(0.25 if count==2 else 0.28);var y:=0.5+sin(angle)*0.23;centers.append({"x":x,"y":y})
-  var rx:=0.18 if count==2 else 0.145;var ry:=0.24 if count==2 else 0.175
+  var angle:=rotation+i*TAU/count;var x:=0.5+cos(angle)*(0.33 if archipelago else 0.25 if count==2 else 0.28);var y:=0.5+sin(angle)*(0.31 if archipelago else 0.23);centers.append({"x":x,"y":y})
+  var rx:=0.087 if archipelago else 0.18 if count==2 else 0.145;var ry:=0.102 if archipelago else 0.24 if count==2 else 0.175
   var p1:=random_value()*6.28;var p2:=random_value()*6.28;var p3:=random_value()*6.28;var stretch:=0.88+random_value()*0.22;var poly:=[]
-  for j in 40:
-   var a:=j*TAU/40;var shape:=1+0.16*sin(a*3+p1)+0.10*cos(a*5+p2)+0.06*sin(a*7+p3)
+  var points:=24 if archipelago else 40
+  for j in points:
+   var a:=j*TAU/points;var shape:=1+0.16*sin(a*3+p1)+0.10*cos(a*5+p2)+0.06*sin(a*7+p3)
    poly.append([clampf(x+cos(a)*rx*shape*stretch,0.045,0.955),clampf(y+sin(a)*ry*shape/stretch,0.045,0.955)])
   polygons.append(poly)
  var bridges:=0
- for i in (1 if count==2 else count-1):
+ for i in (0 if archipelago else 1 if count==2 else count-1):
   if bridges>=(1 if count==2 else count-2):break
   if random_value()>0.45:continue
   var a:Dictionary=centers[i];var b:Dictionary=centers[(i+1)%count];var dx:float=b.x-a.x;var dy:float=b.y-a.y;var length:=sqrt(dx*dx+dy*dy);var nx:float=-dy/length;var ny:float=dx/length
@@ -32,7 +36,7 @@ func layout()->Dictionary:
   polygons.append([[a.x+nx*width,a.y+ny*width],[mx+nx*width,my+ny*width],[b.x+nx*width,b.y+ny*width],[b.x-nx*width,b.y-ny*width],[mx-nx*width,my-ny*width],[a.x-nx*width,a.y-ny*width]]);bridges+=1
  var islands:=[]
  for attempt in 300:
-  if islands.size()>=16:break
+  if islands.size()>=(19 if archipelago else 16):break
   var x:=0.06+random_value()*0.88;var y:=0.07+random_value()*0.86;var reject:=false
   for poly in polygons:
    if signed_distance(x,y,poly)>-0.027:reject=true;break
@@ -91,4 +95,4 @@ func generate()->Dictionary:
    var i:=r*Grid.COLS+c;heights[i]=continent_height(data,c,r);lat[i]=absf((r+0.5)/Grid.ROWS-0.5)*2
    heat[i]=clampf(1-float(lat[i])*0.92+(Geography.noise(c+417,r+73,seed)-0.5)*0.18,0,1)
    moisture[i]=clampf(smooth(c/13.0+17,r/13.0+71)*0.6+smooth(c/41.0+53,r/41.0+11)*0.4,0,1)
- return {"seed":seed,"heights":heights,"lat":lat,"heat":heat,"moisture":moisture,"starts":data.starts,"world_type":"continents","layout":data}
+ return {"seed":seed,"heights":heights,"lat":lat,"heat":heat,"moisture":moisture,"starts":data.starts,"world_type":"archipelago" if archipelago else "continents","layout":data}

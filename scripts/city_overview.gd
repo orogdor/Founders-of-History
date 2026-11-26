@@ -4,6 +4,7 @@ const Economy=preload("res://scripts/economy_rules.gd")
 const Needs=preload("res://scripts/city_needs.gd")
 const Territory=preload("res://scripts/city_territory.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
+const Setup=preload("res://scripts/world_setup.gd")
 var host: Node
 var scroll: ScrollContainer
 var grid: GridContainer
@@ -26,13 +27,13 @@ func _ready() -> void:
  detail_toggle=Button.new();detail_toggle.text="▸ Linna üksikasjad";detail_toggle.alignment=HORIZONTAL_ALIGNMENT_LEFT;detail_toggle.pressed.connect(toggle_details);body.add_child(detail_toggle)
  details=RichTextLabel.new();details.fit_content=true;details.visible=false;details.scroll_active=false;details.add_theme_color_override("default_color",Color("e6d4aa"));body.add_child(details)
  var row:=HBoxContainer.new();row.add_theme_constant_override("separation",6);body.add_child(row)
- for item in [["Ehita",func():hide();host.game_hud.dock_menu.open_menu("build")],["Varud",func():hide();host.show_resource_details()],["Töölised",func():hide();host.show_basic_labor()],["Värbamine",func():hide();host.show_training()]]:
+ for item in [["Ehita",func():hide();host.game_hud.dock_menu.open_menu("build")],["Majandus",func():hide();host.show_resource_details()],["Töölised",func():hide();host.show_basic_labor()],["Värbamine",func():hide();host.show_training()]]:
   var button:=Button.new();button.text=item[0];button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;button.pressed.connect(item[1]);row.add_child(button)
  var trade_row:=HBoxContainer.new();trade_row.add_theme_constant_override("separation",6);body.add_child(trade_row)
  trade_button=Button.new();trade_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;trade_button.pressed.connect(toggle_city_trade);trade_row.add_child(trade_button)
  var recruit:=Button.new();recruit.text="Värba asunik";recruit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;recruit.pressed.connect(func():hide();host.recruit_new_settler());trade_row.add_child(recruit)
- var foreign:=HBoxContainer.new();foreign.add_theme_constant_override("separation",6);body.add_child(foreign)
- for team in [1,2,3]:
+ var foreign:=GridContainer.new();foreign.columns=3;foreign.add_theme_constant_override("h_separation",6);foreign.add_theme_constant_override("v_separation",6);body.add_child(foreign)
+ for team in range(1,Setup.MAX_OPPONENTS+1):
   var button:=Button.new();button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;button.pressed.connect(toggle_foreign_merchant.bind(team));foreign.add_child(button);merchant_buttons.append(button)
 
 func make_card(key: String,icon: String,label: String) -> void:
@@ -57,7 +58,7 @@ func set_card(key: String,value: String,sub: String,ratio: float=-1,warn:=false)
 func open_screen() -> void:
  if not host.city_created:return
  var viewport_size:=get_viewport().get_visible_rect().size
- scroll.custom_minimum_size=Vector2(maxf(200,minf(540,viewport_size.x-90)),maxf(160,minf(410,viewport_size.y-120)))
+ scroll.custom_minimum_size=Vector2(maxf(200,minf(540,viewport_size.x-90)),maxf(100,minf(379,viewport_size.y-150)))
  grid.columns=2 if viewport_size.x<500 else 3
  refresh();popup_centered();host.fit_game_dialog(self,Vector2i(600,500))
 
@@ -91,7 +92,8 @@ func refresh() -> void:
  trade_button.text="Kaubavedu: "+("peatatud" if city.get("tradeDisabled",false) else "lubatud")
  for i in merchant_buttons.size():
   var team:=i+1;var blocked: bool=city.get("blockedMerchants",{}).get(str(team),false)
-  merchant_buttons[i].text=["Soome","Rootsi","Norra"][i]+": "+("ei" if blocked else "jah")
+  merchant_buttons[i].visible=team<=Setup.opponent_count(host.game)
+  merchant_buttons[i].text=Setup.faction_name(team)+": "+("ei" if blocked else "jah")
  var buildings: Array=city.economy.buildings;var pop:=float(realm.pop);var capacity:=Economy.housing_capacity(buildings);var food:=Needs.food_total(stock);var water:=float(stock.get("water",0))
  var food_need:=pop*0.6;var water_need:=pop*0.45;var growth:=float(realm.get("growthProgress",0))/maxf(1,float(realm.get("growthNeed",4)))
  var needs:=Needs.calculate(city,int(host.game.ages[city.team]));var employed:=float(realm.get("employed",0));var incoming:=0;var outgoing:=0

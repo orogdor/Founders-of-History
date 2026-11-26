@@ -162,6 +162,17 @@ static func color_heights(cells: Array,heights: PackedFloat32Array,c: int,r: int
 			var color_height: float=(elevation-0.7)*0.3
 			var wobble: float=(Terrain.seeded_smooth(x/9.0+41.3,z/9.0+7.9,seed)-0.5)*0.45
 			var geometry_height:=color_height+maxf(0.0,elevation-10.0)*0.9*Visual.mountain_mask(cells,x,z,seed) if elevation>10.0 else color_height
+			# Continuous atlas coordinates keep the relief identical at tile edges.
+			# Fade it out near water and river banks so crossings retain their shape.
+			var dry:=smoothstep(0.85,2.7,color_height)
+			var river_clearance:=1.0
+			if not near.is_empty():river_clearance=smoothstep(float(near.width)*2.1+4.0,float(near.width)*2.1+16.0,float(near.distance))
+			var broad:=Terrain.seeded_smooth(x/31.0+37.2,z/31.0+15.9,seed)
+			var rolling:=Terrain.seeded_smooth(x/13.0+19.3,z/13.0+83.1,seed)
+			var fine:=Terrain.seeded_smooth(x/6.0+72.4,z/6.0+29.8,seed)
+			var relief:=(broad-0.5)*8.2+(rolling-0.5)*2.65+(fine-0.5)*0.55
+			relief=maxf(relief,0.35-color_height)
+			geometry_height+=relief*dry*river_clearance
 			var sea_height:=color_height
 			if not river_segments.is_empty() or not mouths.is_empty():sea_height=(shore-0.7)*0.3
 			values[j*17+i]=Vector4(color_height,wobble,geometry_height,sea_height)

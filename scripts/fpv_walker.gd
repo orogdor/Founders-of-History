@@ -1,5 +1,8 @@
 extends Node
 
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+
+const Mobile = preload("res://scripts/mobile_profile.gd")
 const Human=preload("res://assets/people/human_far.glb")
 const Motion=preload("res://scripts/human_motion.gd")
 const Navigation=preload("res://scripts/local_navigation.gd")
@@ -7,11 +10,12 @@ const Grid=preload("res://scripts/campaign_grid.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const HouseCollision=preload("res://scripts/house_collision.gd")
 const Production=preload("res://scripts/production_bonuses.gd")
+const SKY_SHADER=preload("res://scripts/walking_sky.gdshader")
+const BuildLabel=preload("res://scripts/build_label.gd")
 var host: Node
 var active:=false
 var placing:=false
 var placed:=false
-var switching:=false
 var tile:=Vector2i.ZERO
 var pos:=Vector3.ZERO
 var velocity:=Vector3.ZERO
@@ -25,9 +29,12 @@ var model: Node3D
 var motion:=Motion.new()
 var overlay: CanvasLayer
 var bar: Control
-var hint: Label
-var names_button: Button
+var hint: PanelContainer
+var names_button: TextureButton
 var saved_camera: Dictionary={}
+var walking_environment: Environment
+var sky_material: ShaderMaterial
+var sky_hour: float=-1.0
 var touch_move_id:=-1
 var touch_look_id:=-1
 var touch_origin:=Vector2.ZERO
@@ -40,21 +47,58 @@ func _ready() -> void:
 	model=Human.instantiate();model.name="FirstPersonWalker";model.scale=Vector3.ONE*1.66;model.visible=false;add_child(model)
 	overlay=CanvasLayer.new();overlay.layer=20;add_child(overlay)
 	bar=Control.new();bar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);bar.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.visible=false;overlay.add_child(bar)
+	bar.theme=InterfaceTheme.get_theme()
 	var cross:=Label.new();cross.text="+";cross.add_theme_font_size_override("font_size",24);cross.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;cross.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cross.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(cross)
-	var info:=Label.new();info.text="Esimese isiku vaade · WASD liigu · hiir vaata · Shift jookse · tühik hüppa · Tab hiir · Esc välju";info.position=Vector2(20,20);info.add_theme_font_size_override("font_size",17);info.add_theme_color_override("font_color",Color.WHITE);info.add_theme_color_override("font_shadow_color",Color.BLACK);info.add_theme_constant_override("shadow_offset_x",2);info.add_theme_constant_override("shadow_offset_y",2);bar.add_child(info)
-	var buttons:=HBoxContainer.new();buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT);buttons.position=Vector2(-340,54);bar.add_child(buttons)
-	names_button=Button.new();names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
-	names_button.pressed.connect(func():
+	var info := Label.new()
+	info.text = "Liigu vasakul, vaata paremal." if Mobile.active else "WASD liigu · Shift jookse · Tühik hüppa · Tab vabasta hiir"
+	info.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	info.offset_left = 16
+	info.offset_right = -170
+	info.offset_top = 16
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_theme_font_size_override("font_size", 14)
+	info.add_theme_color_override("font_outline_color", Color("101820"))
+	info.add_theme_constant_override("outline_size", 4)
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(info)
+	var buttons:=HBoxContainer.new()
+	bar.add_child(buttons)
+	buttons.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	buttons.offset_left=-175.0;buttons.offset_right=-16.0;buttons.offset_top=43.0
+	buttons.add_theme_constant_override("separation",6)
+	var version:=Label.new();version.name="GameVersion";version.text=BuildLabel.short_text(get_tree())
+	version.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;version.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	version.offset_left=-178.0;version.offset_right=-24.0;version.offset_top=15.0
+	version.add_theme_font_size_override("font_size",16);version.add_theme_color_override("font_outline_color",Color("101820"))
+	version.add_theme_constant_override("outline_size",4);version.mouse_filter=Control.MOUSE_FILTER_IGNORE;bar.add_child(version)
+	names_button=walking_button(buttons,"action_focus","Näita üksuste nimesid",func():
 		host.game_hud.game_menu.set_graphics_value("names",not host.graphics_soldier_names)
-		names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas")
-	buttons.add_child(names_button)
-	var reposition:=Button.new();reposition.text="Paiguta ümber";reposition.pressed.connect(func():exit_walking();placed=false;start());buttons.add_child(reposition)
-	var leave:=Button.new();leave.text="Välju";leave.pressed.connect(exit_walking);buttons.add_child(leave)
-	hint=Label.new();hint.text="Klõpsa detailkaardil kohta, kuhu tegelane asetada · Esc katkestab";hint.position=Vector2(20,65);hint.visible=false;overlay.add_child(hint)
+		update_names_icon())
+	update_names_icon()
+	walking_button(buttons,"map_center","Paiguta ümber",func():exit_walking();placed=false;start())
+	walking_button(buttons,"action_stop","Välju kõndimisest",exit_walking)
+	hint=PanelContainer.new();hint.theme=InterfaceTheme.get_theme();hint.visible=false;overlay.add_child(hint)
+	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP);hint.offset_left=-175;hint.offset_right=175;hint.offset_top=84
+	var placement:=HBoxContainer.new();hint.add_child(placement)
+	var instruction:=Label.new();instruction.text="Puuduta kaardil vaba kohta" if Mobile.active else "Klõpsa kaardil vaba kohta"
+	instruction.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;instruction.size_flags_horizontal=Control.SIZE_EXPAND_FILL;placement.add_child(instruction)
+	walking_button(placement,"action_stop","Katkesta paigutamine",cancel_placing)
 	touch_stick=Panel.new();touch_stick.size=Vector2(110,110);touch_stick.mouse_filter=Control.MOUSE_FILTER_IGNORE;touch_stick.visible=false
 	var ring:=StyleBoxFlat.new();ring.bg_color=Color(0.08,0.12,0.12,0.32);ring.border_color=Color(1,1,1,0.45);ring.set_border_width_all(2);ring.set_corner_radius_all(55);touch_stick.add_theme_stylebox_override("panel",ring);bar.add_child(touch_stick)
 	touch_knob=Panel.new();touch_knob.size=Vector2(38,38);touch_knob.position=Vector2(36,36);touch_knob.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var knob_style:=StyleBoxFlat.new();knob_style.bg_color=Color(1,1,1,0.5);knob_style.set_corner_radius_all(19);touch_knob.add_theme_stylebox_override("panel",knob_style);touch_stick.add_child(touch_knob)
+
+func walking_button(parent: Control,icon: String,description: String,action: Callable) -> TextureButton:
+	var texture: Texture2D=load("res://assets/ui/ui-art-v303_"+icon+".webp")
+	var button:=InterfaceTheme.icon_button(texture,description,action)
+	button.custom_minimum_size=Vector2(47,47)
+	parent.add_child(button)
+	return button
+
+func update_names_icon() -> void:
+	names_button.tooltip_text="Peida üksuste nimed" if host.graphics_soldier_names else "Näita üksuste nimesid"
+	names_button.accessibility_name=names_button.tooltip_text
+	names_button.modulate=Color.WHITE if host.graphics_soldier_names else Color(0.76,0.76,0.76)
 
 func start() -> void:
 	if not host.detail_mode:host.update_status("Ava esmalt detailkaart.");return
@@ -62,34 +106,83 @@ func start() -> void:
 	if active:exit_walking();return
 	if placing:cancel_placing();return
 	if placed and tile==current_tile():enter();return
-	placing=true;hint.visible=true;host.update_status("Klõpsa kaardil tegelase asukoht.")
+	placing=true;hint.visible=true
 
 func current_tile() -> Vector2i:
+	if is_instance_valid(host.detail_root):return host.detail_root.tree_cell
 	return host.selected if host.detail_inspection else host.player
 
 func cancel_placing() -> void:
 	placing=false;hint.visible=false
 
 func place_at(x: float,z: float) -> bool:
-	if blocked(x,z):host.update_status("Tegelast ei saa vette või hoonesse asetada.");return false
-	pos=Vector3(x,ground_height(x,z),z);tile=current_tile();placed=true;cancel_placing();yaw=0.54;pitch=-0.08;host.zoom=45.0;enter();return true
+	if blocked(x,z):host.update_status("Vali vaba koht avastatud alal.");return false
+	pos=Vector3(x,ground_height(x,z),z);tile=tile_at(x,z);placed=true;cancel_placing();yaw=0.54;pitch=-0.08;host.zoom=45.0;enter();return true
 
 func enter() -> void:
 	if not placed:return
 	active=true;velocity=Vector3.ZERO;vertical_speed=0;airborne=false;model.visible=false;bar.visible=true
-	if names_button!=null:names_button.text="Nimed: sees" if host.graphics_soldier_names else "Nimed: väljas"
-	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far}
-	host.camera.fov=68.0;host.camera.near=0.05;host.camera.far=2400.0
+	update_names_icon()
+	saved_camera={"fov":host.camera.fov,"near":host.camera.near,"far":host.camera.far,"environment":host.camera.environment}
+	host.camera.fov=68.0;host.camera.near=0.12;host.camera.far=720.0
+	host.update_daylight()
+	start_sky()
+	var neighbors:=host.detail_root.get_node_or_null("NeighborTiles") as Node3D
+	if neighbors!=null:neighbors.update_stream(Vector2(pos.x,pos.z),Vector2(-sin(yaw),-cos(yaw)))
 	if is_instance_valid(host.game_hud):host.game_hud.visible=false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED);apply_camera()
 
-func exit_walking() -> void:
+func exit_walking(recenter:=true) -> void:
 	if not active:return
 	active=false;velocity=Vector3.ZERO;bar.visible=false;Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	host.camera.environment=saved_camera.get("environment")
+	var neighbors:=host.detail_root.get_node_or_null("NeighborTiles") as Node3D
+	if neighbors!=null:neighbors.stop_stream()
 	touch_move_id=-1;touch_look_id=-1;touch_movement=Vector2.ZERO;touch_stick.visible=false
 	if not saved_camera.is_empty():host.camera.fov=saved_camera.fov;host.camera.near=saved_camera.near;host.camera.far=saved_camera.far;saved_camera={}
 	if is_instance_valid(host.game_hud):host.game_hud.visible=true
-	host.camera_target=Vector3(pos.x,0,pos.z);host.zoom=minf(host.zoom,70.0);sync_model();host.update_camera()
+	host.camera_target=Vector3(pos.x,0,pos.z);host.zoom=minf(host.zoom,70.0)
+	var shift:=tile-current_tile()
+	if recenter and shift!=Vector2i.ZERO:
+		if host.transition_detail_tile(tile,shift,true):shift_origin(Vector3(shift.x*225.0,0,shift.y*195.0))
+		else:placed=false;host.camera_target=Vector3.ZERO
+	sync_model();host.update_camera()
+
+func start_sky() -> void:
+	if sky_material==null:
+		sky_material=ShaderMaterial.new();sky_material.shader=SKY_SHADER
+	var sky:=Sky.new();sky.sky_material=sky_material;sky.radiance_size=Sky.RADIANCE_SIZE_32
+	sky.process_mode=Sky.PROCESS_MODE_INCREMENTAL
+	walking_environment=host.world_environment.environment.duplicate()
+	walking_environment.sky=sky
+	walking_environment.background_mode=Environment.BG_SKY
+	walking_environment.ambient_light_sky_contribution=0.0
+	walking_environment.fog_enabled=true
+	walking_environment.fog_mode=Environment.FOG_MODE_DEPTH
+	walking_environment.fog_depth_begin=110.0
+	walking_environment.fog_depth_end=425.0
+	walking_environment.fog_density=1.0
+	walking_environment.fog_sky_affect=0.0
+	host.camera.environment=walking_environment
+	sky_hour=-1.0
+	update_sky()
+
+func update_sky() -> void:
+	if not active or walking_environment==null:return
+	walking_environment.ambient_light_energy=host.world_environment.environment.ambient_light_energy
+	walking_environment.ambient_light_color=host.world_environment.environment.ambient_light_color
+	var hour:=float(host.daylight_hour())
+	if sky_hour>=0.0 and absf(hour-sky_hour)<0.02:return
+	sky_hour=hour
+	var altitude:=sin((hour-6.0)*PI/12.0)
+	var daylight:=smoothstep(-0.16,0.32,altitude)
+	var twilight:=1.0-smoothstep(0.04,0.38,absf(altitude))
+	var horizon:=Color("141f35").lerp(Color("a8c6d5"),daylight).lerp(Color("b77c61"),twilight*0.47)
+	sky_material.set_shader_parameter("horizon",horizon)
+	sky_material.set_shader_parameter("daylight",daylight)
+	sky_material.set_shader_parameter("twilight",twilight)
+	sky_material.set_shader_parameter("sun_direction",host.sunlight.position.normalized())
+	walking_environment.fog_light_color=horizon
 
 func sync_model() -> void:
 	model.position=pos;model.rotation.y=yaw+PI;model.visible=placed and not active and host.detail_mode and tile==current_tile()
@@ -150,7 +243,7 @@ func pier_height(x: float,z: float) -> Variant:
 				if building.get("type","") not in ["fisher","harbor"] or not building.get("ready",false) or float(building.get("hp",0))<=0:continue
 				var bx:=float(building.x)+dc*225.0;var bz:=float(building.z)+dr*195.0
 				if absf(x-bx)>35 or absf(z-bz)>35:continue
-				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if surface==null:continue
 				var base:float=host.detail_rendered_height(bx,bz)
 				if building.has("baseY"):
@@ -164,14 +257,24 @@ func pier_height(x: float,z: float) -> Variant:
 
 func ground_height(x: float,z: float) -> float:
 	var height:float=host.detail_rendered_height(x,z);var pier: Variant=pier_height(x,z)
-	return maxf(height,float(pier)) if pier!=null else height
+	if pier!=null:height=maxf(height,float(pier))
+	return maxf(height,-0.78)
+
+func shift_origin(shift: Vector3) -> void:
+	pos-=shift
+
+func tile_at(x: float,z: float) -> Vector2i:
+	return current_tile()+Vector2i(floori((x+112.5)/225.0),floori((z+97.5)/195.0))
 
 func blocked(x: float,z: float) -> bool:
-	if not host.detail_mode or absf(x)>335.5 or absf(z)>290.5:return true
-	var dc:=floori((x+112.5)/225.0);var dr:=floori((z+97.5)/195.0);var at:=current_tile()+Vector2i(dc,dr)
+	if not host.detail_mode:return true
+	var center:=current_tile()
+	var at:=tile_at(x,z)
+	var offset:=at-center;var dc:=offset.x;var dr:=offset.y
 	if at.x<0 or at.y<0 or at.x>=Grid.COLS or at.y>=Grid.ROWS:return true
 	if not host.reveal_all and not host.game.explored[0].has(str(at.x)+":"+str(at.y)):return true
-	if host.detail_rendered_height(x,z)<-0.25 and pier_height(x,z)==null:return true
+	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+	if at!=center and (neighbors==null or not neighbors.can_enter(at)):return true
 	var contexts:=[]
 	for parent in host.game.get("cities",[]):
 		contexts.append(parent);contexts.append_array(parent.get("districts",{}).values())
@@ -183,10 +286,10 @@ func blocked(x: float,z: float) -> bool:
 			if bounds!=null:
 				var early:float=maxf(float(bounds.rx),float(bounds.rz))*2.0+35.0
 				if absf(x-(float(b.x)+dc*225.0))>=early or absf(z-(float(b.z)+dr*195.0))>=early:continue
-				var age:=Production.upgrade_level(host.game,int(city.team))
+				var age:=Production.visual_age(host.game,int(city.team))
 				var reach:float=maxf(maxf(float(bounds.rx),float(bounds.rz))*0.82+2.0,HouseCollision.reach(host.detail_root,b,age))
 				if absf(x-(float(b.x)+dc*225.0))>=reach or absf(z-(float(b.z)+dr*195.0))>=reach:continue
-				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if hit==true:return true
 				if hit==null and b.type not in ["woodgate","gatehouse"] and absf(x-(float(b.x)+dc*225.0))<float(bounds.rx)*0.82 and absf(z-(float(b.z)+dr*195.0))<float(bounds.rz)*0.82:return true
 	return false
@@ -196,8 +299,13 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	dt=minf(dt,0.1)
 	if input.length()>1:input=input.normalized()
 	var speed:=1.66*(5.6 if run else 2.4)
+	if pos.y< -0.45:speed*=0.54
 	var forward:=Vector3(-sin(yaw),0,-cos(yaw));var side:=Vector3(cos(yaw),0,-sin(yaw))
 	var want:=forward*input.y*speed+side*input.x*speed
+	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
+	if neighbors!=null:
+		var heading:=want.normalized() if not want.is_zero_approx() else forward
+		neighbors.update_stream(Vector2(pos.x,pos.z),Vector2(heading.x,heading.z))
 	velocity=velocity.lerp(want,1.0-exp(-dt*(2.0 if airborne else 12.0)));moving=velocity.length_squared()>0.04
 	var nx:=pos.x+velocity.x*dt;var nz:=pos.z+velocity.z*dt
 	if not blocked(nx,pos.z):pos.x=nx
@@ -208,13 +316,10 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	vertical_speed-=1.66*9.5*dt;pos.y+=vertical_speed*dt
 	if pos.y<=ground:pos.y=ground;vertical_speed=0;airborne=false
 	if moving and not airborne:bob+=dt*(13.0 if run else 8.5)
-	var dc:=1 if pos.x>112.5 else -1 if pos.x< -112.5 else 0
-	var dr:=1 if pos.z>97.5 else -1 if pos.z< -97.5 else 0
-	if dc!=0 or dr!=0:
-		var delta:=Vector2i(dc,dr);var next:=current_tile()+delta;switching=true
-		var ok: bool=host.transition_detail_tile(next,delta);switching=false
-		if ok:pos-=Vector3(dc*225.0,0,dr*195.0);tile=next
-		else:pos.x=clampf(pos.x,-112.25,112.25);pos.z=clampf(pos.z,-97.25,97.25)
+	tile=tile_at(pos.x,pos.z)
+	var offset:=tile-current_tile()
+	if maxi(absi(offset.x),absi(offset.y))>=3 and neighbors!=null and neighbors.worker==null:
+		host.transition_detail_tile(tile,offset,true)
 	apply_camera()
 
 func update(dt: float) -> void:
@@ -233,6 +338,5 @@ func apply_camera() -> void:
 
 func on_detail_closed() -> void:
 	cancel_placing()
-	if active and not switching:exit_walking()
+	if active:exit_walking(false)
 	model.visible=false
-

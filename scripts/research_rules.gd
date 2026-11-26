@@ -46,6 +46,7 @@ static func start_research(state: Dictionary, team: int, id: String) -> Dictiona
 			break
 	if not has_city:
 		return {"error": "Raja esmalt vähemalt üks linn. Avastused kehtivad kogu riigis."}
+	if research.active != id:research.ageWait=null
 	research.active = id
 	research.paused = false
 	research.queue.erase(id)
@@ -53,9 +54,17 @@ static func start_research(state: Dictionary, team: int, id: String) -> Dictiona
 		research.progress[id] = 0.0
 	return {"ok": true}
 
+static func purchasable_points(state: Dictionary,team: int) -> float:
+	var research: Dictionary=state.research[team]
+	var id: Variant=research.active
+	if id==null or tech_block(research,str(id))!="":return 0.0
+	return clampf(research_cost(state,DATA.data.techs[id])-float(research.progress.get(id,0)),0,12)
+
 static func buy_research(state: Dictionary,team: int) -> Dictionary:
 	var research: Dictionary=state.research[team];var id: Variant=research.active
 	if id==null:return {"error":"Ühtegi uuringut pole käimas."}
+	var points:=purchasable_points(state,team)
+	if points<0.000001:return {"error":"Uuringu teaduspunktid on täis."}
 	var town: Dictionary={};var highest: float=-INF
 	for city in state.cities:
 		if int(city.team)!=team or city.get("districtOf")!=null:continue
@@ -63,8 +72,8 @@ static func buy_research(state: Dictionary,team: int) -> Dictionary:
 		if gold>highest:highest=gold;town=city
 	if town.is_empty() or highest<40:return {"error":"Kassas pole 40 kulda."}
 	var stock: Dictionary=town.economy.realms[team].resources
-	stock.gold=float(stock.gold)-40;research.progress[id]=float(research.progress.get(id,0))+12
-	return {"ok":true,"id":id,"town":town.name}
+	stock.gold=float(stock.gold)-40;research.progress[id]=float(research.progress.get(id,0))+points
+	return {"ok":true,"id":id,"town":town.name,"points":points}
 
 static func queue_research(state: Dictionary, team: int, id: String) -> Dictionary:
 	var research: Dictionary = state.research[team]
@@ -162,6 +171,7 @@ static func tick_research(state: Dictionary, dt: float) -> Array:
 	var events: Array = []
 	for team in state.research.size():
 		var research: Dictionary = state.research[team]
+		if research.get("ageWait") is Dictionary and research.ageWait.get("id")!=research.active:research.ageWait=null
 		if not research.has("queue"): research.queue = []
 		if not research.has("boosted"): research.boosted = []
 		research.rate = science_rate(state, team)

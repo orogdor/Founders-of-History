@@ -5,12 +5,13 @@ const Economy=preload("res://scripts/economy_rules.gd")
 const Era=preload("res://scripts/era_economy.gd")
 const Needs=preload("res://scripts/city_needs.gd")
 const Research=preload("res://scripts/research_rules.gd")
+const Setup=preload("res://scripts/world_setup.gd")
 
 static func tick(state: Dictionary,dt: float) -> void:
 	state.treasuryClockV280=float(state.get("treasuryClockV280",0))+dt
 	if state.treasuryClockV280<30:return
 	state.treasuryClockV280=0
-	for team in [1,2,3]:
+	for team in range(1, Setup.opponent_count(state)+1):
 		var towns: Array=[]
 		for city in state.cities:
 			if int(city.team)==team and city.get("districtOf")==null:towns.append(city)

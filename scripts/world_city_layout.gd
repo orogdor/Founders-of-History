@@ -1,87 +1,64 @@
 extends RefCounted
 
-const SIZES:={"hall":10.0,"house":7.0,"lumber":8.4,"quarry":9.0,"well":3.0,"farm":9.0,"barracks":9.2,"archery":9.2,"hunter":8.4,"fisher":9.2,"study":8.6,"pasture":9.0,"mason":8.0,"claypit":7.0,"pottery_kiln":6.0,"watchtower":4.0,"palisade":7.0,"woodgate":6.0,"stonewall":7.0,"stonetower":5.0,"cellar":5.0,"storage":7.0,"warehouse":8.0,"mill":7.0,"bakery":6.0,"coppermine":8.0,"tinmine":8.0,"bronze_foundry":7.0,"forester":7.0,"saw":7.0,"road_depot":7.0}
-const MODELS:={"hall":"peamaja","house":"house","lumber":"lumber","forester":"lumber","saw":"lumber","quarry":"quarry","farm":"farm","well":"well","hunter":"hunter","fisher":"fisher","pasture":"pasture","mason":"mason","barracks":"barracks","archery":"archery","claypit":"claypit","pottery_kiln":"pottery_kiln","study":"study","watchtower":"watchtower","palisade":"palisade","woodgate":"woodgate","stonewall":"palisade","stonetower":"watchtower","cellar":"house","storage":"house","warehouse":"house","mill":"farm","bakery":"house","coppermine":"quarry","tinmine":"quarry","bronze_foundry":"pottery_kiln","road_depot":"lumber"}
-const CORE:=["hall","house","well","study","cellar","storage","warehouse","market","bakery","mill","scriptorium","inn","granary"]
-const SKIP:=["field","road","bridge"]
-static var meshes: Dictionary={}
+const Models=preload("res://scripts/building_models.gd")
+const Placement=preload("res://scripts/building_placement.gd")
+const Navigation=preload("res://scripts/local_navigation.gd")
+const SKIP=["road","bridge"]
 
-static func stamp(buildings: Array) -> String:
-	var parts:=PackedStringArray()
-	for b in buildings:
-		if b.type in SKIP or float(b.get("hp",0))<=0 or b.get("virtual",false):continue
-		parts.append("%s:%s:%s:%s:%s" % [b.type,b.get("ready",false),roundi(float(b.x)),roundi(float(b.z)),b.get("buildingRotationV228",b.get("wallAngleV175",0))])
-	return "|".join(parts)
+static func drawable(building: Dictionary) -> bool:
+	return Placement.alive(building) and building.type not in SKIP
 
-static func layout(buildings: Array) -> Dictionary:
-	var extent:=0.0;var core:=0.0
-	for b in buildings:
-		if b.type in SKIP or float(b.get("hp",0))<=0 or b.get("virtual",false):continue
-		var radius:=float(SIZES.get(b.type,6.0))/4.5*0.5
-		var e:=maxf(absf(float(b.x)/4.5)+radius,absf(float(b.z)/3.9)+radius)
-		extent=maxf(extent,e)
-		if b.type in CORE:core=maxf(core,e)
-	var basis:=core if core>0 else extent
-	var factor:=clampf(24.5/basis,1,5) if basis>0 else 1.0
-	var list: Array=[]
-	for b in buildings:
-		if b.type in SKIP or float(b.get("hp",0))<=0 or b.get("virtual",false):continue
-		var size:=float(SIZES.get(b.type,6.0))/4.5*factor*1.4
-		var limit:=maxf(0,24.5-size*0.5)
-		var x:=float(b.x)/4.5*factor;var z:=float(b.z)/3.9*factor
-		if absf(x)>limit or absf(z)>limit:
-			var f:=minf(1,minf(limit/maxf(0.000001,absf(x)),limit/maxf(0.000001,absf(z))))
-			x*=f;z*=f
-		list.append({"building":b,"x":x,"z":z,"size":size})
-	return {"scale":factor,"list":list}
+static func stamp(buildings: Array,age: int,neighbors: Array=[]) -> int:
+	var data:Array=[age]
+	for building in buildings:
+		if drawable(building):data.append(Placement.stamp(building))
+	for building in neighbors:data.append(Placement.stamp(building))
+	return hash(data)
 
 static func clearances(buildings: Array,origin: Vector2) -> Array:
-	var result: Array=[];var core_radius:=0.0
-	for item in layout(buildings).list:
-		var radius:=maxf(2.4,float(item.size)*0.9)
-		result.append({"x":origin.x+float(item.x),"z":origin.y+float(item.z),"r":radius})
-		if item.building.type in CORE:core_radius=maxf(core_radius,Vector2(float(item.x),float(item.z)).length()+radius)
-	if core_radius>0:result.append({"x":origin.x,"z":origin.y,"r":core_radius})
+	var result:Array=[]
+	var projection:=Vector2(50.0/225.0,50.0/195.0)
+	for building in buildings:
+		if not drawable(building):continue
+		var center:=Vector2(building.x,building.z)
+		if building.type in Placement.Walls:
+			var ends:=Placement.wall_endpoints(building)
+			var steps:=maxi(1,ceili(ends[0].distance_to(ends[1])/5.0))
+			for i in steps+1:
+				var point:=origin+ends[0].lerp(ends[1],float(i)/steps)*projection
+				result.append({"x":point.x,"z":point.y,"r":1.6})
+		else:
+			var bounds:Variant=Navigation.clearance(building)
+			var radius:=2.0 if bounds==null else clampf(maxf(float(bounds.rx),float(bounds.rz))*0.34,1.6,5.0)
+			var point:=origin+center*projection
+			if building.type=="field":
+				radius=clampf(maxf(float(building.get("width",16))*projection.x,float(building.get("depth",16))*projection.y)*0.5,1.6,9.0)
+			result.append({"x":point.x,"z":point.y,"r":radius})
 	return result
 
-static func get_mesh(name: String) -> Mesh:
-	if meshes.has(name):return meshes[name]
-	var path: String="res://assets/world/town_models/"+name+".glb"
-	if not ResourceLoader.exists(path):return null
-	var source: Node=load(path).instantiate();var found:=find_mesh(source)
-	if found==null:source.free();return null
-	var mesh: Mesh=found.mesh.duplicate()
-	var material:=StandardMaterial3D.new();material.vertex_color_use_as_albedo=true;material.roughness=0.95;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-	for surface in mesh.get_surface_count():mesh.surface_set_material(surface,material)
-	meshes[name]=mesh;source.free();return mesh
-
-static func find_mesh(node: Node) -> MeshInstance3D:
-	if node is MeshInstance3D:return node
-	for child in node.get_children():
-		var found:=find_mesh(child)
-		if found!=null:return found
-	return null
-
-static func build(buildings: Array,origin: Vector3,height: Callable) -> Node3D:
-	var root:=Node3D.new();root.name="TownBuildings"
-	var groups: Dictionary={}
-	for item in layout(buildings).list:
-		var b: Dictionary=item.building;var name: String=MODELS.get(b.type,"house")
-		if not groups.has(name):groups[name]=[]
-		groups[name].append(item)
-	for name in groups:
-		var mesh:=get_mesh(name)
+static func build(buildings: Array,age: int,origin: Vector3,height: Callable,neighbors: Array=[]) -> Node3D:
+	var root:=Node3D.new()
+	root.name="TownBuildings"
+	var groups:Dictionary={}
+	var base:=float(height.call(origin))
+	var ground:=func(x: float,z: float) -> float:return float(height.call(origin+Vector3(x,0,z)))-base
+	var defenses:=buildings.filter(func(b):return Placement.alive(b) and Placement.is_defense(b))
+	defenses.append_array(neighbors)
+	var scale:=Placement.WORLD_SCALE
+	for building in buildings:
+		if not drawable(building):continue
+		var type:String=building.type
+		var mesh:=Models.simplified_mesh(type,age,building.get("houseDesignV354",{}),int(building.get("woodFortTierV1757",1)))
 		if mesh==null:continue
-		var bounds:=mesh.get_aabb();var divisor:=maxf(maxf(bounds.size.x,bounds.size.z),0.000001)
-		var center:=Vector3(bounds.position.x+bounds.size.x/2.0,bounds.position.y,bounds.position.z+bounds.size.z/2.0)
-		var batch:=MultiMesh.new();batch.transform_format=MultiMesh.TRANSFORM_3D;batch.mesh=mesh;batch.instance_count=groups[name].size()
-		for i in groups[name].size():
-			var item: Dictionary=groups[name][i];var b: Dictionary=item.building
-			var ready: bool=b.get("ready",false);var scalar: float=float(item.size)*0.04*(1 if ready else 0.75)/divisor
-			var angle:=float(b.get("buildingRotationV228",b.get("wallAngleV175",b.get("shoreAngle",0))))
-			var basis:=Basis(Vector3.UP,angle).scaled(Vector3(scalar,scalar*(1 if ready else 0.5),scalar))
-			var point:=Vector3(float(item.x)*0.04,0,float(item.z)*0.04)
-			point.y=float(height.call(origin+point))-float(height.call(origin))
-			batch.set_instance_transform(i,Transform3D(basis,point-basis*center))
-		var visual:=MultiMeshInstance3D.new();visual.multimesh=batch;root.add_child(visual)
+		var progress:=1.0 if building.get("ready",false) else 0.32
+		if type in Placement.Walls:
+			var ends:=Placement.joined_endpoints(building,defenses)
+			Models.add_instance(groups,mesh,Placement.wall_transform(building,ends,mesh.get_aabb(),scale,ground,progress))
+			var cap:=Placement.cap_mesh(building)
+			for end in ends:Models.add_instance(groups,cap,Placement.cap_transform(end,scale,ground,cap,progress))
+		else:
+			var y:float=ground.call(float(building.x)*scale.x,float(building.z)*scale.z)
+			var exaggeration:=1.0 if Placement.is_defense(building) else 1.24
+			Models.add_instance(groups,mesh,Placement.building_transform(building,scale,y,progress,exaggeration))
+	Models.add_batches(root,groups,false)
 	return root

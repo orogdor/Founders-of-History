@@ -1,4 +1,7 @@
 extends Node3D
+
+const InterfaceTheme = preload("res://scripts/interface_theme.gd")
+const Palette = preload("res://scripts/faction_palette.gd")
 const Districts=preload("res://scripts/district_context.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const Grid=preload("res://scripts/campaign_grid.gd")
@@ -76,8 +79,7 @@ func build_ground_tile(dc: int,dr: int) -> void:
  var visual: PackedVector4Array=host.detail_visual_for(c,r);visual_tiles[key]=visual
  var color: Color=host.terrain_color(r*Grid.COLS+c)
  var instance:=MeshInstance3D.new();instance.mesh=host.detail_mesh_for(c,r,heights,visual);instance.position=Vector3(dc*225,0,dr*195)
- instance.set_instance_shader_parameter("detail_uv_offset",Vector2(dc*225,dr*195))
- GroundMaterial.attach(instance,color,1.0 if host.visual_biome(r*Grid.COLS+c) in ["forest","taiga","jungle"] else 0.0);add_child(instance)
+ GroundMaterial.attach(instance,color,1.0 if host.visual_biome(r*Grid.COLS+c) in ["forest","taiga","jungle"] else 0.0,Vector2i(c,r));add_child(instance)
  var water:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(225,195);water.mesh=plane
  water.position=instance.position;water.material_override=host.detail_ocean_for(c,r,heights,visual);add_child(water)
  var landscape:=Node3D.new();landscape.position=Vector3(dc*225,0,dr*195);add_child(landscape)
@@ -134,8 +136,8 @@ func build_border() -> void:
 
 func build_ui() -> void:
  layer=CanvasLayer.new();layer.layer=20;add_child(layer)
- panel=PanelContainer.new();panel.position=Vector2(12,12);panel.custom_minimum_size=Vector2(370,0)
- var box:=StyleBoxTexture.new();box.texture=load("res://assets/ui/ui-art-v304_panel.webp");box.texture_margin_left=70;box.texture_margin_right=70;box.texture_margin_top=50;box.texture_margin_bottom=50;box.content_margin_left=20;box.content_margin_right=20;box.content_margin_top=18;box.content_margin_bottom=34;panel.add_theme_stylebox_override("panel",box);layer.add_child(panel)
+ panel=PanelContainer.new();panel.position=Vector2(12,12);panel.custom_minimum_size=Vector2(minf(370.0,get_viewport().get_visible_rect().size.x-24.0),0)
+ panel.add_theme_stylebox_override("panel",InterfaceTheme.panel(20));panel.theme=InterfaceTheme.get_theme();layer.add_child(panel)
  var body:=VBoxContainer.new();body.add_theme_constant_override("separation",7);panel.add_child(body)
  var title:=Label.new();title.text="LINNA PIIRAMINE" if battle.get("fortress") is Dictionary else "LAHING";title.add_theme_font_size_override("font_size",20);title.add_theme_color_override("font_color",Color("f6dfa9"));body.add_child(title)
  info=Label.new();info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(info)
@@ -143,7 +145,7 @@ func build_ui() -> void:
  var row:=HBoxContainer.new();body.add_child(row)
  formation=OptionButton.new();formation.size_flags_horizontal=Control.SIZE_EXPAND_FILL;formation.item_selected.connect(select_formation);row.add_child(formation)
  mode=OptionButton.new();mode.add_item("Automaatne");mode.add_item("Manuaalne");mode.item_selected.connect(select_mode);row.add_child(mode)
- var commands:=HBoxContainer.new();body.add_child(commands)
+ var commands:=HFlowContainer.new();body.add_child(commands)
  var stop:=Button.new();stop.text="Peata üksus";stop.pressed.connect(stop_squad);commands.add_child(stop)
  var pause:=Button.new();pause.text="Peata / jätka";pause.pressed.connect(func():host.toggle_simulation_pause());commands.add_child(pause)
  retreat=Button.new();retreat.text="Tagane armeega";retreat.pressed.connect(withdraw);commands.add_child(retreat)
@@ -263,7 +265,7 @@ func correct_soldier_materials(node: Node,team: int) -> void:
    if not soldier_materials.has(key):
     var material: BaseMaterial3D=original.duplicate()
     if soldier_color_surfaces[mesh_key]:material.vertex_color_use_as_albedo=true
-    if faction:material.albedo_color=FACTION_COLORS[clampi(team,0,3)]
+    if faction:material.albedo_color=Palette.color(team,FACTION_COLORS[clampi(team,0,3)])
     soldier_materials[key]=material
    node.set_surface_override_material(surface,soldier_materials[key])
  for child in node.get_children():correct_soldier_materials(child,team)
@@ -274,7 +276,7 @@ func add_faction_strip(model: Node3D,team: int) -> void:
  var attachment:=BoneAttachment3D.new();attachment.bone_name="chest";skeleton.add_child(attachment)
  var ribbon:=MeshInstance3D.new();var shape:=BoxMesh.new();shape.size=Vector3(0.11,0.14,0.012);ribbon.mesh=shape;ribbon.position=Vector3(0.10,-0.09,0.125);ribbon.rotation.z=-0.12
  if not faction_materials.has(team):
-  var material:=StandardMaterial3D.new();material.albedo_color=FACTION_COLORS[clampi(team,0,3)];material.roughness=0.9;faction_materials[team]=material
+  var material:=StandardMaterial3D.new();material.albedo_color=Palette.color(team,FACTION_COLORS[clampi(team,0,3)]);material.roughness=0.9;faction_materials[team]=material
  ribbon.material_override=faction_materials[team];attachment.add_child(ribbon)
 
 func sync_siege_models() -> void:
@@ -346,7 +348,7 @@ func sync_models() -> void:
   var id: String=str(int(unit.team))+":"+str(int(unit.source));visible_markers[id]=true
   if not markers.has(id):
    var ring:=MeshInstance3D.new();var mesh:=TorusMesh.new();mesh.inner_radius=2.4;mesh.outer_radius=2.7;ring.mesh=mesh
-   var mat:=StandardMaterial3D.new();mat.albedo_color=TEAM_COLORS[clampi(int(unit.team),0,3)];mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=mat;add_child(ring);markers[id]=ring
+   var mat:=StandardMaterial3D.new();mat.albedo_color=Palette.color(int(unit.team),TEAM_COLORS[clampi(int(unit.team),0,3)]);mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=mat;add_child(ring);markers[id]=ring
   markers[id].position=Vector3(unit.x,ground(unit.x,unit.z)+0.15,unit.z)
   markers[id].visible=float(unit.hp)>0
   markers[id].scale=Vector3.ONE*(1.35 if int(unit.team)==0 and int(unit.source)==selected_source else 1.0)

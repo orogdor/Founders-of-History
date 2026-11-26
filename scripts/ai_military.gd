@@ -1,6 +1,7 @@
 class_name AIMilitary
 extends RefCounted
 const Fortifications=preload("res://scripts/fortifications.gd")
+const Grid=preload("res://scripts/campaign_grid.gd")
 const District=preload("res://scripts/district_context.gd")
 const Economy=preload("res://scripts/economy_rules.gd")
 const Availability=preload("res://scripts/era_availability.gd")
@@ -120,7 +121,7 @@ static func scout(state: Dictionary,team: int,can_traverse: Callable,find_path: 
  for dr in range(-7,8,2):
   for dc in range(-7,8,2):
    var c:=int(strongest.c)+dc;var r:=int(strongest.r)+dr;var p={"c":c,"r":r}
-   if c<0 or c>=220 or r<0 or r>=165 or state.explored[team].has(str(c)+":"+str(r)) or not can_traverse.call(p):continue
+   if c<0 or c>=Grid.COLS or r<0 or r>=Grid.ROWS or state.explored[team].has(str(c)+":"+str(r)) or not can_traverse.call(p):continue
    options.append({"c":c,"r":r,"dist":absi(dc)+absi(dr),"order":order});order+=1
  options.sort_custom(func(a,b):return a.order<b.order if a.dist==b.dist else a.dist<b.dist)
  for i in mini(12,options.size()):
@@ -178,4 +179,3 @@ static func plan_attack(state: Dictionary,team: int,find_path: Callable) -> void
  if targets.is_empty():return
  var path: Variant=find_path.call(army,targets[0],team)
  if path is Array:army.path=path
-

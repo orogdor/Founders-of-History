@@ -1,5 +1,6 @@
 class_name CityNeeds
 extends RefCounted
+const Flows = preload("res://scripts/city_resource_flows.gd")
 const DATA:=preload("res://data/city_needs.json")
 
 static func food_total(stock: Dictionary) -> float:
@@ -33,4 +34,7 @@ static func consume_luxuries(city: Dictionary,age: int,dt: float) -> void:
 	var realm: Dictionary=city.economy.realms[city.team]
 	for key in DATA.data.luxuries:
 		if key!="pottery" and int(DATA.data.goods[key].age)>age:continue
-		realm.resources[key]=maxf(0.0,float(realm.resources.get(key,0.0))-float(realm.pop)*0.02*dt/60.0)
+		var before := float(realm.resources.get(key,0.0))
+		var after := maxf(0.0,before-float(realm.pop)*0.02*dt/60.0)
+		realm.resources[key] = after
+		Flows.record(realm,float(city.economy.time)+dt,key,after-before)

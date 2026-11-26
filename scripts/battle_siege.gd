@@ -3,6 +3,7 @@ extends RefCounted
 const BLOCKING_FORTIFICATIONS=["palisade","woodgate","stonewall","reinforced_wall","gatehouse","watchtower","stonetower","keep"]
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
 const Districts=preload("res://scripts/district_context.gd")
+const Economy=preload("res://scripts/economy_rules.gd")
 const Rules=preload("res://scripts/battle_siege_rules.gd")
 const WALL_SECTIONS=["palisade","woodgate","stonewall","reinforced_wall","gatehouse"]
 
@@ -140,8 +141,8 @@ static func transfer_city(state: Dictionary,city: Dictionary,team: int) -> void:
   if int(unit.team)==old and garrison is Dictionary and int(garrison.get("c",-1))==int(city.c) and int(garrison.get("r",-1))==int(city.r):unit.erase("garrison");unit.hp=0
  city.team=team;city.builderAgents=[];city.trainingAgent=null
  for job in city.get("training",[]):job.team=team
- city.economy.realms[team]=realm
  for context in Districts.contexts(city):
+  Economy.ensure_realms(context.economy,team+1)
   context.team=team;context.economy.realms[team]=realm
   for building in context.economy.get("buildings",[]):building.team=team
   for cargo in context.economy.get("cargo",[]):cargo.team=team
@@ -185,4 +186,3 @@ static func capture_settlers(state: Dictionary) -> Array:
    break
  if not captured.is_empty():reconcile_victory(state)
  return captured
-
