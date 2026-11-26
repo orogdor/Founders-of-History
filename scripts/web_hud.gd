@@ -298,7 +298,8 @@ func layout() -> void:
 	var left:=dock_left+(dock_width-cards_width)*0.5
 	var card_height:=card_width*1.5
 	var card_top:=bottom-23.0-card_height
-	place("dock_background",dock_left,card_top-16.0,dock_width,card_height+34.0)
+	var dock_top:=card_top-16.0
+	place("dock_background",dock_left,dock_top,dock_width,bottom-dock_top)
 	for i in 6:
 		var key: String=["cities","build","armies","trade","diplomacy","journal"][i]
 		place("card_"+key,left+i*(card_width+gap),card_top,card_width,card_height)
