@@ -420,6 +420,7 @@ func add_section(parent: Node,text: String,action: Callable) -> Button:
 	return button
 
 func open_menu() -> void:
+	was_loading=host.generation_thread!=null
 	seed.text=host.seed_input.text
 	use_campaign_setup(host.game)
 	menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))

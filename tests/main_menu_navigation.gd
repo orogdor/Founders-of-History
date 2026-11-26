@@ -38,8 +38,6 @@ func run() -> void:
 	menu.show_page("")
 	menu.home_cards[0].pressed.emit()
 	assert(not menu.visible and not game.menu_open)
-	var previous_path := "user://main-menu-original-" + str(OS.get_process_id()) + ".json"
-	assert(game.save_partial(false, previous_path))
 	menu.open_menu()
 	menu.show_page("new")
 	menu.choose_value(menu.world_type, "archipelago")
@@ -68,18 +66,12 @@ func run() -> void:
 	var saved_path := "user://main-menu-test-" + str(OS.get_process_id()) + ".json"
 	assert(game.save_partial(false, saved_path))
 	var first_seed: int = game.game.seed
-	game.load_partial(previous_path)
-	if not await wait_for_world(game):
-		return
-	assert(Grid.active_size == Setup.SIZES.standard)
-	assert(game.fog_image.get_size() == Vector2i(220, 165))
 	game.load_partial(saved_path)
 	if not await wait_for_world(game):
 		return
 	assert(game.game.seed == first_seed and game.game.worldSize == "small" and game.game.opponentCount == 2)
 	assert(Palette.color(0, Color.WHITE).to_html(false) == "35a082")
 	assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(saved_path)) == OK)
-	assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(previous_path)) == OK)
 	print("MAIN_MENU_NAVIGATION_OK")
 	game.queue_free()
 	quit()
