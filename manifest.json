@@ -1,37 +1,37 @@
 {
   "schema": 1,
   "runtime": "godot-4.7.2-windows-v1",
-  "revision": 23,
-  "source": "1f141cfc1dcc4f2c1a0b8435f6f953dd7fe92e96",
+  "revision": 25,
+  "source": "21beaaf30e6ca915fdcbb079f38ba81cfc897fad",
   "base": {
     "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-base-v1/windows-base.pck",
     "sha256": "76dc077da861baca0907fc6923412172be96d3a0fbd0e28acd47204adbaacfea",
     "size": 772092496
   },
   "patch": {
-    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-23-1/windows-patch.pck",
-    "sha256": "e556d74ce7d139ef1bc98678458697ce38eed6ae056c03ff578c82c9becce6e1",
-    "size": 1550194360
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-25-1/windows-patch.pck",
+    "sha256": "f70cc0e6ee5b1853dadaaea4253d37ebe8ba26ea55cab6a011a6c1ad893a37b0",
+    "size": 1550230540
   },
   "deltas": [
     {
-      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-23-1/windows-delta-22-1.bin",
-      "sha256": "a6c559caf731dc214b9c603d5b145f0de5245bd8857567e810a747ce415435b4",
-      "size": 4150948,
+      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-25-1/windows-delta-23-1.bin",
+      "sha256": "71f479c975b995d81abccd293c4644ffa57783945463cb9f6e13501f9e634841",
+      "size": 4389883,
+      "from": {
+        "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-23-1/windows-patch.pck",
+        "sha256": "e556d74ce7d139ef1bc98678458697ce38eed6ae056c03ff578c82c9becce6e1",
+        "size": 1550194360
+      }
+    },
+    {
+      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-25-1/windows-delta-22-1.bin",
+      "sha256": "b48c949d651a0538998b7b17e0f10d8523d14efd644162766c7003ec522196c3",
+      "size": 4355886,
       "from": {
         "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-22-1/windows-patch.pck",
         "sha256": "58a13fb1473b644f627d77735a11350c36b82ab3c6faa875bb83e00e41ff5d18",
         "size": 1550187560
-      }
-    },
-    {
-      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-23-1/windows-delta-21-1.bin",
-      "sha256": "90b5e61236a179a17a2c6d9bb02e414419c6d35b793c243c6bb19fb20ef3ad2d",
-      "size": 4236518,
-      "from": {
-        "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-21-1/windows-patch.pck",
-        "sha256": "7203b84a3da778ad3b8339368a26161a611fce94fcc71c700c64378dc2b40879",
-        "size": 1550167372
       }
     }
   ]
