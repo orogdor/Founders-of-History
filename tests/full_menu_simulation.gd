@@ -22,7 +22,10 @@ static func run(tree: SceneTree, game: Node, capture: String = "") -> void:
 		return
 	menu.set_graphics_value("fps", 60)
 	menu.set_graphics_value("resolution", 100)
-	menu.show_page("extras")
+	menu.show_page("")
+	menu.home_footer.get_child(0).pressed.emit()
+	if not verify(tree, menu.pages["extras"].visible, "Home opens game and updates"):
+		return
 	var initial_reveal: bool = game.reveal_all
 	menu.toggle_reveal()
 	if not verify(tree, game.reveal_all != initial_reveal, "game.reveal_all != initial_reveal"):
@@ -158,7 +161,8 @@ static func run(tree: SceneTree, game: Node, capture: String = "") -> void:
 		return
 	print("MENU_CITY_SAVE_LOAD_EXPORT_OK")
 	print("FULL_MENU_SIMULATION_OK")
-	tree.quit()
+	menu.open_menu()
+	menu.home_footer.get_child(1).pressed.emit()
 
 static func check_dock(tree: SceneTree, hud: Control, mode: String) -> void:
 	if hud.elements.has("card_"+mode):

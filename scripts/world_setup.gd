@@ -13,7 +13,7 @@ const PALETTE := {
 	"c43d43": "Punane",
 	"9271ce": "Lilla",
 	"d2a12e": "Kuldne",
-	"35a082": "Smaragdroheline",
+	"35a082": "Smaragd",
 	"e07839": "Oranž",
 	"d075a5": "Roosa",
 	"b5bdcf": "Hõbedane",
