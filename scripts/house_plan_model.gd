@@ -702,9 +702,7 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  if span.has("curve_center"):
   var radius:=float(span.curve_radius)/Plan.PX_PER_M
   var perimeter:=TAU*radius
-  # The reflected fieldstone pattern closes after two repeats around the room.
-  var repeat:=2.0 if masonry and StoneSurface.uses_atlas(style) else 1.0
-  uv_scale=maxf(repeat,roundf(perimeter*uv_scale/repeat)*repeat)/perimeter
+  uv_scale=maxf(1.0,roundf(perimeter*uv_scale))/perimeter
   var radial:Vector2=(span.a+span.b)/2-span.curve_center
   align=fposmod(radial.angle(),TAU)*radius
   var side:=Vector2(-axis.y,axis.x)

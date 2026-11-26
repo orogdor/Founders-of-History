@@ -18,22 +18,38 @@ void vertex() {
 	stone_normal = normalize(MODEL_NORMAL_MATRIX * NORMAL);
 }
 
+vec3 stone_photo(vec2 point, vec2 start, vec2 area, vec2 dx, vec2 dy) {
+	return textureGrad(stone_texture, start + point * area, dx * area, dy * area).rgb;
+}
+
 vec3 stone_sample(vec2 at) {
 	vec2 dx = dFdx(at);
 	vec2 dy = dFdy(at);
 	if (atlas_tile < 0) {
 		return textureGrad(stone_texture, at, dx, dy).rgb;
 	}
-	// The photographs have their own padded borders. Reflection keeps joints
-	// continuous at the edge without cross-fading unrelated stones.
-	vec2 mirrored = abs(fract(at * 0.5 + 0.5) * 2.0 - 1.0);
-	vec2 direction = mix(vec2(1.0), vec2(-1.0), step(vec2(1.0), mod(at, 2.0)));
 	vec2 texel = vec2(1.0) / vec2(textureSize(stone_texture, 0));
 	vec2 tile_size = vec2(0.2, 1.0);
 	vec2 padding = tile_size * (1.0 / 66.0);
 	vec2 area = tile_size - 2.0 * padding - texel;
 	vec2 start = vec2(float(atlas_tile) * tile_size.x, 0.0) + padding + texel * 0.5;
-	return textureGrad(stone_texture, start + mirrored * area, dx * direction * area, dy * direction * area).rgb;
+	vec2 uv = fract(at);
+	vec2 shifted = fract(at + vec2(0.423, 0.617));
+	vec2 edge = 1.0 - smoothstep(vec2(0.018), vec2(0.14), min(uv, 1.0 - uv));
+	// Offset only the strip crossing each join. The photo keeps its original
+	// orientation and the interior is sampled once.
+	vec3 color = stone_photo(uv, start, area, dx, dy);
+	if (edge.x > 0.0) {
+		color = mix(color, stone_photo(vec2(shifted.x, uv.y), start, area, dx, dy), edge.x);
+	}
+	if (edge.y > 0.0) {
+		vec3 across = stone_photo(vec2(uv.x, shifted.y), start, area, dx, dy);
+		if (edge.x > 0.0) {
+			across = mix(across, stone_photo(shifted, start, area, dx, dy), edge.x);
+		}
+		color = mix(color, across, edge.y);
+	}
+	return color;
 }
 
 void fragment() {
