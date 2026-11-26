@@ -8,6 +8,7 @@ const Eras=preload("res://scripts/house_eras.gd")
 const HouseModel=preload("res://scripts/house_plan_model.gd")
 const Lights=preload("res://scripts/detail_lights.gd")
 const NatureProps=preload("res://scripts/detail_nature_props.gd")
+const StoneSurface=preload("res://scripts/stone_surface.gd")
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -55,6 +56,17 @@ func run() -> void:
 		high.free()
 		var gate_mesh:=Models.simplified_mesh("woodgate",age)
 		assert(gate_mesh!=null and gate_mesh.get_aabb().size.x>=6.4)
+	var fieldstone:=StoneSurface.material("stone",true,true)
+	assert(fieldstone.get_shader_parameter("stone_texture")==StoneSurface.FIELDSTONE)
+	assert(fieldstone.get_shader_parameter("mesh_uv") and float(fieldstone.get_shader_parameter("relief_amount"))<0.015)
+	var wall_model:=Models.create("stonewall",2)
+	var found_stone:=false
+	for part in wall_model.find_children("*","MeshInstance3D",true,false):
+		for i in part.mesh.get_surface_count():
+			var finish: Material=part.get_active_material(i)
+			found_stone=found_stone or (finish is ShaderMaterial and finish.shader==StoneSurface.STONE)
+	assert(found_stone,"The imported fortification should share the new masonry")
+	wall_model.free()
 	var hunter:=Models.create("hunter",0)
 	assert(hunter.get_child(0).get_script()==HouseModel)
 	assert(Models.bounds(hunter).size.y<4.6,"A hunting hut should stay close to human scale")

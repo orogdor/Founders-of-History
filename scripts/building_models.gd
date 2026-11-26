@@ -7,6 +7,7 @@ const Fits=preload("res://data/building_fits.json")
 const Rules=preload("res://data/build_rules.json")
 const TownShader=preload("res://scripts/town_material.gdshader")
 const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const StoneSurface=preload("res://scripts/stone_surface.gd")
 const Mobile=preload("res://scripts/mobile_profile.gd")
 const PlainFallbacks=["nitrate","oilwell","refinery","powerplant","autofactory","airfield","master_workshop","infirmary","keep"]
 const LOW_CACHE_SIZE=128
@@ -58,7 +59,7 @@ static func source(spec: Dictionary,simplified: bool,settlement_detail:=false) -
 		var path:="res://assets/buildings/"+str(spec.id)+".glb"
 		if spec.id.is_empty() or not ResourceLoader.exists(path):return null
 		raw=load(path).instantiate()
-		if not simplified:apply_imported_materials(raw,spec.town_shader)
+		if not simplified:apply_imported_materials(raw,spec.town_shader,true)
 	if not spec.fit.is_empty():
 		var scale: Array=spec.fit.scale
 		var offset: Array=spec.fit.offset
@@ -66,9 +67,14 @@ static func source(spec: Dictionary,simplified: bool,settlement_detail:=false) -
 		raw.position=Vector3(offset[0],offset[1],offset[2])
 	return raw
 
-static func apply_imported_materials(node: Node,town: bool) -> void:
+static func apply_imported_materials(node: Node,town: bool,building:=false) -> void:
 	if node is MeshInstance3D and node.mesh!=null:
 		for surface in node.mesh.get_surface_count():
+			if building:
+				var style:=StoneSurface.source_style(node.get_active_material(surface))
+				if not style.is_empty():
+					node.set_surface_override_material(surface,StoneSurface.material(style,false,not Mobile.active))
+					continue
 			var surface_key:="%d:%d" % [node.mesh.get_rid().get_id(),surface]
 			if not has_vertex_colors.has(surface_key):
 				var colors:Variant=node.mesh.surface_get_arrays(surface)[Mesh.ARRAY_COLOR]
@@ -90,7 +96,7 @@ static func apply_imported_materials(node: Node,town: bool) -> void:
 					SurfaceDetail.refine_architecture(corrected,"",not Mobile.active)
 					vertex_materials[key]=corrected
 				node.set_surface_override_material(surface,vertex_materials[key])
-	for child in node.get_children():apply_imported_materials(child,town)
+	for child in node.get_children():apply_imported_materials(child,town,building)
 
 static func bounds(node: Node,transform:=Transform3D.IDENTITY) -> AABB:
 	var pose:Transform3D=transform*node.transform if node is Node3D else transform
@@ -183,6 +189,8 @@ static func append_settlement(node: Node,transform: Transform3D,groups: Dictiona
 	for child in node.get_children():append_settlement(child,pose,groups,materials,town)
 
 static func settlement_material(original: Material,town: bool) -> Material:
+	var style:=StoneSurface.source_style(original)
+	if not style.is_empty():return StoneSurface.material(style,false,false)
 	if town:
 		if settlement_town_material==null:
 			settlement_town_material=ShaderMaterial.new()

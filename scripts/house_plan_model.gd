@@ -2,6 +2,7 @@ extends Node3D
 
 const HouseEras=preload("res://scripts/house_eras.gd")
 const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const StoneSurface=preload("res://scripts/stone_surface.gd")
 const Mobile=preload("res://scripts/mobile_profile.gd")
 const Plan=preload("res://scripts/house_plan_geometry.gd")
 const PlanCollision=preload("res://scripts/house_plan_collision.gd")
@@ -38,8 +39,10 @@ const LOD_COLORS={
  "glass":"566d73"
 }
 
-func material_for(style: String) -> StandardMaterial3D:
+func material_for(style: String) -> Material:
  if materials.has(style):return materials[style]
+ if (not simplified or settlement_detail) and StoneSurface.is_masonry(style):
+  return StoneSurface.material(style,false,not simplified and not Mobile.active)
  var material:=StandardMaterial3D.new();material.albedo_color=Color(str(PALETTE.get(style,"ffffff")));material.roughness=1.0;material.cull_mode=BaseMaterial3D.CULL_DISABLED
  if simplified and not settlement_detail:
   material.albedo_color=Color(str(LOD_COLORS.get(style,PALETTE.get(style,"a69679"))))
@@ -687,18 +690,21 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var daub:bool=round_exterior and style=="weave"
  var depth:=width*0.37 if style in ["wood","stave","bamboo","weave"] and not daub else width
  var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,depth)
- var wall_material:Material=hut_daub_material() if daub else material_for(style)
+ var masonry:=StoneSurface.is_masonry(style) and (not simplified or settlement_detail)
+ var wall_material:Material=hut_daub_material() if daub else StoneSurface.material(style,true,not simplified and not Mobile.active) if masonry else material_for(style)
  var arrays:=mesh.get_mesh_arrays()
  var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
  var normals:PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
  var uv:PackedVector2Array=arrays[Mesh.ARRAY_TEX_UV]
  var axis:=Vector2(delta.x,delta.z).normalized()
  var align:=Vector2(a.x,a.z).dot(axis)+delta.length()/2
- var uv_scale:=0.64
+ var uv_scale:=0.99 if masonry and StoneSurface.uses_atlas(style) else 0.64
  if span.has("curve_center"):
   var radius:=float(span.curve_radius)/Plan.PX_PER_M
   var perimeter:=TAU*radius
-  uv_scale=maxf(1.0,roundf(perimeter*uv_scale))/perimeter
+  # The reflected fieldstone pattern closes after two repeats around the room.
+  var repeat:=2.0 if masonry and StoneSurface.uses_atlas(style) else 1.0
+  uv_scale=maxf(repeat,roundf(perimeter*uv_scale/repeat)*repeat)/perimeter
   var radial:Vector2=(span.a+span.b)/2-span.curve_center
   align=fposmod(radial.angle(),TAU)*radius
   var side:=Vector2(-axis.y,axis.x)
