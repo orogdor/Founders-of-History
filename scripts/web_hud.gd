@@ -178,9 +178,11 @@ func build_hud() -> void:
 	image_button("settings","ui-art-v306_settings","Menüü ja mängu seaded",toggle_menu)
 	picture("research_frame","ui-art-v302_research")
 	image_button("research_icon","ui-art-v263_cmd_research","Uurimine",open_research)
-	var research_name:=text_item("research_name","Vali uurimus",15,Color("ffe7b6"))
-	research_name.add_theme_stylebox_override("normal",menu_box(Color("12202a"),Color("9b783b")))
+	var research_name:=text_item("research_name","Vali uurimus",16,Color("432916"))
 	research_name.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	research_name.max_lines_visible=2
+	research_name.clip_text=true
+	research_name.add_theme_constant_override("line_spacing",-1)
 	var progress:=ProgressBar.new()
 	progress.show_percentage=false;progress.min_value=0;progress.max_value=100
 	progress.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -263,43 +265,46 @@ func layout() -> void:
 	place("pause",right*0.91,4,48,45)
 	place("settings",right*0.952,4,42,43)
 	place("research_frame",7,54,248,356)
-	place("research_icon",75,78,114,114)
-	place("research_name",23,172,218,46)
+	place("research_icon",77,78,108,108)
+	place("research_name",49,190,165,42)
 	place("research_progress",69,253,124,4)
 	for i in 4:place("research_queue_"+str(i),[5.0,45.0,101.0,160.0][i],[225.0,257.0,268.0,257.0][i],54,53)
 	place("research_all",205,228,47,53)
 	for i in 4:
 		var plus: Label=elements["research_queue_plus_"+str(i)]
 		plus.add_theme_font_size_override("font_size",maxi(10,roundi(25*ui_scale)))
-	var map_frame:=Rect2(0,bottom-326,298,326)
-	var selection_frame:=Rect2(right-326,bottom-328,326,328)
+	var map_frame:=Rect2(0,bottom-308,282,308)
+	var selection_frame:=Rect2(right-309,bottom-311,309,311)
 	place("map_frame",map_frame.position.x,map_frame.position.y,map_frame.size.x,map_frame.size.y)
 	place("selection_frame",selection_frame.position.x,selection_frame.position.y,selection_frame.size.x,selection_frame.size.y)
-	place_in_frame("minimap",map_frame,Vector2(0.421,0.548),202)
+	place_in_frame("minimap",map_frame,Vector2(0.421,0.548),191)
 	place_in_frame("map_switch",map_frame,Vector2(0.195,0.191),66)
 	place_in_frame("zoom_in",map_frame,Vector2(0.418,0.141),43)
 	place_in_frame("zoom_out",map_frame,Vector2(0.591,0.179),43)
 	place_in_frame("center",map_frame,Vector2(0.765,0.259),47)
 	place_in_frame("layers",map_frame,Vector2(0.856,0.438),47)
 	place_in_frame("resource_layer",map_frame,Vector2(0.856,0.612),48)
-	place_in_frame("portrait",selection_frame,Vector2(0.59,0.54),174)
-	place("selection_name",selection_frame.position.x+104,bottom-102,174,46)
+	place_in_frame("portrait",selection_frame,Vector2(0.59,0.54),165)
+	place("selection_name",selection_frame.position.x+100,bottom-96,165,43)
 	place_in_frame("selection_info",selection_frame,Vector2(0.615,0.133),53)
 	place_in_frame("selection_menu",selection_frame,Vector2(0.809,0.145),54)
 	place_in_frame("action_0",selection_frame,Vector2(0.255,0.245),56)
 	place_in_frame("action_1",selection_frame,Vector2(0.424,0.171),50)
 	place_in_frame("action_2",selection_frame,Vector2(0.168,0.431),58)
 	place_in_frame("action_3",selection_frame,Vector2(0.168,0.652),58)
-	var dock_left:=map_frame.end.x-17.0
-	var dock_width:=selection_frame.position.x-dock_left+18.0
+	# The center panel extends under both frames. The card lane starts outside the frames.
+	var dock_left:=map_frame.position.x+map_frame.size.x*0.52
+	var dock_right:=selection_frame.end.x-selection_frame.size.x*0.52
+	var lane_left:=map_frame.end.x+4.0
+	var lane_width:=selection_frame.position.x-lane_left-4.0
 	var gap:=9.0
-	var card_width:=maxf(1.0,minf((dock_width-66.0-gap*5.0)/6.0,minf(145.0,bottom*0.143)))
+	var card_width:=maxf(1.0,minf((lane_width-gap*5.0)/6.0,minf(145.0,bottom*0.143)))
 	var cards_width:=card_width*6.0+gap*5.0
-	var left:=dock_left+(dock_width-cards_width)*0.5
+	var left:=lane_left+(lane_width-cards_width)*0.5
 	var card_height:=card_width*1.5
 	var card_top:=bottom-23.0-card_height
 	var dock_top:=card_top-16.0
-	place("dock_background",dock_left,dock_top,dock_width,bottom-dock_top)
+	place("dock_background",dock_left,dock_top,dock_right-dock_left,bottom-dock_top)
 	for i in 6:
 		var key: String=["cities","build","armies","trade","diplomacy","journal"][i]
 		place("card_"+key,left+i*(card_width+gap),card_top,card_width,card_height)

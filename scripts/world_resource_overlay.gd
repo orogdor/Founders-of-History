@@ -5,6 +5,9 @@ const Terrain=preload("res://scripts/world_terrain.gd")
 const Geography=preload("res://scripts/world_geography.gd")
 const Campaign=preload("res://scripts/campaign_state.gd")
 const DetailTerrain=preload("res://scripts/detail_terrain.gd")
+const FactionPalette=preload("res://scripts/faction_palette.gd")
+const HEADER=preload("res://assets/ui/ui-art-v302_header.webp")
+const POPULATION=preload("res://assets/ui/ui-art-v263_res_population.webp")
 const UI:="res://assets/ui/"
 const ICONS:={"clay":"res_clay","copper":"res_copper","tin":"res_tin","wood":"res_wood","stone":"res_stone","ore":"res_iron","grain":"res_grain","water":"res_water","coal":"res_coal"}
 const LABELS:={"game":"🦌","fish":"🐟","oil":"🛢"}
@@ -19,7 +22,8 @@ var clock:=0.0
 var suggestion_clock:=3.0
 var suggestion_stamp: String=""
 var suggestions: Array=[]
-var city_banner: StyleBoxFlat
+var city_banner: Texture2D
+var city_font: Font
 var route_stamp: String=""
 var route_dashes: Array=[]
 var route_markers: Array=[]
@@ -36,8 +40,27 @@ func _ready() -> void:
 			for x in art.get_width():
 				var pixel:=art.get_pixel(x,y);var corrected:=pixel.linear_to_srgb();corrected.a=pixel.a;art.set_pixel(x,y,corrected)
 		icons[key]=ImageTexture.create_from_image(art)
-	city_banner=StyleBoxFlat.new();city_banner.bg_color=Color(0.047,0.102,0.110,0.86)
-	city_banner.border_color=Color(0.90,0.78,0.49,0.75);city_banner.set_border_width_all(1);city_banner.set_corner_radius_all(12)
+	city_banner=city_nameplate_texture()
+	var serif:=SystemFont.new()
+	serif.font_names=PackedStringArray(["Georgia","Noto Serif","DejaVu Serif","serif"])
+	serif.font_weight=700
+	city_font=serif
+
+static func city_nameplate_texture() -> Texture2D:
+	var source:=HEADER.get_image()
+	if source.is_compressed():source.decompress()
+	var trim:=source.get_region(Rect2i(650,0,372,78))
+	trim.convert(Image.FORMAT_RGBA8)
+	# Cut the connecting rails away from the central ornament.
+	for x in 48:
+		for y in trim.get_height():
+			var half_width:=2.0+float(x)*0.52
+			var opacity:=1.0-smoothstep(half_width-1.0,half_width+1.0,absf(float(y)-39.0))
+			for column in [x,trim.get_width()-1-x]:
+				var color:=trim.get_pixel(column,y)
+				color.a*=opacity
+				trim.set_pixel(column,y,color)
+	return ImageTexture.create_from_image(trim)
 
 func toggle_manual() -> void:
 	manual=not manual;stamp=""
@@ -139,53 +162,62 @@ func _draw() -> void:
 	draw_city_banners()
 
 func draw_detail_city_banner() -> void:
-	if host.battle_view!=null or host.settler_mode:return
-	var tile: Vector2i=host.selected if host.detail_inspection else host.player
-	var city: Variant=null
-	for candidate in host.game.get("cities",[]):
-		if int(candidate.c)==tile.x and int(candidate.r)==tile.y and (int(candidate.team)==0 or Campaign.visible_now(host.game,0,candidate)):
-			city=candidate;break
-	if city==null or not is_instance_valid(host.detail_root):return
-	var hall: Variant=null
-	for building in city.economy.buildings:
-		if building.type=="hall" and not building.get("virtual",false) and float(building.get("hp",0))>0:hall=building;break
-	if hall==null:return
-	var point:=Vector3(float(hall.x),host.detail_root.display_height(hall.x,hall.z)+26.0,float(hall.z)-14.0)
-	if host.camera.is_position_behind(point):return
-	var anchor: Vector2=host.camera.unproject_position(point)
-	var scale:=clampf(get_viewport_rect().size.y/720.0,0.5,2.0);var width:=186.0*scale;var height:=29.0*scale
-	var rect:=Rect2(anchor.x-width/2,anchor.y-height,width,height)
-	if not Rect2(Vector2.ZERO,size).intersects(rect):return
-	draw_style_box(city_banner,rect)
-	var x:=rect.position.x;var y:=rect.position.y
-	var shield:=PackedVector2Array([Vector2(x+9*scale,y+6*scale),Vector2(x+22*scale,y+6*scale),Vector2(x+22*scale,y+16*scale),Vector2(x+15.5*scale,y+23*scale),Vector2(x+9*scale,y+16*scale)])
-	draw_colored_polygon(shield,Color(["4f9a92","c0634a","8a6cc0","c9a43a"][clampi(int(city.team),0,3)]));draw_polyline(shield+PackedVector2Array([shield[0]]),Color("f4dfaa"),scale)
-	var font: Font=host.game_hud.ui_bold if host.game_hud.ui_bold!=null else get_theme_default_font()
-	var font_size:=maxi(9,roundi(14*scale));var name:=str(city.get("name","Linn"));var population:=str(floori(float(city.economy.realms[city.team].pop)))
-	draw_string(font,Vector2(x+28*scale,y+19*scale),name,HORIZONTAL_ALIGNMENT_LEFT,110*scale,font_size,Color("f4ead2"))
-	var pop_text:="♟ "+population;var pop_size:=maxi(8,roundi(11*scale));var pop_width:=font.get_string_size(pop_text,HORIZONTAL_ALIGNMENT_LEFT,-1,pop_size).x
-	draw_string(font,Vector2(x+width-pop_width-5*scale,y+19*scale),pop_text,HORIZONTAL_ALIGNMENT_LEFT,-1,pop_size,Color("e6c77e"))
+	if host.battle_view!=null or host.settler_mode or not is_instance_valid(host.detail_root):return
+	var tile: Vector2i=host.detail_root.tree_cell
+	for city in host.game.get("cities",[]):
+		if int(city.c)!=tile.x or int(city.r)!=tile.y or not city_visible(city):continue
+		for building in city.economy.buildings:
+			if building.type!="hall" or building.get("virtual",false) or float(building.get("hp",0))<=0:continue
+			var point:=Vector3(float(building.x),host.detail_root.display_height(building.x,building.z)+16.0,float(building.z)-3.0)
+			draw_city_banner(city,point,clampf(get_viewport_rect().size.y/830.0,0.72,1.6))
+			return
+		break
+
+func city_visible(city: Dictionary) -> bool:
+	return int(city.team)==0 or Campaign.visible_now(host.game,0,city)
 
 func draw_city_banners() -> void:
-	var scale:=clampf(get_viewport_rect().size.y/941.0,0.65,1.4)
-	var font_size:=maxi(10,roundi(15*scale))
+	var scale:=clampf(get_viewport_rect().size.y/915.0,0.64,1.45)
 	for city in host.game.get("cities",[]):
-		if int(city.team)!=0 and not Campaign.visible_now(host.game,0,city):continue
+		if not city_visible(city):continue
 		var point: Vector3=host.cell_position(Vector2i(int(city.c),int(city.r)))+Vector3(1,0,-0.08)
 		point.y=host.world_marker_height(point)+1.36
-		if host.camera.is_position_behind(point):continue
-		var anchor: Vector2=host.camera.unproject_position(point)
-		if anchor.x < -100 or anchor.y < -50 or anchor.x > size.x+100 or anchor.y > size.y+50:continue
-		var name:=str(city.get("name","Linn"));var population:=str(floori(float(city.economy.realms[city.team].pop)))
-		var name_width:=get_theme_default_font().get_string_size(name,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
-		var pop_width:=get_theme_default_font().get_string_size(population,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
-		var width:=clampf(name_width+pop_width+48*scale,90*scale,210*scale);var height:=27*scale
-		var rect:=Rect2(anchor.x-width/2,anchor.y-height,width,height)
-		draw_style_box(city_banner,rect)
-		var shield:=Rect2(rect.position+Vector2(8,6)*scale,Vector2(12,14)*scale)
-		draw_rect(shield,Color(["4f9a92","c0634a","8a6cc0","c9a43a"][clampi(int(city.team),0,3)]))
-		draw_string(get_theme_default_font(),rect.position+Vector2(25,19)*scale,name,HORIZONTAL_ALIGNMENT_LEFT,width-pop_width-47*scale,font_size,Color("f4ead2"))
-		draw_string(get_theme_default_font(),rect.position+Vector2(width-pop_width-8*scale,19*scale),population,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color("e6c77e"))
+		draw_city_banner(city,point,scale)
+
+func draw_city_banner(city: Dictionary,point: Vector3,scale: float) -> void:
+	if host.camera.is_position_behind(point):return
+	var anchor: Vector2=host.camera.unproject_position(point)
+	if not Rect2(Vector2.ZERO,size).grow(116.0).has_point(anchor):return
+	var name:=str(city.get("name","Linn"))
+	var headcount:=str(floori(float(city.economy.realms[int(city.team)].pop)))
+	var name_size:=maxi(10,roundi(16*scale))
+	var count_size:=maxi(8,roundi(12*scale))
+	var name_width:=city_font.get_string_size(name,HORIZONTAL_ALIGNMENT_LEFT,-1,name_size).x
+	var count_width:=city_font.get_string_size(headcount,HORIZONTAL_ALIGNMENT_LEFT,-1,count_size).x
+	var width:=clampf(name_width+count_width+102.0*scale,140.0*scale,254.0*scale)
+	var rect:=Rect2(anchor.x-width*0.5,anchor.y-43.0*scale,width,38.0*scale)
+	draw_texture_rect(city_banner,Rect2(rect.position+Vector2(0,1.5)*scale,rect.size),false,Color(0.03,0.04,0.06,0.70))
+	draw_texture_rect(city_banner,rect,false)
+	var crest_point:=rect.position+Vector2(width*0.105,10.8*scale)
+	draw_city_crest(crest_point,scale,int(city.team))
+	var count_x:=rect.end.x-width*0.12-count_width
+	var pop_box:=Rect2(Vector2(count_x-17.0*scale,rect.position.y+11.0*scale),Vector2.ONE*15.0*scale)
+	draw_texture_rect(POPULATION,pop_box,false,Color(1.0,0.88,0.62))
+	var text_x:=crest_point.x+20.0*scale
+	var baseline:=rect.position.y+24.0*scale
+	draw_string(city_font,Vector2(text_x,baseline),name,HORIZONTAL_ALIGNMENT_LEFT,count_x-text_x-20.0*scale,name_size,Color("f4e3bd"))
+	draw_string(city_font,Vector2(count_x,baseline-0.4*scale),headcount,HORIZONTAL_ALIGNMENT_LEFT,-1,count_size,Color("edd295"))
+
+func draw_city_crest(at: Vector2,scale: float,team: int) -> void:
+	var outline:=PackedVector2Array()
+	for p in [Vector2(0,0),Vector2(13,0),Vector2(13,8.6),Vector2(11.3,12),Vector2(6.5,16),Vector2(1.7,12),Vector2(0,8.6)]:
+		outline.append(at+p*scale)
+	var color:=FactionPalette.color(team,Color("607f9b"))
+	draw_colored_polygon(outline,color.darkened(0.20))
+	var light:=PackedVector2Array([outline[0],at+Vector2(6.5,0)*scale,outline[4],outline[5],outline[6]])
+	draw_colored_polygon(light,color.lightened(0.17))
+	outline.append(outline[0])
+	draw_polyline(outline,Color("dcc18c"),maxf(0.7,scale),true)
 
 func route_world_point(c: float,r: float) -> Vector3:
 	var point:=Vector3((c+0.5-Grid.COLS/2.0)*host.CELL_SIZE,0,(r+0.5-Grid.ROWS/2.0)*host.CELL_SIZE)

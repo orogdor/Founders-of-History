@@ -9,8 +9,9 @@ const Fence=preload("res://scripts/house_fence.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
 const WINDOWS:=[Vector2(0.76,1.44),Vector2(0.87,1.53),Vector2(0.92,1.64),Vector2(0.92,1.74),Vector2(0.88,1.86),Vector2(0.83,2.04),Vector2(0.68,2.16)]
 const ReedShader=preload("res://scripts/house_reed.gdshader")
-const PALETTE={"clay":"c18b54","weave":"a18353","stone":"a4a292","wood":"986741","bamboo":"9a805d","mudbrick":"c99b63","cutstone":"d3cab2","plank":"b5895a","brick":"b8573c","plaster":"efe7d3","halftimber":"ece2c9","hide":"b58d65","turf":"9a9462","stave":"c09872","minoanRed":"8e2a1d","minoanBlack":"1d1b1b"}
-const TEXTURES={"hide":"land-hide","clay":"atlas-clay","weave":"atlas-weave","stone":"proc-stone","wood":"atlas-wood","bamboo":"atlas-wood","mudbrick":"proc-mudbrick","cutstone":"proc-cutstone","plank":"proc-plank","brick":"proc-brick","plaster":"proc-plaster","halftimber":"proc-plaster","cyclopean":"proc-cyclopean","fresco":"proc-fresco","limestone":"proc-limestone","stave":"atlas-wood","turf":"land-earth","prestigePlaster":"proc-plaster","marble":"proc-marble","reticulatum":"proc-reticulatum","romanbrick":"proc-romanbrick","floor":"land-dirt","reed":"atlas-straw","thatch":"atlas-straw","sod":"proc-sod","bark":"proc-bark","shingle":"proc-shingle","tile":"proc-tile","earth":"proc-clayroof","roofplank":"proc-roofplank"}
+const DaubShader=preload("res://scripts/house_daub.gdshader")
+const PALETTE={"clay":"c18b54","weave":"a18353","stone":"a4a292","hutStone":"8d8777","wood":"986741","bamboo":"9a805d","mudbrick":"c99b63","cutstone":"d3cab2","plank":"b5895a","brick":"b8573c","plaster":"efe7d3","halftimber":"ece2c9","hide":"b58d65","turf":"9a9462","stave":"c09872","minoanRed":"8e2a1d","minoanBlack":"1d1b1b"}
+const TEXTURES={"hide":"land-hide","clay":"atlas-clay","weave":"atlas-weave","stone":"proc-stone","hutStone":"proc-stone","wood":"atlas-wood","bamboo":"atlas-wood","mudbrick":"proc-mudbrick","cutstone":"proc-cutstone","plank":"proc-plank","brick":"proc-brick","plaster":"proc-plaster","halftimber":"proc-plaster","cyclopean":"proc-cyclopean","fresco":"proc-fresco","limestone":"proc-limestone","stave":"atlas-wood","turf":"land-earth","prestigePlaster":"proc-plaster","marble":"proc-marble","reticulatum":"proc-reticulatum","romanbrick":"proc-romanbrick","floor":"land-dirt","reed":"atlas-straw","thatch":"atlas-straw","sod":"proc-sod","bark":"proc-bark","shingle":"proc-shingle","tile":"proc-tile","earth":"proc-clayroof","roofplank":"proc-roofplank"}
 static var model_cache:Dictionary={}
 static var cache_order:Array[String]=[]
 var roof_material:="reed"
@@ -23,6 +24,8 @@ var reed_surface: ShaderMaterial
 var simplified:=false
 var settlement_detail:=false
 var early_round_hut:=false
+var daub_material: ShaderMaterial
+var hut_reed_surface: ShaderMaterial
 const LOD_COLORS={
  "limestone":"b4ac90","cutstone":"a8a38c","cyclopean":"80766b","marble":"dad2bc",
  "fresco":"b18c62","brick":"985746","romanbrick":"a35f49","reticulatum":"9b8c69",
@@ -65,14 +68,30 @@ func material_for(style: String) -> StandardMaterial3D:
  if style=="glass":
   material.albedo_color=Color(0.37,0.58,0.65,0.54);material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
   material.roughness=0.24;materials[style]=material;return material
- if key.begins_with("proc-"):material.albedo_color=Color.WHITE
+ if key.begins_with("proc-") and style!="hutStone":material.albedo_color=Color.WHITE
  if not key.is_empty() and ResourceLoader.exists(file):material.albedo_texture=load(file);material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;material.uv1_scale=Vector3(2,2,1)
  if style in ["reed","thatch"]:material.uv1_scale=Vector3(0.2,1,1)
  if not settlement_detail:SurfaceDetail.refine_architecture(material,style,not Mobile.active)
  materials[style]=material;return material
 
+func hut_daub_material() -> Material:
+ if simplified and not settlement_detail:return material_for("clay")
+ if daub_material==null:
+  daub_material=ShaderMaterial.new()
+  daub_material.shader=DaubShader
+  daub_material.set_shader_parameter("clay_atlas",preload("res://assets/house_designer/atlas-clay.webp"))
+  daub_material.set_shader_parameter("wattle_atlas",preload("res://assets/house_designer/atlas-weave.webp"))
+ return daub_material
+
 func roof_surface_material() -> Material:
  if (simplified and not settlement_detail) or roof_material not in ["reed","thatch"]:return material_for(roof_material)
+ if early_round_hut:
+  if hut_reed_surface==null:
+   hut_reed_surface=ShaderMaterial.new()
+   hut_reed_surface.shader=ReedShader
+   hut_reed_surface.set_shader_parameter("reed_atlas",preload("res://assets/house_designer/atlas-straw.webp"))
+   hut_reed_surface.set_shader_parameter("hut_thatch",true)
+  return hut_reed_surface
  if reed_surface==null:
   reed_surface=ShaderMaterial.new();reed_surface.shader=ReedShader
   reed_surface.set_shader_parameter("reed_atlas",load("res://assets/house_designer/atlas-straw.webp"))
@@ -371,10 +390,36 @@ func add_settlement_opening(a: Vector3,b: Vector3,opening: Dictionary,era: int,b
   fence_box(jamb-axis*trim*0.5,jamb+axis*trim*0.5,bottom,top-bottom,trim*1.8,face)
  fence_box(a-axis*trim,b+axis*trim,top-trim*0.26,trim,trim*2.0,face)
  fence_box(a-axis*trim,b+axis*trim,bottom-trim*0.27,trim*0.55,trim*2.7,"stone" if door else face)
- if door and curved and era==0 and roof_material in ["reed","thatch"]:add_reed_door_hood(a,b,top)
+ if door and curved and era==0 and roof_material in ["reed","thatch"]:
+  if early_round_hut:add_hut_entrance(a,b,top)
+  else:add_reed_door_hood(a,b,top)
  if not door and str(opening.get("style","")) in ["glazed","lattice","archwin"]:
   var middle:=(a+b)*0.5
   fence_box(middle-axis*0.035,middle+axis*0.035,bottom,top-bottom,0.09,face)
+
+func add_hut_entrance(a: Vector3,b: Vector3,top: float) -> void:
+ var axis:Vector3=(b-a).normalized()
+ var center:Vector3=(a+b)*0.5
+ var front:=Vector3(-axis.z,0,axis.x)
+ if front.dot(center)<0.0:front=-front
+ var half_width:=a.distance_to(b)*0.5
+ var roof:=SurfaceTool.new()
+ roof.begin(Mesh.PRIMITIVE_TRIANGLES);roof.set_material(roof_surface_material())
+ var peak:=center-front*0.08+Vector3.UP*(top+0.46)
+ var tip:=center+front*0.64+Vector3.UP*(top+0.29)
+ for side:float in [-1.0,1.0]:
+  var eave:=center+axis*side*(half_width+0.26)+Vector3.UP*(top+0.02)
+  var lip:=eave+front*0.72+Vector3.DOWN*0.095
+  var points:=[peak,eave,tip,lip,lip+Vector3.DOWN*0.13,eave+Vector3.DOWN*0.095]
+  var uv:=[Vector2(0,1.15),Vector2(0.9,0.0),Vector2(0,0.96),Vector2(0.9,0.01),Vector2(0.91,-0.11),Vector2(0.91,-0.10)]
+  for index in [0,1,2,2,1,3,1,5,3,3,5,4]:
+   roof.set_uv(uv[index]);roof.add_vertex(points[index])
+  var post:Vector3=center+axis*side*(half_width+0.075)+front*0.42
+  add_pole(post-axis*side*0.045,post+Vector3.UP*(top-0.02)+axis*side*0.045,0.086,"bark")
+  add_pole(post+Vector3.UP*(top-0.28),eave+Vector3.UP*0.10,0.043,"wood")
+ roof.generate_normals()
+ var canopy:=MeshInstance3D.new();canopy.name="HutEntranceCanopy";canopy.mesh=roof.commit()
+ canopy.set_meta("house_roof",true);add_child(canopy)
 
 func add_reed_door_hood(a: Vector3,b: Vector3,top: float) -> void:
  var axis: Vector3=(b-a).normalized()
@@ -638,8 +683,11 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var a:=local(span.a);var b:=local(span.b);var delta:=b-a
  if delta.length()<0.016:return
  var style:=str(span.finish);var width:=0.19 if span.group=="outer" else 0.115
- var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,width*0.37 if style in ["wood","stave","bamboo","weave"] else width)
- var wall_material:=material_for(style)
+ var round_exterior:bool=early_round_hut and span.group=="outer" and span.has("curve_center")
+ var daub:bool=round_exterior and style=="weave"
+ var depth:=width*0.37 if style in ["wood","stave","bamboo","weave"] and not daub else width
+ var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,depth)
+ var wall_material:Material=hut_daub_material() if daub else material_for(style)
  var arrays:=mesh.get_mesh_arrays()
  var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
  var normals:PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
@@ -673,9 +721,12 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var surface:=SurfaceTool.new();surface.create_from(source_mesh,0);surface.generate_tangents()
  var wall_mesh:=surface.commit()
  var node:=MeshInstance3D.new();node.name="HouseWall";node.mesh=wall_mesh;node.material_override=wall_material;node.position=(a+b)/2+Vector3(0,(low+high)/2,0);node.rotation.y=-atan2(delta.z,delta.x);add_child(node)
- if (settlement_detail or early_round_hut) and span.group=="outer" and low<=0.0:
-  var footing:=0.20 if early_round_hut and style=="weave" else 0.16 if style in ["stone","cutstone","limestone","medievalRubble"] else 0.11
+ if round_exterior and low<=0.0:
+  add_hut_footing(a,b)
+ elif settlement_detail and span.group=="outer" and low<=0.0:
+  var footing:=0.16 if style in ["stone","cutstone","limestone","medievalRubble"] else 0.11
   fence_box(a,b,low-0.065,footing,width*1.42,"stone" if style in ["wood","stave","weave","bamboo"] else style)
+ if daub:return
  if simplified and style!="halftimber" and not (settlement_detail and style in ["wood","stave"]):return
  if style=="wood":
   var rows:=maxi(1,roundi((high-low)/(0.28 if settlement_detail else 0.19)));var row_height:float=(high-low)/rows
@@ -703,6 +754,21 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
     if i<posts:
      var q:=a.lerp(b,float(i+1)/posts)+offset
      add_wall_brace((p if i%2==1 else q)+Vector3.UP*(low+0.05),(q if i%2==1 else p)+Vector3.UP*(high-0.05),0.028)
+
+func add_hut_footing(a: Vector3,b: Vector3) -> void:
+ if simplified and not settlement_detail:return
+ var axis:=b-a
+ var seed:=roundi((a.x+3.1*a.z)*911.0)
+ var shape:=SphereMesh.new()
+ shape.radial_segments=7;shape.rings=3
+ shape.radius=0.5;shape.height=1.0
+ var stone:=MeshInstance3D.new()
+ stone.name="HutFieldstone"
+ stone.mesh=shape;stone.material_override=material_for("hutStone")
+ stone.position=a.lerp(b,0.41+0.19*fence_noise(seed))+Vector3.UP*(0.015+0.035*fence_noise(seed+11))
+ stone.scale=Vector3(axis.length()*(1.10+0.34*fence_noise(seed+15)),0.18+0.16*fence_noise(seed+18),0.27+0.09*fence_noise(seed+12))
+ stone.rotation=Vector3((fence_noise(seed+23)-0.5)*0.31,-atan2(axis.z,axis.x),(fence_noise(seed+47)-0.5)*0.29)
+ add_child(stone)
 
 func add_wall_brace(a: Vector3,b: Vector3,radius: float) -> void:
  if a.distance_to(b)<0.001:return
@@ -764,8 +830,10 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
     roof_end(sample,along_t,inset,0.88+lift)
  elif room.type=="round":
   var outline:=Plan.room_polygon(room);var center:=Plan.point(room.a);var radius:float=float(room.r)/Plan.PX_PER_M
+  if early_round_hut:
+   add_round_thatch(outline,center,radius,rise,lift)
+   return
   var peak:=1.75+(maxf(2.70,2.15+radius*0.92)-1.75)*rise
-  if early_round_hut:peak=1.40+(maxf(2.05,1.60+radius*0.51)-1.40)*rise
   var seat:=0.27
   var sample=func(s: float,t: float) -> Vector3:
    t=minf(t,0.992);var index:float=s*outline.size();var k:=floori(index);var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k);var clear:=0.0
@@ -777,12 +845,45 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
    var eave:=0.8 if lift>0 else 0.62+clear*0.95;var seat_height:=1.05+clear*0.66
    var fullness:float=1+(1-t/seat)*maxf(0.15,0.32/maxf(0.40,radius)) if t<=seat else 1-(t-seat)/(1-seat)
    var p:Vector2=center.lerp(rim,fullness)
-   var curve:=0.66 if early_round_hut else 0.71 if settlement_detail else 0.90
+   var curve:=0.71 if settlement_detail else 0.90
    var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),curve)
-   var reed_edge:=(0.032*sin(s*TAU*7)+0.022*sin(s*TAU*11))*(1-t) if early_round_hut else 0.0
-   return local(p,y+reed_edge+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
+   return local(p,y+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
   roof_grid(sample,maxi(outline.size()*3,72),38)
   roof_courses(sample,maxi(outline.size()*3,72),clampi(roundi(radius*3.2),6,11),true)
+
+func add_round_thatch(outline: PackedVector2Array,center: Vector2,radius: float,rise: float,lift: float) -> void:
+ var ridge:=center+Vector2(-0.12,0.09)*Plan.PX_PER_M
+ var eave:=lift+0.89
+ var height:=(1.38+0.27*radius)*clampf(rise,0.22,1.85)
+ var sample:=func(s: float,t: float) -> Vector3:
+  var around:=s*TAU
+  var index:=s*outline.size();var k:=floori(index)
+  var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k)
+  var overhang:=0.43+0.050*sin(around*3.0)+0.035*cos(around*7.0)
+  var edge:=rim+(rim-center).normalized()*overhang*Plan.PX_PER_M
+  var radius_curve:=1.0-t+sin(t*PI)*0.085
+  var p:=ridge.lerp(edge,radius_curve)
+  var wobble:=0.043*sin(around*7.0)+0.026*sin(around*15.0+1.7)
+  var y:=eave+height*(t+0.15*sin(t*PI))+wobble*pow(1.0-t,1.9)
+  return local(p,y)
+ var columns:=outline.size()*3
+ roof_grid(sample,columns,25)
+ if simplified and not settlement_detail:return
+ var edge:=SurfaceTool.new()
+ edge.begin(Mesh.PRIMITIVE_TRIANGLES);edge.set_material(roof_surface_material())
+ var steps:=columns if not settlement_detail else 32
+ for i in steps:
+  var u:=float(i)/steps;var v:=float(i+1)/steps
+  var top_a:Vector3=sample.call(u,0.0);var top_b:Vector3=sample.call(v,0.0)
+  var bottom_a:Vector3=top_a.lerp(local(center,top_a.y),0.055)-Vector3.UP*(0.16+0.046*fence_noise(i))
+  var bottom_b:Vector3=top_b.lerp(local(center,top_b.y),0.055)-Vector3.UP*(0.16+0.046*fence_noise((i+1)%steps))
+  var vertices:=[top_a,top_b,bottom_a,bottom_b]
+  var uv:=[Vector2(u*3.8,0.0),Vector2(v*3.8,0.0),Vector2(u*3.8,-0.12),Vector2(v*3.8,-0.12)]
+  for index in [0,2,1,1,2,3]:
+   edge.set_uv(uv[index]);edge.add_vertex(vertices[index])
+ edge.generate_normals()
+ var mesh:=MeshInstance3D.new();mesh.name="ThatchEave";mesh.mesh=edge.commit();add_child(mesh)
+ if not settlement_detail:add_reed_fringe(sample,columns,1)
 
 func add_terrace_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
  var floor:=Plan.room_polygon(room)

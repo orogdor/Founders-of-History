@@ -6,6 +6,7 @@ render_mode cull_disabled, diffuse_burley;
 uniform sampler2D reed_atlas : source_color, filter_linear_mipmap, repeat_disable;
 uniform vec4 reed_tint : source_color = vec4(0.46, 0.42, 0.36, 1.0);
 uniform bool settlement_detail = false;
+uniform bool hut_thatch = false;
 varying vec3 surface_world;
 
 void vertex() {
@@ -28,7 +29,21 @@ vec3 reed_sample(vec2 cell, vec2 uv) {
 }
 
 void fragment() {
- if (settlement_detail) {
+ if (hut_thatch) {
+  vec3 bundle = reed_sample(vec2(3.0, 9.0), vec2(UV.x*1.44, UV.y*0.59));
+  float grain = dot(bundle, vec3(0.24, 0.68, 0.08));
+  float strand_x = UV.x * 277.0 + sin(UV.y*7.3 + UV.x*34.0)*0.08;
+  float line = sin(strand_x*6.283 + sin(UV.y*24.0)*0.28);
+  float fine = line * (1.0-smoothstep(0.16,0.60,fwidth(strand_x)));
+  float weather = 0.5+0.5*sin(surface_world.x*0.91+surface_world.y*2.4)*sin(surface_world.z*0.75+surface_world.y*0.33);
+  vec3 straw = mix(vec3(0.29,0.21,0.115),vec3(0.52,0.38,0.207),grain*0.65+weather*0.35);
+  float cut_ends = smoothstep(-0.19,-0.015,UV.y);
+  ALBEDO = straw*(0.59+0.41*cut_ends)*(0.93+fine*0.12);
+  ROUGHNESS = 0.95;
+  SPECULAR = 0.13;
+  float close_detail = 1.0-smoothstep(14.0,38.0,length(VERTEX));
+  NORMAL = material_relief_normal(VERTEX,NORMAL,close_detail*(grain*0.007+fine*0.0007));
+ } else if (settlement_detail) {
   vec3 straw = reed_sample(vec2(3.0, 9.0), UV);
   float tone = 0.94 + sin(surface_world.x * 1.08 + surface_world.z * 0.69) * 0.06;
   ALBEDO = (straw * vec3(0.78, 0.74, 0.64) + vec3(0.028, 0.018, 0.010)) * tone;
