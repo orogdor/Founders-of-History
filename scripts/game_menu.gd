@@ -1,7 +1,7 @@
 extends Control
 
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
-
+const MenuArt = preload("res://scripts/main_menu_art.gd")
 const Mobile = preload("res://scripts/mobile_profile.gd")
 const BuildLabel = preload("res://scripts/build_label.gd")
 
@@ -36,26 +36,39 @@ var pages: Dictionary={}
 var nav_buttons: Dictionary={}
 var page_title: Label
 var sidebar: VBoxContainer
+var home: Control
+var home_title: VBoxContainer
+var home_dock: HBoxContainer
+var home_continue: Button
+var home_cards: Array[Button] = []
+var home_footer: HBoxContainer
+var title_top: Label
+var title_bottom: Label
+var home_status: Label
+var back_compact: Button
+var current_page := ""
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter=Control.MOUSE_FILTER_STOP;visible=false
-	var background:=TextureRect.new();background.texture=load("res://assets/ui/ui-art-v304_chronicle.webp")
-	background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(background)
-	var shade:=ColorRect.new();shade.color=Color("06101b");shade.color.a=0.82
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(shade)
+	theme=InterfaceTheme.get_theme()
+	MenuArt.cover(self, MenuArt.BACKGROUND, TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	var shade := MenuArt.vignette()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+	build_home()
 	var center:=CenterContainer.new();center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(center)
+	center.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	menu_card=PanelContainer.new();center.add_child(menu_card)
-	menu_card.add_theme_stylebox_override("panel",InterfaceTheme.panel(10))
+	menu_card.add_theme_stylebox_override("panel",MenuArt.panel(36))
 	var columns:=HBoxContainer.new();columns.add_theme_constant_override("separation",0);menu_card.add_child(columns)
 	menu_cover=PanelContainer.new();menu_cover.custom_minimum_size.x=230;columns.add_child(menu_cover)
-	var nav_style:=StyleBoxFlat.new();nav_style.bg_color=Color("0d1925");nav_style.border_color=Color("4f483a");nav_style.border_width_right=1;nav_style.content_margin_left=18;nav_style.content_margin_right=18;nav_style.content_margin_top=22;nav_style.content_margin_bottom=16
+	var nav_style:=StyleBoxFlat.new();nav_style.bg_color=Color("0a1420bb");nav_style.border_color=Color("9d784b7a");nav_style.border_width_right=1;nav_style.content_margin_left=12;nav_style.content_margin_right=12;nav_style.content_margin_top=10;nav_style.content_margin_bottom=10
 	menu_cover.add_theme_stylebox_override("panel",nav_style)
 	var nav_scroll:=ScrollContainer.new();nav_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;menu_cover.add_child(nav_scroll)
 	sidebar=VBoxContainer.new();sidebar.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sidebar.size_flags_vertical=Control.SIZE_EXPAND_FILL;sidebar.add_theme_constant_override("separation",6);nav_scroll.add_child(sidebar)
-	var brand:=add_label(sidebar,"FOUNDERS OF\nHISTORY",23,Color("f5dfab"));brand.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	var spacer:=Control.new();spacer.custom_minimum_size.y=8;sidebar.add_child(spacer)
+	var back := add_button(sidebar,"‹  Peamenüü",show_page.bind(""))
+	back.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	continue_button=add_button(sidebar,"▶  Jätka mängu",close_menu,true)
 	add_nav("new","Uus mäng")
 	add_nav("saves","Salvestused")
@@ -66,10 +79,12 @@ func _ready() -> void:
 	var scroll:=ScrollContainer.new();menu_scroll=scroll;scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;columns.add_child(scroll)
 	var frame:=PanelContainer.new();menu_frame=frame;frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var panel:=StyleBoxFlat.new();panel.bg_color=Color(0.02,0.06,0.10,0.1)
-	panel.content_margin_left=18;panel.content_margin_right=28;panel.content_margin_top=24;panel.content_margin_bottom=20
+	var panel:=StyleBoxFlat.new();panel.bg_color=Color("101d2bba")
+	panel.content_margin_left=14;panel.content_margin_right=14;panel.content_margin_top=12;panel.content_margin_bottom=16
 	frame.add_theme_stylebox_override("panel",panel);scroll.add_child(frame)
 	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",10);frame.add_child(content)
+	back_compact=add_button(content,"‹  Peamenüü",show_page.bind(""))
+	back_compact.alignment=HORIZONTAL_ALIGNMENT_LEFT
 	var version:=add_label(content,BuildLabel.detailed_text(get_tree()),12,Color("d5bf90"));version.name="GameVersion"
 	page_title=add_label(content,"",25,Color("f7e5bc"))
 	menu_status=add_label(content,"",12,Color("bfc9b8"));menu_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -130,11 +145,95 @@ func _ready() -> void:
 	import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE;import_dialog.add_filter("*.json ; JSON-fail")
 	import_dialog.file_selected.connect(import_game);add_child(import_dialog)
 	if updates!=null:add_update_controls(extras,updates)
-	var footer:=add_label(content,"60 mängusekundit = 1 käik. Menüü ja pausi ajal mäng seisab.",11,Color("aabeb1"));footer.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	menu_card.theme=InterfaceTheme.get_theme()
-	show_page("new")
+	show_page("")
 	get_viewport().size_changed.connect(layout_menu)
 	layout_menu()
+
+func build_home() -> void:
+	home=Control.new()
+	home.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	home.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(home)
+
+	home_title=VBoxContainer.new()
+	home_title.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	home_title.add_theme_constant_override("separation", -4)
+	home.add_child(home_title)
+	title_top=add_label(home_title,"F O U N D E R S   O F",25,MenuArt.GOLD)
+	title_top.accessibility_name="Founders of"
+	title_bottom=add_label(home_title,"HISTORY",82,Color("fff0c7"))
+	var display_font := SystemFont.new()
+	display_font.font_names=PackedStringArray(["Georgia","Noto Serif","DejaVu Serif"])
+	display_font.font_weight=700
+	for letter in [title_top,title_bottom]:
+		letter.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		letter.add_theme_font_override("font",display_font)
+		letter.add_theme_color_override("font_shadow_color",Color("070a14bd"))
+		letter.add_theme_constant_override("shadow_offset_x",0)
+		letter.add_theme_constant_override("shadow_offset_y",3)
+	var title_rule := MenuArt.rule()
+	home_title.add_child(title_rule)
+	home_title.add_theme_constant_override("separation",2)
+
+	var rail := MenuArt.picture(MenuArt.DIVIDER)
+	rail.name="DockRail"
+	home.add_child(rail)
+	home_dock=HBoxContainer.new()
+	home_dock.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	home_dock.add_theme_constant_override("separation",14)
+	home.add_child(home_dock)
+	var artwork := [
+		["Jätka mängu", preload("res://assets/ui/ui-art-v306_kingdom_portrait.webp"), Rect2(0,0,512,512), close_menu],
+		["Uus mäng", preload("res://assets/ui/ui-art-v306_card_build.webp"), Rect2(32,43,383,398), show_page.bind("new")],
+		["Salvestused", preload("res://assets/ui/ui-art-v306_card_journal.webp"), Rect2(32,43,383,398), show_page.bind("saves")],
+		["Seaded", preload("res://assets/ui/ui-art-v306_card_diplomacy.webp"), Rect2(35,132,379,310), show_page.bind("options")],
+	]
+	for entry in artwork:
+		var button := MenuArt.card(entry[0],entry[1],entry[2],entry[3])
+		home_dock.add_child(button)
+		home_cards.append(button)
+	home_continue=home_cards[0]
+
+	home_status=add_label(home,"",14,MenuArt.GOLD)
+	home_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	home_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	home_status.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	home_status.add_theme_color_override("font_outline_color",Color("101820"))
+	home_status.add_theme_constant_override("outline_size",6)
+
+	home_footer=HBoxContainer.new()
+	home_footer.alignment=BoxContainer.ALIGNMENT_CENTER
+	home_footer.add_theme_constant_override("separation",12)
+	home.add_child(home_footer)
+	add_button(home_footer,"Mäng ja uuendused",show_page.bind("extras"))
+	add_button(home_footer,"Sulge mäng",func():get_tree().quit())
+
+func layout_home(viewport: Vector2) -> void:
+	var gap := 10 if viewport.x < 650.0 else 16
+	var card_width := minf(145.0,minf((viewport.x-32.0-gap*3)/4.0,viewport.y*0.21))
+	card_width = maxf(42.0,card_width)
+	var card_height := roundf(card_width*1.5)
+	home_dock.add_theme_constant_override("separation",gap)
+	for button in home_cards:
+		button.custom_minimum_size=Vector2(card_width,card_height)
+		var caption: Label=button.get_meta("caption")
+		caption.add_theme_font_size_override("font_size",clampi(int(card_width*0.13),9,19))
+	var dock_width := card_width*4.0 + gap*3.0
+	var dock_bottom := viewport.y - clampf(viewport.y*0.127,63.0,94.0)
+	home_dock.size=Vector2(dock_width,card_height)
+	home_dock.position=Vector2(roundf((viewport.x-dock_width)*0.5),roundf(dock_bottom-card_height))
+	home_status.size=Vector2(minf(viewport.x-24.0,600.0),36.0)
+	home_status.position=Vector2((viewport.x-home_status.size.x)*0.5,home_dock.position.y-42.0)
+	var rail: TextureRect=home.get_node("DockRail")
+	var rail_width := minf(viewport.x,maxf(dock_width+116.0,viewport.x*0.73))
+	rail.size=Vector2(rail_width,clampf(viewport.y*0.035,16.0,30.0))
+	rail.position=Vector2((viewport.x-rail_width)*0.5,dock_bottom-rail.size.y*0.62)
+	home_footer.size=Vector2(viewport.x,45.0)
+	home_footer.position=Vector2(0,dock_bottom+12.0)
+	title_top.add_theme_font_size_override("font_size",clampi(roundi(viewport.y*0.035),14,29))
+	title_bottom.add_theme_font_size_override("font_size",clampi(roundi(minf(viewport.x*0.115,viewport.y*0.118)),32,90))
+	home_title.size=Vector2(viewport.x,0)
+	home_title.position=Vector2(0,clampf(viewport.y*0.095,18.0,86.0))
 
 func add_update_controls(parent: VBoxContainer,updates: Node) -> void:
 	add_button(parent,"Kontrolli uuendusi",updates.check)
@@ -144,11 +243,18 @@ func add_update_controls(parent: VBoxContainer,updates: Node) -> void:
 
 func layout_menu() -> void:
 	var viewport:=get_viewport_rect().size
-	var width:=maxf(240.0,minf(1060.0,viewport.x-32.0));var height:=maxf(180.0,viewport.y-48.0)
+	layout_home(viewport)
+	var width:=maxf(240.0,minf(920.0,viewport.x-32.0));var height:=maxf(180.0,minf(660.0,viewport.y-36.0))
 	menu_card.custom_minimum_size=Vector2(width,height);menu_card.size=menu_card.custom_minimum_size
-	menu_cover.custom_minimum_size.x=clampf(width*0.28,150.0,230.0)
+	var compact := viewport.x < 640.0
+	menu_cover.visible=not compact
+	back_compact.visible=compact
+	var frame_style: StyleBox = menu_card.get_theme_stylebox("panel")
+	for side in [SIDE_LEFT,SIDE_TOP,SIDE_RIGHT,SIDE_BOTTOM]:
+		frame_style.set_content_margin(side,16.0 if compact else 36.0)
+	menu_cover.custom_minimum_size.x=clampf(width*0.28,132.0,208.0)
 	menu_scroll.custom_minimum_size=Vector2.ZERO
-	menu_frame.custom_minimum_size.x=maxf(160.0,width-menu_cover.custom_minimum_size.x-30.0)
+	menu_frame.custom_minimum_size.x=0
 
 func add_nav(key: String, caption: String) -> void:
 	var button:=add_button(sidebar,caption,show_page.bind(key))
@@ -159,6 +265,9 @@ func add_nav(key: String, caption: String) -> void:
 	nav_buttons[key]=button
 
 func show_page(key: String) -> void:
+	current_page=key
+	home.visible=key.is_empty()
+	menu_card.visible=not key.is_empty()
 	for page in pages:pages[page].visible=page==key
 	for page in nav_buttons:nav_buttons[page].disabled=page==key
 	var titles={"new":"Uus mäng","saves":"Salvestused","options":"Seaded","extras":"Mäng ja uuendused"}
@@ -191,7 +300,8 @@ func open_menu() -> void:
 	for i in difficulty.item_count:
 		if difficulty.get_item_metadata(i)==host.game.get("difficulty","normal"):difficulty.select(i);break
 	menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
-	update_reveal();refresh_slots();show_page("new");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
+	update_reveal();refresh_slots();show_page("");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
+	performance_layer.hide()
 
 func _process(_delta: float) -> void:
 	if performance_label!=null and performance_label.visible:
@@ -202,12 +312,18 @@ func _process(_delta: float) -> void:
 	if not visible:return
 	var loading: bool=host.generation_thread!=null
 	continue_button.disabled=loading
+	if home_continue.disabled!=loading:
+		home_continue.disabled=loading
+		var refresh: Callable=home_continue.get_meta("refresh")
+		refresh.call()
 	if loading:menu_status.text="Salvestatud maailma laadimine käib…" if not host.pending_load.is_empty() else "Maailma loomine käib…"
 	elif was_loading:menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""));seed.text=host.seed_input.text
+	home_status.text=menu_status.text if loading or host.autosave_suspended else ""
 	was_loading=loading
 
 func close_menu() -> void:
 	visible=false;host.menu_open=false
+	performance_layer.show()
 
 func toggle_reveal() -> void:
 	host.toggle_fog();update_reveal()
@@ -311,7 +427,9 @@ func open_controls() -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if visible and event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
-		close_menu();get_viewport().set_input_as_handled()
+		if not current_page.is_empty():show_page("")
+		elif not continue_button.disabled:close_menu()
+		get_viewport().set_input_as_handled()
 
 func create_performance_overlay() -> void:
 	performance_layer=CanvasLayer.new();performance_layer.layer=30;host.add_child(performance_layer)

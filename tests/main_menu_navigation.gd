@@ -11,6 +11,13 @@ func run() -> void:
 	var menu=game.game_hud.game_menu
 	menu.open_menu()
 	await process_frame
+	assert(menu.home.visible and not menu.menu_card.visible)
+	var home_pages := ["new", "saves", "options"]
+	for index in home_pages.size():
+		menu.home_cards[index + 1].pressed.emit()
+		await process_frame
+		assert(menu.pages[home_pages[index]].visible and not menu.home.visible)
+		menu.show_page("")
 	for key in ["new","saves","options","extras"]:
 		menu.nav_buttons[key].pressed.emit()
 		await process_frame
@@ -24,7 +31,8 @@ func run() -> void:
 	await process_frame
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("/tmp/founders-menu.png")
-	menu.close_menu()
+	menu.show_page("")
+	menu.home_cards[0].pressed.emit()
 	assert(not menu.visible and not game.menu_open)
 	print("MAIN_MENU_NAVIGATION_OK")
 	game.queue_free()
