@@ -55,6 +55,16 @@ static func tile_heights(cells: Array, c: int, r: int) -> Array:
 			result.append(floor((sampled-0.7)*30+0.5)/100.0)
 	return result
 
+static func tile_straddles_shore(cells: Array,c: int,r: int) -> bool:
+	# A 50 m tile plus the maximum 11 m shore warp only reaches the
+	# neighbouring samples. All-land samples are at least 4 m high.
+	for dz in range(-1,2):
+		for dx in range(-1,2):
+			if sample(cells,c+dx,r+dz)>=4.0:continue
+			var heights:=tile_heights(cells,c,r)
+			return heights.min()<0 and heights.max()>0
+	return false
+
 static func detail_height(heights: Array, x: float, z: float) -> float:
 	if heights.size() != 81: return 0.3
 	var fx := clampf((x/225.0+0.5)*8,0,8)
@@ -140,4 +150,3 @@ static func raw_resources(c: int, r: int, biome: String, heights: Array, seed: i
 		if detail_height(heights,x,z) > 0.4 and absf(z) > 16:
 			resources.append([1 if i%5 == 0 else 0,x,z])
 	return resources
-

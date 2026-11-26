@@ -489,17 +489,28 @@ static func reserve(state: Dictionary,city: Dictionary,runtime: Dictionary,natur
  var natural:Variant=natural_plan.call() if natural_plan.is_valid() else null
  if natural is Dictionary:natural.reservedV168=true;return natural
  var nav:LocalNavigation=runtime.nav;var best:Variant=null;var best_score:=-INF
+ var passable: Dictionary={}
  for ex in [14,0,28]:
   for ez in [14,0,28]:
    for dx in [0,-7,7]:
     for dz in [0,-7,7]:
-     var candidate:=wall_plan([hall],int(state.seed)+int(city.id)*19,{"extraX":ex,"extraZ":ez,"dx":dx,"dz":dz});var bad:=0
+     var candidate:=wall_plan([hall],int(state.seed)+int(city.id)*19,{"extraX":ex,"extraZ":ez,"dx":dx,"dz":dz})
+     var radius_x_penalty:=absf(float(candidate.rx)-56)*0.2
+     var radius_z_penalty:=absf(float(candidate.rz)-56)*0.2
+     var center_penalty:=(absi(dx)+absi(dz))*0.06
+     var score:float=-radius_x_penalty-radius_z_penalty-center_penalty
+     if score<=best_score:continue
+     var bad:=0
      for slot in candidate.slots:
       var half:float=float(slot.get("palisadeSpanV167",14))/2 if slot.type=="palisade" else 7.0 if slot.type=="woodgate" else 2.0
       var count:=ceili(half/3)
       for k in range(-count,count+1):
        var step:=float(k)*half/count;var x:float=float(slot.x)+(0 if slot.wallAxis else step);var z:float=float(slot.z)+(step if slot.wallAxis else 0)
-       if not (terrain_passable.call(x,z) if terrain_passable.is_valid() else nav.is_open(x,z)):bad+=1;break
-     var score:float= -bad*25-absf(float(candidate.rx)-56)*0.2-absf(float(candidate.rz)-56)*0.2-(absi(dx)+absi(dz))*0.06
+       var point:=Vector2(x,z)
+       if not passable.has(point):passable[point]=terrain_passable.call(x,z) if terrain_passable.is_valid() else nav.is_open(x,z)
+       if not passable[point]:
+        bad+=1;score=-bad*25-radius_x_penalty-radius_z_penalty-center_penalty
+        break
+      if score<=best_score:break
      if score>best_score:best_score=score;candidate.reservedV168=true;candidate.terrainBlockedAtFounding=bad;best=candidate
  return best

@@ -36,10 +36,17 @@ var person: Node3D
 const TREE_REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.09630,"palm":13.54984}
 var tree_instances: Dictionary={}
 var tree_lod_levels: Dictionary={}
+const TREE_LOD_NAMES: Array[String] = ["far","mid","near"]
+const HIDDEN_TREE := Transform3D(Basis(Vector3.ZERO,Vector3.ZERO,Vector3.ZERO),Vector3.ZERO)
+var tree_transforms: Dictionary={}
+var tree_lod_queue: Array=[]
+static var tree_lod_frame: int=-1
+static var tree_lod_groups:=0
 var tree_lod_dirty:=true
 var tree_lod_timer:=0.0
 var tree_lod_camera:=Vector3(INF,INF,INF)
 var tree_lod_view_height:=0.0
+var tree_lod_fov:=0.0
 var mobile_tree_shadows:=false
 var tree_groups: Dictionary={}
 var tree_companions: Dictionary={}
@@ -249,6 +256,7 @@ func _process(delta: float) -> void:
 	if tree_lod_timer>=0.25:
 		tree_lod_timer=0.0
 		update_tree_lods(camera)
+	if not tree_lod_queue.is_empty():process_tree_lod_group()
 	nature_lod_timer+=delta
 	if nature_lod_timer<0.2:return
 	nature_lod_timer=0.0
@@ -732,65 +740,100 @@ func update_tree_lods(camera: Camera3D) -> void:
 			node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		return
 	var view_height:=get_viewport().get_visible_rect().size.y
-	if not tree_lod_dirty and tree_lod_camera.is_equal_approx(camera.global_position) and is_equal_approx(tree_lod_view_height,view_height):return
+	if not tree_lod_queue.is_empty():return
+	if not tree_lod_dirty and tree_lod_camera.distance_squared_to(camera.global_position)<0.36 and is_equal_approx(tree_lod_view_height,view_height) and is_equal_approx(tree_lod_fov,camera.fov):return
 	tree_lod_camera=camera.global_position;tree_lod_view_height=view_height;tree_lod_dirty=false
-	var hidden:=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
-	var pixel_factor:=view_height/(2.0*tan(deg_to_rad(camera.fov*0.5)))
-	for key in tree_counts:
-		if not tree_instances.has(key):continue
-		var source: MultiMesh=tree_instances[key].multimesh
-		var count:=source.instance_count
-		var kind: String=key.split(":")[0]
-		var states: PackedByteArray=tree_lod_levels.get(key,PackedByteArray())
-		if states.size()!=count:states.resize(count)
-		var desired:=PackedByteArray();desired.resize(count)
-		var needed: Dictionary={"mid":true}
-		for existing_level in ["far","mid","near"]:
-			var existing_key: String=str(key)+":"+existing_level
-			if tree_instances.has(existing_key) and tree_instances[existing_key].multimesh.instance_count!=count:tree_instances[existing_key].multimesh.instance_count=count
-		for i in count:
-			var t:=source.get_instance_transform(i)
-			var height:=float(TREE_REFERENCE_HEIGHTS[kind])*t.basis.get_scale().y
-			if height<0.001:desired[i]=1;continue
-			var center:=global_transform*(t.origin+Vector3.UP*height*0.5)
-			var pixels:=height*pixel_factor/maxf(1.0,camera.global_position.distance_to(center))
-			var previous:=int(states[i])
-			var level:=2 if pixels>(37.0 if previous==2 else 45.0) else 1 if pixels>(10.0 if previous==1 else 12.0) else 0
-			desired[i]=level;needed[["far","mid","near"][level]]=true
-		for level in needed:
-			var lod_key: String=str(key)+":"+str(level)
-			ensure_tree_group(lod_key)
-			if not tree_instances.has(lod_key):tree_lod_dirty=true;continue
-			var mesh: MultiMesh=tree_instances[lod_key].multimesh
-			if mesh.instance_count!=count:mesh.instance_count=count
-		if not tree_instances.has(str(key)+":mid"):tree_lod_dirty=true;continue
-		for i in count:
-			var level: int=desired[i]
-			var chosen: String=["far","mid","near"][level]
-			if not tree_instances.has(str(key)+":"+chosen):chosen="mid";level=1
-			var source_transform:=source.get_instance_transform(i)
-			for option in ["far","mid","near"]:
-				var lod_key: String=str(key)+":"+option
-				if tree_instances.has(lod_key):tree_instances[lod_key].multimesh.set_instance_transform(i,source_transform if option==chosen else hidden)
-			states[i]=level
-		tree_lod_levels[key]=states
+	tree_lod_fov=camera.fov
+	tree_lod_queue=tree_transforms.keys()
+
+func process_tree_lod_group() -> void:
+	var frame:=Engine.get_process_frames()
+	if tree_lod_frame!=frame:tree_lod_frame=frame;tree_lod_groups=0
+	if tree_lod_groups>=3:return
+	tree_lod_groups+=1
+	var key: String=tree_lod_queue.pop_front()
+	var transforms: Array=tree_transforms[key]
+	var count:=transforms.size()
+	var reference_height:=float(TREE_REFERENCE_HEIGHTS[key.get_slice(":",0)])
+	var states: PackedByteArray=tree_lod_levels.get(key,PackedByteArray())
+	if states.size()!=count:
+		states.resize(count)
+		states.fill(255)
+	var desired:=PackedByteArray();desired.resize(count)
+	var needed: Array[bool]=[false,true,false]
+	var pose:=global_transform
+	var pixel_factor:=tree_lod_view_height/(2.0*tan(deg_to_rad(tree_lod_fov*0.5)))
+	for i in count:
+		var transform: Transform3D=transforms[i]
+		var height:=reference_height*transform.basis.y.length()
+		var center:=pose*(transform.origin+Vector3.UP*height*0.5)
+		var pixels:=height*pixel_factor/maxf(1.0,tree_lod_camera.distance_to(center))
+		var previous:=int(states[i])
+		var level:=2 if pixels>(37.0 if previous==2 else 45.0) else 1 if pixels>(10.0 if previous==1 else 12.0) else 0
+		desired[i]=level if height>=0.001 else 1
+		needed[desired[i]]=true
+	var meshes: Array[MultiMesh]=[null,null,null]
+	var resized: Array[bool]=[false,false,false]
+	for level in TREE_LOD_NAMES.size():
+		var lod_key: String=key+":"+TREE_LOD_NAMES[level]
+		if needed[level]:ensure_tree_group(lod_key)
+		if not tree_instances.has(lod_key):
+			if needed[level]:tree_lod_dirty=true
+			continue
+		var mesh: MultiMesh=tree_instances[lod_key].multimesh
+		meshes[level]=mesh
+		if mesh.instance_count==count:continue
+		mesh.instance_count=count
+		var hidden:=PackedFloat32Array()
+		hidden.resize(count*12)
+		mesh.buffer=hidden
+		resized[level]=true
+	for i in count:
+		var previous:=int(states[i])
+		var next:=int(desired[i])
+		if meshes[next]==null:next=1
+		if meshes[next]==null:continue
+		if previous!=next and previous<meshes.size() and meshes[previous]!=null and not resized[previous]:
+			meshes[previous].set_instance_transform(i,HIDDEN_TREE)
+		if previous!=next or resized[next]:meshes[next].set_instance_transform(i,transforms[i])
+		states[i]=next
+	tree_lod_levels[key]=states
+
+func set_tree_transform(key: String,index: int,transform: Transform3D) -> void:
+	if Mobile.active:
+		tree_instances[key].multimesh.set_instance_transform(index,transform)
+		return
+	var transforms: Array=tree_transforms[key]
+	if transforms[index]==transform:return
+	transforms[index]=transform
+	tree_lod_dirty=true
+	var states: PackedByteArray=tree_lod_levels.get(key,PackedByteArray())
+	if index>=states.size() or int(states[index])>=TREE_LOD_NAMES.size():return
+	var lod_key: String=key+":"+TREE_LOD_NAMES[states[index]]
+	if tree_instances.has(lod_key) and index<tree_instances[lod_key].multimesh.instance_count:
+		tree_instances[lod_key].multimesh.set_instance_transform(index,transform)
 
 func hide_tree(id: Variant) -> void:
 	tree_lod_dirty=true
 	var key: String=tree_groups.get(id,"")
-	if tree_instances.has(key):tree_instances[key].multimesh.set_instance_transform(int(tree_indices[id]),Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO))
+	if tree_instances.has(key):set_tree_transform(key,int(tree_indices[id]),HIDDEN_TREE)
 	if tree_companions.has(id):
 		var companion: Dictionary=tree_companions[id]
-		if tree_instances.has(companion.key):tree_instances[companion.key].multimesh.set_instance_transform(int(companion.index),Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO))
+		if tree_instances.has(companion.key):set_tree_transform(companion.key,int(companion.index),HIDDEN_TREE)
 
 func sync_tree_instances(now: float,buildings: Array=[]) -> void:
-	tree_sync_time=now;tree_sync_buildings=buildings;tree_pending=false;tree_lod_dirty=true
+	tree_sync_time=now;tree_sync_buildings=buildings;tree_pending=false
 	var resized:=false
 	for key in tree_counts:
 		ensure_tree_group(key)
 		if not tree_instances.has(key):tree_pending=true;continue
 		if tree_instances.has(key) and tree_instances[key].multimesh.instance_count!=int(tree_counts[key]):
 			tree_instances[key].multimesh.instance_count=int(tree_counts[key])
+			if not Mobile.active:
+				var transforms: Array=tree_transforms.get(key,[])
+				while transforms.size()<int(tree_counts[key]):transforms.append(HIDDEN_TREE)
+				tree_transforms[key]=transforms
+				tree_lod_dirty=true
 			resized=true
 	for resource in resources:
 		if resource.kind!="tree" or not tree_indices.has(resource.id):continue
@@ -801,7 +844,7 @@ func sync_tree_instances(now: float,buildings: Array=[]) -> void:
 		var transform:=tree_transform(resource,heights,now,visual_heights)
 		if tree_mountain or display_height(resource.x,resource.z)<0.5 or Landscape.near_water(Vector2(resource.x,resource.z),river_segments,1.55):transform=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
 		transform.basis=Basis(Vector3.UP,float(resource.id)*0.39)*transform.basis.scaled(Vector3.ONE*(0.9*height/float(TREE_REFERENCE_HEIGHTS[kind])))
-		tree_instances[key].multimesh.set_instance_transform(int(tree_indices[resource.id]),transform)
+		set_tree_transform(key,int(tree_indices[resource.id]),transform)
 		if not tree_companions.has(resource.id):continue
 		var companion: Dictionary=tree_companions[resource.id];var companion_key: String=companion.key
 		if not tree_instances.has(companion_key):continue
@@ -818,7 +861,7 @@ func sync_tree_instances(now: float,buildings: Array=[]) -> void:
 			var growth: float=tree_transform(resource,heights,now,visual_heights).basis.get_scale().x
 			var size: float=float(companion.scale)*growth*companion_height/float(TREE_REFERENCE_HEIGHTS[companion_kind])
 			companion_transform=Transform3D(Basis(Vector3.UP,float(companion.seed)*0.39).scaled(Vector3.ONE*size),Vector3(companion.x,companion.y,companion.z))
-		tree_instances[companion_key].multimesh.set_instance_transform(int(companion.index),companion_transform)
+		set_tree_transform(companion_key,int(companion.index),companion_transform)
 	if not fill_trees.is_empty():sync_forest_fill(buildings,resized)
 
 func sync_forest_fill(buildings: Array,force:=false) -> void:
@@ -845,7 +888,7 @@ func sync_forest_fill(buildings: Array,force:=false) -> void:
 			var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
 			var scale:=0.9*height*float(entry.scale)/float(TREE_REFERENCE_HEIGHTS[kind])
 			transform=Transform3D(Basis(Vector3.UP,float(entry.id)*0.39).scaled(Vector3.ONE*scale),Vector3(entry.x,display_height(entry.x,entry.z),entry.z))
-		tree_instances[key].multimesh.set_instance_transform(int(entry.index),transform)
+		set_tree_transform(key,int(entry.index),transform)
 
 func sync_removed_resources(world_resources: Array,now: float=0.0,buildings: Array=[]) -> void:
 	for resource in world_resources:

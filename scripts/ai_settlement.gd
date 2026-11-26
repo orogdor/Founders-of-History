@@ -3,23 +3,42 @@ extends RefCounted
 const Needs=preload("res://scripts/city_needs.gd")
 const Settlement=preload("res://scripts/settlement_rules.gd")
 const Minerals=preload("res://scripts/mineral_sites.gd")
+const Terrain=preload("res://scripts/detail_terrain.gd")
+const Defenses=preload("res://scripts/ai_stone_defenses.gd")
 const DATA=preload("res://data/build_rules.json")
 const WEIGHT={"wood":22,"stone":22,"water":28,"grain":30,"game":14,"fish":12,"clay":16,"copper":30,"tin":30,"ore":60,"oil":100}
 const AGE={"wood":0,"stone":0,"water":0,"grain":0,"game":0,"fish":0,"clay":0,"copper":1,"tin":1,"ore":1,"oil":5}
 
 # V169: a first village prefers a dry reserved defensive perimeter. The
 # assessment callback performs the terrain, route and perimeter survey.
+static func first_village_neighbors(target: Dictionary) -> Array[Dictionary]:
+ var candidates: Array[Dictionary]=[]
+ for offset in [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1),Vector2i(1,-1),Vector2i(-1,-1),Vector2i(1,1),Vector2i(-1,1)]:
+  candidates.append({"c":int(target.c)+offset.x,"r":int(target.r)+offset.y})
+ return candidates
+
 static func first_village_site(target: Dictionary,assess: Callable) -> Dictionary:
  var best: Variant=assess.call(target)
  if best is Dictionary and int(best.blocked)==0:return target
- for offset in [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1),Vector2i(1,-1),Vector2i(-1,-1),Vector2i(1,1),Vector2i(-1,1)]:
-  var candidate={"c":int(target.c)+offset.x,"r":int(target.r)+offset.y}
+ for candidate in first_village_neighbors(target):
   var next: Variant=assess.call(candidate)
   if not next is Dictionary:continue
   var score:float=float(next.blocked)*100+(0 if next.water else 6)+int(next.distance)*2+(0 if next.coast else 1)
   var old_score:float=INF if not best is Dictionary else float(best.blocked)*100+(0 if best.water else 6)+int(best.distance)*2+(0 if best.coast else 1)
   if score<old_score:best=next
  return best.cell if best is Dictionary else target
+
+static func village_wall_obstacles(seed: int,age: int,heights: Array,visual: PackedVector4Array,river: RefCounted,coast: bool) -> int:
+ var passable=func(x,z):
+  return absf(x)<(132.0 if coast else 109.5) and absf(z)<(117.0 if coast else 94.5) and Terrain.detail_height(heights,x,z)>0.2 and Terrain.visual_sample(visual,x,z).z>0.05 and river.passable(x,z)
+ for dx in [-4,0,4]:
+  for dz in [-4,0,4]:
+   if not passable.call(-18+dx,-12+dz):return -1
+ # The prospective settlement uses the same rectangular reservation as before.
+ var hall:={"type":"hall","hp":1200,"ready":true,"x":-18,"z":-12}
+ var city:={"id":0,"team":0,"economy":{"buildings":[hall]}}
+ var plan: Variant=Defenses.reserve({"seed":seed,"ages":[age]},city,{"nav":null},Callable(),passable)
+ return int(plan.terrainBlockedAtFounding) if plan is Dictionary else -1
 static func policy(time: float,age: int,cities: int,pending: int,pop: float,food: float,last: float,has_settlement: bool) -> Dictionary:
  var capacity:=mini(12,maxi(2,2+floori(maxf(0,time)/(26*60))));var interval:=360 if age<=1 else 420 if age<=3 else 600
  var concentrate: bool=(age==0 and cities>=2) or (age==1 and cities>=2 and pop<30)

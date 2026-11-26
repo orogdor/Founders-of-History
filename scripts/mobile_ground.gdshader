@@ -66,6 +66,9 @@ void fragment() {
 	highp vec2 dy = dFdy(uv);
 	highp vec2 world_dx = dFdx(ground_pos);
 	highp vec2 world_dy = dFdy(ground_pos);
+	highp vec2 wide_uv = overview ? uv : terrain_secondary_uv(ground_pos);
+	highp vec2 wide_dx = dFdx(wide_uv);
+	highp vec2 wide_dy = dFdy(wide_uv);
 	float range = length(VERTEX);
 	float detail = overview ? 1.0-smoothstep(32.0,78.0,range) : 1.0-smoothstep(82.0,375.0,range);
 	float sand = overview ? 1.0-smoothstep(0.8,4.2,elevation) : 1.0-smoothstep(0.12+shoreline,0.83+shoreline,elevation);
@@ -86,8 +89,8 @@ void fragment() {
 		beach *= mix(0.80,1.14,patches)+(grain-0.5)*0.12*resolvable;
 	}
 	if (surface_textures_ready && detail > 0.0) {
-		float patches = overview ? sin(ground_pos.x*0.12)*sin(ground_pos.y*0.085)
-			: 2.0*ground_noise(ground_pos*0.12+vec2(10.0,19.0))-1.0;
+		vec2 patches_uv=ground_pos+terrain_bend(ground_pos*0.037,vec2(71.3,41.9))*12.0;
+		float patches = 2.0*ground_noise(patches_uv*vec2(0.072,0.128)+vec2(10.0,19.0))-1.0;
 		float soil = clamp(0.20+patches*0.29+rock*0.65,0.0,1.0);
 		if (!overview) { soil = mix(soil,1.0,sand); }
 		float forest = land.a*(1.0-soil);
@@ -98,9 +101,6 @@ void fragment() {
 		vec3 forest_sample = textureGrad(forest_color,uv,dx,dy).rgb;
 		vec3 heights = primary_heights;
 		if (!overview && range < 164.0) {
-			highp vec2 wide_uv = terrain_secondary_uv(ground_pos);
-			highp vec2 wide_dx = TERRAIN_SECONDARY_ROTATION*world_dx*TERRAIN_SECONDARY_SCALE;
-			highp vec2 wide_dy = TERRAIN_SECONDARY_ROTATION*world_dy*TERRAIN_SECONDARY_SCALE;
 			float depth_mix = terrain_layer_mix(ground_pos)*(1.0-smoothstep(100.0,164.0,range));
 			heights = mix(heights,textureGrad(ground_height_maps,wide_uv,wide_dx,wide_dy).rgb,depth_mix);
 			soil_sample = mix(soil_sample,textureGrad(soil_color,wide_uv,wide_dx,wide_dy).rgb,depth_mix);

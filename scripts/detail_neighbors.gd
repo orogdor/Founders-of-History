@@ -288,28 +288,33 @@ func _process(_delta: float) -> void:
 		return
 	if worker==null and not pending.is_empty():start_worker(closest(pending))
 
+static func copy_tile_inputs(grid: Array,source: Dictionary,at: Vector2i,include_surface: bool) -> Dictionary:
+	var cells: Array=grid.duplicate()
+	var incoming: Dictionary={}
+	# The river sampler updates caches. Give it private caches and copies of the
+	# nearby cells, including the upstream branches used for river mouths.
+	var radius:=8 if include_surface else 3
+	for row in range(maxi(0,at.y-radius),mini(Grid.ROWS,at.y+radius+1)):
+		for column in range(maxi(0,at.x-radius),mini(Grid.COLS,at.x+radius+1)):
+			var index:=row*Grid.COLS+column
+			cells[index]=cells[index].duplicate()
+			if include_surface and source.get("incoming",{}).has(index):
+				var branches: Array=[]
+				for upstream in source.incoming[index]:branches.append(upstream.duplicate())
+				incoming[index]=branches
+	var graph: Dictionary={}
+	if include_surface and not source.is_empty():
+		graph={"incoming":incoming,"anchors":source.anchors,"lakes":source.lakes}
+	return {"cells":cells,"graph":graph}
+
 func start_worker(at: Vector2i) -> void:
 	pending.erase(at)
 	var make_surface:=not tiles.has(at)
 	var cell: Dictionary={}
 	if bool(wanted.get(at,true)) and has_nature(at):cell=host_node.city_cell_data({"c":at.x,"r":at.y},true).duplicate(true)
-	var cells: Array=host_node.grid.duplicate()
-	var source: Dictionary=host_node.world_river_graph
-	var incoming: Dictionary={}
-	# The river sampler updates caches. Give it private caches and copies of the
-	# nearby cells, including the upstream branches used for river mouths.
-	var radius:=8 if make_surface else 3
-	for row in range(maxi(0,at.y-radius),mini(Grid.ROWS,at.y+radius+1)):
-		for column in range(maxi(0,at.x-radius),mini(Grid.COLS,at.x+radius+1)):
-			var index:=row*Grid.COLS+column
-			cells[index]=cells[index].duplicate()
-			if make_surface and source.get("incoming",{}).has(index):
-				var branches: Array=[]
-				for upstream in source.incoming[index]:branches.append(upstream.duplicate())
-				incoming[index]=branches
-	var graph: Dictionary={}
-	if make_surface and not source.is_empty():
-		graph={"incoming":incoming,"anchors":source.anchors,"lakes":source.lakes}
+	var inputs:=copy_tile_inputs(host_node.grid,host_node.world_river_graph,at,make_surface)
+	var cells: Array=inputs.cells
+	var graph: Dictionary=inputs.graph
 	var atlas: PackedFloat32Array=host_node.world_height_samples
 	var seed:=int(host_node.game.seed)
 	var biome: String=host_node.visual_biome(index_of(at))
