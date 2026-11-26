@@ -199,7 +199,19 @@ func build_hud() -> void:
 		plus.add_theme_color_override("font_color",Color("f5d790"));plus.add_theme_color_override("font_shadow_color",Color.BLACK);plus.add_theme_constant_override("shadow_offset_y",1)
 		plus.set_meta("base_font_size",25);plus.add_theme_font_size_override("font_size",25);slot.add_child(plus);elements["research_queue_plus_"+str(i)]=plus
 	image_button("research_all","ui-art-v291_research_city","Kõik avastused",open_research)
-	picture("dock_background","ui-art-v304_panel")
+	var dock_background:=picture("dock_background","ui-art-v304_panel")
+	var dock_shader:=Shader.new()
+	dock_shader.code="""shader_type canvas_item;
+void fragment() {
+	vec2 artwork_uv = vec2(mix(0.086, 0.914, UV.x), UV.y);
+	float taper = 0.077 * smoothstep(0.68, 1.0, UV.y);
+	float distance_from_end = min(UV.x, 1.0 - UV.x);
+	COLOR = texture(TEXTURE, artwork_uv);
+	COLOR.a *= smoothstep(taper, taper + 0.008, distance_from_end);
+}"""
+	var dock_paint:=ShaderMaterial.new()
+	dock_paint.shader=dock_shader
+	dock_background.material=dock_paint
 	picture("map_frame","ui-art-v302_minimap")
 	minimap.get_parent().remove_child(minimap)
 	add_child(minimap);elements["minimap"]=minimap

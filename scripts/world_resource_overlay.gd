@@ -46,21 +46,13 @@ func _ready() -> void:
 	serif.font_weight=700
 	city_font=serif
 
-static func city_nameplate_texture() -> Texture2D:
-	var source:=HEADER.get_image()
-	if source.is_compressed():source.decompress()
-	var trim:=source.get_region(Rect2i(650,0,372,78))
-	trim.convert(Image.FORMAT_RGBA8)
-	# Cut the connecting rails away from the central ornament.
-	for x in 48:
-		for y in trim.get_height():
-			var half_width:=2.0+float(x)*0.52
-			var opacity:=1.0-smoothstep(half_width-1.0,half_width+1.0,absf(float(y)-39.0))
-			for column in [x,trim.get_width()-1-x]:
-				var color:=trim.get_pixel(column,y)
-				color.a*=opacity
-				trim.set_pixel(column,y,color)
-	return ImageTexture.create_from_image(trim)
+static func city_nameplate_texture() -> AtlasTexture:
+	var plate:=AtlasTexture.new()
+	plate.atlas=HEADER
+	var width:=float(HEADER.get_width())
+	plate.region=Rect2(width*0.396,0,width*0.208,HEADER.get_height())
+	plate.filter_clip=true
+	return plate
 
 func toggle_manual() -> void:
 	manual=not manual;stamp=""
@@ -196,7 +188,6 @@ func draw_city_banner(city: Dictionary,point: Vector3,scale: float) -> void:
 	var count_width:=city_font.get_string_size(headcount,HORIZONTAL_ALIGNMENT_LEFT,-1,count_size).x
 	var width:=clampf(name_width+count_width+102.0*scale,140.0*scale,254.0*scale)
 	var rect:=Rect2(anchor.x-width*0.5,anchor.y-43.0*scale,width,38.0*scale)
-	draw_texture_rect(city_banner,Rect2(rect.position+Vector2(0,1.5)*scale,rect.size),false,Color(0.03,0.04,0.06,0.70))
 	draw_texture_rect(city_banner,rect,false)
 	var crest_point:=rect.position+Vector2(width*0.105,10.8*scale)
 	draw_city_crest(crest_point,scale,int(city.team))

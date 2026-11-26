@@ -415,7 +415,7 @@ func add_hut_entrance(a: Vector3,b: Vector3,top: float) -> void:
   for index in [0,1,2,2,1,3,1,5,3,3,5,4]:
    roof.set_uv(uv[index]);roof.add_vertex(points[index])
   var post:Vector3=center+axis*side*(half_width+0.075)+front*0.42
-  add_pole(post-axis*side*0.045,post+Vector3.UP*(top-0.02)+axis*side*0.045,0.086,"bark")
+  add_pole(post-axis*side*0.045,post+Vector3.UP*(top-0.02)+axis*side*0.045,0.069,"wood")
   add_pole(post+Vector3.UP*(top-0.28),eave+Vector3.UP*0.10,0.043,"wood")
  roof.generate_normals()
  var canopy:=MeshInstance3D.new();canopy.name="HutEntranceCanopy";canopy.mesh=roof.commit()
@@ -863,7 +863,7 @@ func add_round_thatch(outline: PackedVector2Array,center: Vector2,radius: float,
   var edge:=rim+(rim-center).normalized()*overhang*Plan.PX_PER_M
   var radius_curve:=1.0-t+sin(t*PI)*0.085
   var p:=ridge.lerp(edge,radius_curve)
-  var wobble:=0.043*sin(around*7.0)+0.026*sin(around*15.0+1.7)
+  var wobble:=0.027*sin(around*7.0)+0.017*sin(around*15.0+1.7)
   var y:=eave+height*(t+0.15*sin(t*PI))+wobble*pow(1.0-t,1.9)
   return local(p,y)
  var columns:=outline.size()*3
@@ -875,8 +875,8 @@ func add_round_thatch(outline: PackedVector2Array,center: Vector2,radius: float,
  for i in steps:
   var u:=float(i)/steps;var v:=float(i+1)/steps
   var top_a:Vector3=sample.call(u,0.0);var top_b:Vector3=sample.call(v,0.0)
-  var bottom_a:Vector3=top_a.lerp(local(center,top_a.y),0.055)-Vector3.UP*(0.16+0.046*fence_noise(i))
-  var bottom_b:Vector3=top_b.lerp(local(center,top_b.y),0.055)-Vector3.UP*(0.16+0.046*fence_noise((i+1)%steps))
+  var bottom_a:Vector3=top_a.lerp(local(center,top_a.y),0.055)-Vector3.UP*(0.118+0.031*fence_noise(i))
+  var bottom_b:Vector3=top_b.lerp(local(center,top_b.y),0.055)-Vector3.UP*(0.118+0.031*fence_noise((i+1)%steps))
   var vertices:=[top_a,top_b,bottom_a,bottom_b]
   var uv:=[Vector2(u*3.8,0.0),Vector2(v*3.8,0.0),Vector2(u*3.8,-0.12),Vector2(v*3.8,-0.12)]
   for index in [0,2,1,1,2,3]:

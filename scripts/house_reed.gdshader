@@ -36,9 +36,9 @@ void fragment() {
   float line = sin(strand_x*6.283 + sin(UV.y*24.0)*0.28);
   float fine = line * (1.0-smoothstep(0.16,0.60,fwidth(strand_x)));
   float weather = 0.5+0.5*sin(surface_world.x*0.91+surface_world.y*2.4)*sin(surface_world.z*0.75+surface_world.y*0.33);
-  vec3 straw = mix(vec3(0.29,0.21,0.115),vec3(0.52,0.38,0.207),grain*0.65+weather*0.35);
+  vec3 straw = mix(vec3(0.26,0.177,0.090),vec3(0.55,0.405,0.224),smoothstep(0.04,0.59,grain)*0.75+weather*0.25);
   float cut_ends = smoothstep(-0.19,-0.015,UV.y);
-  ALBEDO = straw*(0.59+0.41*cut_ends)*(0.93+fine*0.12);
+  ALBEDO = straw*(0.79+0.21*cut_ends)*(0.87+grain*0.14+fine*0.18);
   ROUGHNESS = 0.95;
   SPECULAR = 0.13;
   float close_detail = 1.0-smoothstep(14.0,38.0,length(VERTEX));
