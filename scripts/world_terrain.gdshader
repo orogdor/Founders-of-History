@@ -62,10 +62,10 @@ void fragment(){
   vec3 photo=textureGrad(grass_color,uv,dx,dy).rgb*weights.x
             +textureGrad(soil_color,uv,dx,dy).rgb*weights.y
             +textureGrad(forest_color,uv,dx,dy).rgb*weights.z;
-  col=mix(col,photo,surface_strength*0.29)*(1.0+(height-0.5)*surface_strength*0.30);
+  col=mix(col,photo,surface_strength*0.35)*(1.0+(height-0.5)*surface_strength*0.38);
   float height_x=dot(textureGrad(ground_height_maps,uv+vec2(0.008,0.0),dx,dy).rgb,weights);
   float height_z=dot(textureGrad(ground_height_maps,uv+vec2(0.0,0.008),dx,dy).rgb,weights);
-  vec3 relief=vec3(height-height_x,0.0,height-height_z)*surface_strength*0.85;
+  vec3 relief=vec3(height-height_x,0.0,height-height_z)*surface_strength*1.08;
   NORMAL=normalize(NORMAL+mat3(VIEW_MATRIX)*relief);
  }
  vec2 cw=lp*0.0035+vec2(TIME*0.010,TIME*0.004);float cloud=smoothstep(0.52,0.78,n149(cw)*0.65+n149(cw*2.3+4.0)*0.35);

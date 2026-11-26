@@ -6,6 +6,8 @@ const Placement=preload("res://scripts/building_placement.gd")
 const Fits=preload("res://data/building_fits.json")
 const Rules=preload("res://data/build_rules.json")
 const TownShader=preload("res://scripts/town_material.gdshader")
+const SurfaceDetail=preload("res://scripts/surface_detail.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const PlainFallbacks=["nitrate","oilwell","refinery","powerplant","autofactory","airfield","master_workshop","infirmary","keep"]
 const LOW_CACHE_SIZE=128
 
@@ -68,19 +70,21 @@ static func apply_imported_materials(node: Node,town: bool) -> void:
 			if not has_vertex_colors.has(surface_key):
 				var colors:Variant=node.mesh.surface_get_arrays(surface)[Mesh.ARRAY_COLOR]
 				has_vertex_colors[surface_key]=colors!=null and not colors.is_empty()
-			if not has_vertex_colors[surface_key]:continue
-			if town:
+			var painted: bool=has_vertex_colors[surface_key]
+			if town and painted:
 				if town_material==null:
 					town_material=ShaderMaterial.new()
 					town_material.shader=TownShader
+					town_material.set_shader_parameter("close_detail",not Mobile.active)
 				node.set_surface_override_material(surface,town_material)
 			else:
 				var original:Material=node.get_active_material(surface)
-				if not original is BaseMaterial3D:continue
-				var key:=original.get_instance_id()
+				if not original is StandardMaterial3D or (not painted and original.albedo_texture==null):continue
+				var key:=[original.get_instance_id(),painted]
 				if not vertex_materials.has(key):
-					var corrected:BaseMaterial3D=original.duplicate()
-					corrected.vertex_color_use_as_albedo=true
+					var corrected:StandardMaterial3D=original.duplicate()
+					if painted:corrected.vertex_color_use_as_albedo=true
+					SurfaceDetail.refine_architecture(corrected,"",not Mobile.active)
 					vertex_materials[key]=corrected
 				node.set_surface_override_material(surface,vertex_materials[key])
 	for child in node.get_children():apply_imported_materials(child,town)

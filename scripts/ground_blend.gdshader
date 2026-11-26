@@ -50,7 +50,7 @@ vec4 sample_ground(sampler2D image, vec2 uv, vec2 dx, vec2 dy, float scale_blend
 void fragment(){
  vec2 q=shifted_uv;
  vec2 uv=terrain_primary_uv(q);
- vec2 dx=dFdx(uv)*1.35,dy=dFdy(uv)*1.35;
+ vec2 dx=dFdx(uv)*1.08,dy=dFdy(uv)*1.08;
  float distance_to_camera=length(VERTEX);
  vec4 local_ground=vec4(base_color.rgb,forest_factor);
  if(blend_neighbours){
@@ -60,7 +60,7 @@ void fragment(){
   vec4 diagonal=tile_uv.x<0.0?(tile_uv.y<0.0?ground_nw:ground_sw):(tile_uv.y<0.0?ground_ne:ground_se);
   local_ground=mix(mix(local_ground,horizontal,x),mix(vertical,diagonal,x),z);
  }
- float photo_strength=0.88*(1.0-smoothstep(100.0,300.0,distance_to_camera))*smoothstep(0.4,1.6,ground_height);
+ float photo_strength=0.93*(1.0-smoothstep(112.0,300.0,distance_to_camera))*smoothstep(0.4,1.6,ground_height);
  // The source keeps procedural meadow and soil variation after the close-up
  // photographs have faded; a uniform fallback makes the whole tile flat green.
  float meadow=fractal(q*0.034+vec2(8.0,8.0));
@@ -96,20 +96,39 @@ void fragment(){
   vec3 grass=sample_ground(grass_color,shifted,dx,dy,scale_blend).rgb;
   vec3 soil=sample_ground(soil_color,shifted,dx,dy,scale_blend).rgb;
   vec3 litter=sample_ground(forest_color,shifted,dx,dy,scale_blend).rgb;
-  vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.84+0.12*fractal(q*0.018));
-  photo=mix(photo,photo*local_ground.rgb*2.0,0.25);
-  photo*=mix(1.0,0.84+0.23*height,relief);
-  surface=mix(distant,photo,photo_strength);
+  float growth=smoothstep(0.32,0.73,meadow);
+  grass*=mix(vec3(0.83,1.02,0.89),vec3(1.20,1.10,0.84),growth);
+  soil*=mix(vec3(0.79,0.66,0.56),vec3(1.22,1.02,0.86),smoothstep(0.27,0.69,heights.y));
+  litter*=mix(vec3(0.75,0.74,0.64),vec3(1.17,1.01,0.79),smoothstep(0.29,0.72,heights.z));
+  vec3 photo=(grass*weights.x+soil*weights.y+litter*weights.z)*(0.87+0.13*growth);
+  photo=mix(photo,photo*local_ground.rgb*2.0,0.18);
+  photo*=mix(1.0,0.77+0.36*height,relief);
   vec3 surface_normal=textureGrad(grass_normal,shifted,dx,dy).xyz*weights.x
                     +textureGrad(soil_normal,shifted,dx,dy).xyz*weights.y
                     +textureGrad(forest_normal,shifted,dx,dy).xyz*weights.z;
   surface_normal.xy=transpose(TERRAIN_ROTATION)*(surface_normal.xy-0.5)+0.5;
-  NORMAL_MAP=surface_normal;
-  NORMAL_MAP_DEPTH=0.46*photo_strength;
   vec3 roughness=vec3(sample_ground(grass_rough,shifted,dx,dy,scale_blend).r,
                       sample_ground(soil_rough,shifted,dx,dy,scale_blend).r,
                       sample_ground(forest_rough,shifted,dx,dy,scale_blend).r);
   ROUGHNESS=mix(0.94,clamp(dot(roughness,weights),0.65,1.0),photo_strength);
+  // Resolve smaller blades, leaf litter and pebbles near the camera using a
+  // second octave of the packed photographic height maps. Mips handle minification.
+  float close_detail=1.0-smoothstep(18.0,70.0,distance_to_camera);
+  if(close_detail>0.0){
+   vec2 grain_uv=TERRAIN_SECONDARY_ROTATION*uv*2.0+vec2(0.63,0.11);
+   vec2 grain_dx=TERRAIN_SECONDARY_ROTATION*dx*2.0,grain_dy=TERRAIN_SECONDARY_ROTATION*dy*2.0;
+   float grain=dot(textureGrad(ground_height_maps,grain_uv,grain_dx,grain_dy).rgb,weights);
+   float grain_x=dot(textureGrad(ground_height_maps,grain_uv+vec2(0.005,0.0),grain_dx,grain_dy).rgb,weights);
+   float grain_y=dot(textureGrad(ground_height_maps,grain_uv+vec2(0.0,0.005),grain_dx,grain_dy).rgb,weights);
+   float contact=clamp((grain-0.5)*0.83+(height-grain)*0.18,-0.25,0.25);
+   photo*=1.0+contact*close_detail;
+   vec2 grain_slope=transpose(TERRAIN_SECONDARY_ROTATION*TERRAIN_ROTATION)*vec2(grain-grain_x,grain-grain_y);
+   surface_normal.xy+=grain_slope*0.40*close_detail;
+   ROUGHNESS=clamp(ROUGHNESS+(0.5-grain)*0.13*close_detail,0.62,1.0);
+  }
+  surface=mix(distant,photo,photo_strength);
+  NORMAL_MAP=clamp(surface_normal,vec3(0.0),vec3(1.0));
+  NORMAL_MAP_DEPTH=0.77*photo_strength;
  }
  float sand=1.0-smoothstep(0.12+beach_wobble,0.83+beach_wobble,ground_height);
  if(sand>0.0){

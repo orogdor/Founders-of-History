@@ -53,6 +53,7 @@ func material_for(style: String) -> StandardMaterial3D:
   if style in ["industrialIron","seamMetal"]:material.metallic=0.36
   if not Mobile.active:
    material.heightmap_enabled=true;material.heightmap_texture=load(relief+"-height.webp");material.heightmap_scale=0.75
+  SurfaceDetail.refine_architecture(material,style,not Mobile.active)
   materials[style]=material
   return material
  if style=="glass":
@@ -61,7 +62,7 @@ func material_for(style: String) -> StandardMaterial3D:
  if key.begins_with("proc-"):material.albedo_color=Color.WHITE
  if not key.is_empty() and ResourceLoader.exists(file):material.albedo_texture=load(file);material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;material.uv1_scale=Vector3(2,2,1)
  if style in ["reed","thatch"]:material.uv1_scale=Vector3(0.2,1,1)
- SurfaceDetail.apply(material,not Mobile.active)
+ SurfaceDetail.refine_architecture(material,style,not Mobile.active)
  materials[style]=material;return material
 
 func roof_surface_material() -> Material:

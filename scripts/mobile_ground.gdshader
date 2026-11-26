@@ -111,20 +111,26 @@ void fragment() {
 		vec3 photo = grass_sample*weights.x+soil_sample*weights.y+forest_sample*weights.z;
 		float strength = detail*(1.0-snow)*(overview ? 1.0-sand : 1.0);
 		float relief = dot(heights,weights);
-		float photo_weight = overview ? 0.30 : mix(0.28,0.72,1.0-smoothstep(9.0,48.0,range));
-		vec3 natural_photo = mix(photo,photo*land.rgb*2.0,0.30);
+		float photo_weight = overview ? 0.34 : mix(0.31,0.79,1.0-smoothstep(13.0,58.0,range));
+		vec3 natural_photo = mix(photo,photo*land.rgb*2.0,0.22);
 		col = mix(col,overview ? photo : natural_photo,strength*photo_weight);
-		col *= 1.0+(relief-0.5)*strength*(overview ? 0.34 : photo_weight*0.43);
+		col *= 1.0+(relief-0.5)*strength*(overview ? 0.37 : photo_weight*0.61);
 		if (!overview) {
 			float grains = dot(soil_sample,vec3(0.31,0.57,0.12));
 			beach *= mix(1.0,0.58+0.95*grains+0.24*relief,strength);
+			if (range < 38.0) {
+				vec2 micro_uv = TERRAIN_SECONDARY_ROTATION*uv*2.0+vec2(0.63,0.11);
+				float micro = dot(textureGrad(ground_height_maps,micro_uv,
+					TERRAIN_SECONDARY_ROTATION*dx*2.0,TERRAIN_SECONDARY_ROTATION*dy*2.0).rgb,weights);
+				col *= 1.0+clamp((micro-0.5)*0.54,-0.18,0.18)*(1.0-smoothstep(12.0,38.0,range))*strength;
+			}
 			if (range < 29.0) {
 				float right = dot(textureGrad(ground_height_maps,uv+vec2(0.007,0.0),dx,dy).rgb,weights);
 				float forward = dot(textureGrad(ground_height_maps,uv+vec2(0.0,0.007),dx,dy).rgb,weights);
 				float primary_relief = dot(primary_heights,weights);
 				vec2 slope = transpose(TERRAIN_ROTATION)*vec2(primary_relief-right,primary_relief-forward);
-				NORMAL_MAP = normalize(vec3(slope*0.82,1.0))*0.5+0.5;
-				NORMAL_MAP_DEPTH = 0.72*(1.0-smoothstep(7.0,29.0,range));
+				NORMAL_MAP = normalize(vec3(slope*1.12,1.0))*0.5+0.5;
+				NORMAL_MAP_DEPTH = 0.86*(1.0-smoothstep(7.0,29.0,range));
 			}
 		}
 	}
