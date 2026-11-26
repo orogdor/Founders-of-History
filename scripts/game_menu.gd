@@ -166,7 +166,9 @@ func build_world_setup() -> void:
 
 	add_setup_heading("Riigid", preload("res://assets/ui/ui-art-v263_cmd_army.webp"))
 	faction_fields = add_field_grid()
-	var rival_options := [["Vastasteta", 0], ["1 vastane", 1], ["2 vastast", 2], ["3 vastast", 3]]
+	var rival_options := [["Vastasteta", 0], ["1 vastane", 1]]
+	for count in range(2, WorldSetup.MAX_OPPONENTS + 1):
+		rival_options.append(["%d vastast" % count, count])
 	opponents = add_choice(faction_fields, "Arvutivastased", rival_options)
 	opponents.item_selected.connect(func(_index): refresh_world_setup())
 	var swatches: Dictionary = {}
@@ -256,7 +258,9 @@ static func choose_value(option: OptionButton, value: Variant) -> void:
 func refresh_world_setup() -> void:
 	var count := int(opponents.get_selected_metadata())
 	var width := get_viewport_rect().size.x
-	faction_fields.columns = 1 if width < 440.0 else 3 if width >= 1000.0 and count == WorldSetup.MAX_OPPONENTS else 2
+	faction_fields.columns = 1 if width < 440.0 else 2
+	if width >= 1000.0 and count >= 3:
+		faction_fields.columns = 4 if width >= 1100.0 and count >= 4 else 3
 	var colors := selected_colors()
 	for team in color_fields.size():
 		choose_value(color_fields[team], colors[team])

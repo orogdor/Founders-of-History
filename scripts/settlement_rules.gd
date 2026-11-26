@@ -42,9 +42,10 @@ static func found_city(state: Dictionary, settler: Dictionary, world: Dictionary
 		names.append(city.name)
 		if city.team == settler.team: city_number += 1
 	next_id += 1
-	var economy := Economy.initial_state(state.seed)
-	economy.settlers = []
 	var team: int = settler.team
+	var slots := maxi(state.get("research", []).size(), team + 1)
+	var economy := Economy.initial_state(state.seed, str(state.get("type","continents")), maxi(4,slots))
+	economy.settlers = []
 	var stock: Dictionary = Economy.DATA.data.start.duplicate(true)
 	stock.merge({"wood":100,"stone":55,"plank":0,"gold":0,"water":40},true)
 	if settler.has("cargo"): stock = settler.cargo.duplicate(true)

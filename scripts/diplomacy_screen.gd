@@ -3,6 +3,7 @@ extends AcceptDialog
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 const Campaign = preload("res://scripts/campaign_state.gd")
 const Palette = preload("res://scripts/faction_palette.gd")
+const Setup = preload("res://scripts/world_setup.gd")
 var host: Node
 var body: VBoxContainer
 var feedback: Label
@@ -27,8 +28,7 @@ func rebuild(message: String="") -> void:
   var cities:=0;var population:=0
   for city in host.game.cities:
    if int(city.team)==team:cities+=1;population+=floori(float(city.economy.realms[team].pop))
-  var names: Array=["Eesti","Soome","Rootsi","Norra"]
-  var name: String=names[team]
+  var name := Setup.faction_name(team)
   var current:=Rules.relation(host.game,0,team)
   var label:=Label.new();label.text="%s · %d elanikku · %d linna · %s" % [name,population,cities,{"friendly":"sõprus","neutral":"neutraalne","war":"sõda"}.get(current,current)]
   label.add_theme_color_override("font_color",Palette.color(team,Color("f0e1bf")).lightened(0.22))

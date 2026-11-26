@@ -10,9 +10,7 @@ static func attach(parent: Dictionary,district: Dictionary) -> void:
  district.districtOf=parent.id;district.constructionAreaId=parent.id;district.id=parent.id;district.team=parent.team;district.name=parent.name
  if not district.has("economy"):return
  var economy:Dictionary=district.economy
- if not economy.has("realms") or economy.realms.size()<4:
-  economy.realms=[]
-  for i in 4:economy.realms.append(Economy.realm())
+ Economy.ensure_realms(economy,parent.economy.realms.size())
  economy.realms[int(parent.team)]=parent.economy.realms[int(parent.team)]
  if not economy.has("time"):economy.time=parent.economy.get("time",0)
  for building in economy.get("buildings",[]):building.team=parent.team
@@ -32,7 +30,7 @@ static func create(parent: Dictionary,tile: Vector2i,world: Dictionary,seed: int
  if not parent.has("districts"):parent.districts={}
  var k:=key(tile)
  if parent.districts.has(k):attach(parent,parent.districts[k]);return parent.districts[k]
- var economy:=Economy.initial_state(seed);economy.settlers=[];economy.units=[];economy.cargo=[];economy.time=parent.economy.get("time",time)
+ var economy:=Economy.initial_state(seed,"continents",parent.economy.realms.size());economy.settlers=[];economy.units=[];economy.cargo=[];economy.time=parent.economy.get("time",time)
  economy.buildings=[{"type":"hall","x":0,"z":0,"team":parent.team,"hp":1200,"ready":true,"virtual":true}]
  var district:Dictionary={"c":tile.x,"r":tile.y,"foundedAt":time,"world":world,"economy":economy}
  if retain:parent.districts[k]=district

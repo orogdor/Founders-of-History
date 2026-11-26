@@ -9,6 +9,7 @@ const Discoveries=preload("res://scripts/world_discoveries.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
 const Campaign=preload("res://scripts/campaign_state.gd")
 const Palette=preload("res://scripts/faction_palette.gd")
+const Setup=preload("res://scripts/world_setup.gd")
 const Availability=preload("res://scripts/era_availability.gd")
 const CityOverview=preload("res://scripts/city_overview.gd")
 const BUILD_ORDER=preload("res://data/build_catalog_order.json")
@@ -340,7 +341,6 @@ func enter_city(index: int) -> void:
 	if not host.detail_mode:host.toggle_detail()
 
 func populate_diplomacy() -> void:
-	var names: Array=["Eesti","Soome","Rootsi","Norra"]
 	var rivals := Campaign.opponents(host.game)
 	if rivals.is_empty():
 		var empty := Label.new()
@@ -355,7 +355,7 @@ func populate_diplomacy() -> void:
 		var style:=StyleBoxFlat.new();style.bg_color=Color("182f40");style.border_color=Color("b38e4c");style.set_border_width_all(1);style.set_corner_radius_all(7)
 		style.content_margin_left=12;style.content_margin_right=12;style.content_margin_top=12;style.content_margin_bottom=12;panel.add_theme_stylebox_override("panel",style)
 		var column:=VBoxContainer.new();column.add_theme_constant_override("separation",8);panel.add_child(column);row.add_child(panel)
-		var name:=Label.new();name.text=names[team];name.add_theme_font_override("font",hud.ui_bold);name.add_theme_color_override("font_color",Color("f3d997"));name.add_theme_font_size_override("font_size",maxi(13,roundi(card_size.x*0.15)));column.add_child(name)
+		var name:=Label.new();name.text=Setup.faction_name(team);name.add_theme_font_override("font",hud.ui_bold);name.add_theme_color_override("font_color",Color("f3d997"));name.add_theme_font_size_override("font_size",maxi(13,roundi(card_size.x*0.15)));column.add_child(name)
 		name.add_theme_color_override("font_color",Palette.color(team,Color("f3d997")).lightened(0.22))
 		var divider:=HSeparator.new();column.add_child(divider)
 		var summary:=Label.new();summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART

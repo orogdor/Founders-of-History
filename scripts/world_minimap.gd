@@ -61,11 +61,11 @@ func refresh_map() -> void:
 	var urban: Dictionary=host.territory_allocation.get("urban",{})
 	for key in owned:
 		if not host.reveal_all and not host.game.explored[0].has(key):continue
-		var city: Dictionary=owned[key];var team:=clampi(int(city.team),0,3)
+		var city: Dictionary=owned[key];var team:=int(city.team)
 		var county: bool=not urban.get(str(int(city.id)),{}).has(key)
 		var colors: Array=["a1b691","b89c83","b0a1be","c4b78a"] if county else ["83b4a1","af7d62","9b82bb","c3aa62"]
 		var parts:=str(key).split(":")
-		image.fill_rect(Rect2i(int(parts[0])*2,int(parts[1])*2,2,2),Palette.color(team,Color(colors[team])))
+		image.fill_rect(Rect2i(int(parts[0])*2,int(parts[1])*2,2,2),Palette.color(team,Color(colors[clampi(team,0,3)])))
 	map_texture = ImageTexture.create_from_image(image)
 
 func draw_circle_clipped_line(a: Vector2,b: Vector2,color: Color) -> void:
@@ -125,8 +125,8 @@ func _draw() -> void:
 		if int(city.team)!=0 and not host.reveal_all and not host.game.explored[0].has(key): continue
 		var p := Vector2((float(city.c)+0.5)/Grid.COLS*size.x,(float(city.r)+0.5)/Grid.ROWS*size.y)
 		if not circular or (p/size-Vector2(0.5,0.5)).length()<=0.49:
-			var team := clampi(int(city.team),0,3)
-			draw_circle(p,3.0,Palette.color(team,Color(["e9dfad","ed9c7e","c2a4ea","f0d16f"][team])))
+			var team := int(city.team)
+			draw_circle(p,3.0,Palette.color(team,Color(["e9dfad","ed9c7e","c2a4ea","f0d16f"][clampi(team,0,3)])))
 	for person in host.game.get("settlers",[]):
 		if int(person.team)!=0 or person.get("embarked")!=null: continue
 		var p := Vector2((float(person.c)+0.5)/Grid.COLS*size.x,(float(person.r)+0.5)/Grid.ROWS*size.y)

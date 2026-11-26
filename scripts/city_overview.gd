@@ -32,8 +32,8 @@ func _ready() -> void:
  var trade_row:=HBoxContainer.new();trade_row.add_theme_constant_override("separation",6);body.add_child(trade_row)
  trade_button=Button.new();trade_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;trade_button.pressed.connect(toggle_city_trade);trade_row.add_child(trade_button)
  var recruit:=Button.new();recruit.text="Värba asunik";recruit.size_flags_horizontal=Control.SIZE_EXPAND_FILL;recruit.pressed.connect(func():hide();host.recruit_new_settler());trade_row.add_child(recruit)
- var foreign:=HBoxContainer.new();foreign.add_theme_constant_override("separation",6);body.add_child(foreign)
- for team in [1,2,3]:
+ var foreign:=GridContainer.new();foreign.columns=3;foreign.add_theme_constant_override("h_separation",6);foreign.add_theme_constant_override("v_separation",6);body.add_child(foreign)
+ for team in range(1,Setup.MAX_OPPONENTS+1):
   var button:=Button.new();button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;button.pressed.connect(toggle_foreign_merchant.bind(team));foreign.add_child(button);merchant_buttons.append(button)
 
 func make_card(key: String,icon: String,label: String) -> void:
@@ -93,7 +93,7 @@ func refresh() -> void:
  for i in merchant_buttons.size():
   var team:=i+1;var blocked: bool=city.get("blockedMerchants",{}).get(str(team),false)
   merchant_buttons[i].visible=team<=Setup.opponent_count(host.game)
-  merchant_buttons[i].text=["Soome","Rootsi","Norra"][i]+": "+("ei" if blocked else "jah")
+  merchant_buttons[i].text=Setup.faction_name(team)+": "+("ei" if blocked else "jah")
  var buildings: Array=city.economy.buildings;var pop:=float(realm.pop);var capacity:=Economy.housing_capacity(buildings);var food:=Needs.food_total(stock);var water:=float(stock.get("water",0))
  var food_need:=pop*0.6;var water_need:=pop*0.45;var growth:=float(realm.get("growthProgress",0))/maxf(1,float(realm.get("growthNeed",4)))
  var needs:=Needs.calculate(city,int(host.game.ages[city.team]));var employed:=float(realm.get("employed",0));var incoming:=0;var outgoing:=0

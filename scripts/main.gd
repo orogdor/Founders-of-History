@@ -4046,7 +4046,8 @@ func valid_partial_save(data: Variant) -> bool:
 	if not is_finite(float(saved.time)) or saved.time<0:return false
 	for key in ["settlers","cities","research","ages","explored"]:
 		if not saved.get(key) is Array:return false
-	if saved.research.size()!=4 or saved.ages.size()!=4 or saved.explored.size()!=4:return false
+	var slots := WorldSetup.faction_slots(saved)
+	if saved.research.size()!=slots or saved.ages.size()!=slots or saved.explored.size()!=slots:return false
 	for r in saved.research:
 		if not r is Dictionary or not r.get("known") is Array or not r.get("progress") is Dictionary or not r.get("queue") is Array:return false
 	if not data.get("city_created",false) is bool:return false

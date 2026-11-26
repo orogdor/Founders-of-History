@@ -32,7 +32,9 @@ static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred:
 	if candidates.size() < team_count: return []
 	var selected: Array = []
 	for team in team_count:
-		var target: Dictionary = preferred[team] if team < preferred.size() else {"c":floori((0.77 if team%2 else 0.23)*cols+0.5),"r":floori((0.77 if team>=2 else 0.23)*rows+0.5)}
+		var target: Dictionary = preferred[team] if team < preferred.size() else {}
+		if target.is_empty() and team < 4:
+			target = {"c":floori((0.77 if team%2 else 0.23)*cols+0.5),"r":floori((0.77 if team>=2 else 0.23)*rows+0.5)}
 		var best: Variant = null
 		var best_score := -INF
 		for p in candidates:
@@ -42,9 +44,13 @@ static func choose(cols: int, rows: int, heights: PackedFloat32Array, preferred:
 				var dr: float = q.r-p.r
 				nearest = minf(nearest,sqrt(dc*dc+dr*dr))
 			if nearest < minimum_distance: continue
-			var dc: float = target.c-p.c
-			var dr: float = target.r-p.r
-			var score: float = -sqrt(dc*dc+dr*dr)*1.15+p.quality+(minf(nearest,70)*0.38 if is_finite(nearest) else 0.0)
+			var score: float = p.quality + (minf(nearest,70)*0.38 if is_finite(nearest) else 0.0)
+			if not target.is_empty():
+				var dc: float = target.c-p.c
+				var dr: float = target.r-p.r
+				score = -sqrt(dc*dc+dr*dr)*1.15 + score
+			else:
+				score += nearest*1.2
 			if score > best_score:
 				best_score = score
 				best = p

@@ -81,10 +81,16 @@ static func food_production_allowed(stock: Dictionary,cargo: Array,key: String,r
 static func realm() -> Dictionary:
 	return {"resources":DATA.data.start.duplicate(true),"pop":3,"tech":0,"aiClock":0,"log":[]}
 
-static func initial_state(seed: int, map_type := "continents") -> Dictionary:
+static func initial_state(seed: int, map_type := "continents", faction_slots := 4) -> Dictionary:
 	var realms: Array = []
-	for team in 4: realms.append(realm())
+	for team in faction_slots: realms.append(realm())
 	return {"economyVersion":2,"time":0,"realms":realms,"resources":DATA.data.start.duplicate(true),"pop":3,"tech":0,"settlers":[{"team":0,"x":-8,"z":0,"target":null,"founded":false},{"team":1,"x":-8,"z":0,"target":null,"founded":false}],"buildings":[],"units":[],"cargo":[],"ended":false,"world":{"seed":seed,"type":map_type}}
+
+static func ensure_realms(state: Dictionary, minimum: int) -> void:
+	if not state.get("realms") is Array:
+		state.realms = []
+	while state.realms.size() < minimum:
+		state.realms.append(realm())
 
 static func ready(state: Dictionary, team: int, type: String) -> bool:
 	for b in state.buildings:
@@ -258,4 +264,3 @@ static func demographics_turn(city: Dictionary, economy: Dictionary, buildings: 
 			realm.pop = maxf(3,minf(cap,realm.pop-1))
 			realm.log.append({"time":floori(economy.time),"text":"Toidu- ja veepuudus vähendas elanikkonda"})
 	if realm.log.size()>80: realm.log.pop_front()
-

@@ -4,8 +4,8 @@ extends RefCounted
 const Grid=preload("res://scripts/campaign_grid.gd")
 const Palette=preload("res://scripts/faction_palette.gd")
 const Terrain=preload("res://scripts/world_terrain.gd")
-const TEAM_COLORS=["69d4c3","e77e64","ac87e2","ead06b"]
-const COUNTY_COLORS=["b6ce75","dba082","bca3d6","dfcc87"]
+const TEAM_COLORS=["69d4c3","e77e64","ac87e2","ead06b","35a082","e07839"]
+const COUNTY_COLORS=["b6ce75","dba082","bca3d6","dfcc87","89bfab","e1a583"]
 
 static func smooth(x: float) -> float:
 	var t:=clampf(x,0,1)
@@ -57,7 +57,7 @@ static func rebuild(parent: Node3D,owned: Dictionary,urban: Dictionary,explored:
 	var teams:={}
 	for key in owned:
 		if not reveal_all and not explored.has(key):continue
-		var city: Dictionary=owned[key];var team:=clampi(int(city.team),0,3)
+		var city: Dictionary=owned[key];var team:=clampi(int(city.team),0,TEAM_COLORS.size()-1)
 		if not teams.has(team):teams[team]={}
 		teams[team][key]=true
 		var rural: bool=not urban.get(str(int(city.id)),{}).has(key)

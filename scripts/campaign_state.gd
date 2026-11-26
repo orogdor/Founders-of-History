@@ -12,7 +12,8 @@ static func create_game(seed: int, starts: Array,world_type:="tectonic") -> Dict
 	var units: Array = []
 	var armies: Array = []
 	var explored: Array = []
-	for team in Setup.MAX_OPPONENTS + 1:
+	var slots := maxi(Setup.DEFAULT_OPPONENTS + 1, starts.size())
+	for team in slots:
 		research.append(Research.new_research())
 		ages.append(0)
 		explored.append({})
@@ -22,7 +23,7 @@ static func create_game(seed: int, starts: Array,world_type:="tectonic") -> Dict
 		settlers.append({"id":team,"team":team,"c":int(p.c),"r":int(p.r),"x":0,"z":0,"path":[],"landed":false,"localTarget":null})
 		units.append({"kind":"scout","team":team,"hp":int(Economy.DATA.data.troops.scout.hp),"morale":100})
 		armies.append({"team":team,"c":int(p.c),"r":int(p.r),"path":[]})
-	return {"version":4,"unitBalanceVersion":99,"roadKeyCols":Grid.COLS,"hydrologyVersion":2,"tempo":"normal","strategyPacingV125":true,"researchBalanceVersion":2,"mapExpansionVersion":2,"worldScaleVersion":2,"geographyVersion":0 if world_type=="inland" else 4 if world_type in ["continents","archipelago"] else 7,"coastalStartsVersion":1,"seed":seed,"type":world_type,"difficulty":"normal","time":0,"research":research,"ages":ages,"cities":[],"settlers":settlers,"nextSettler":4,"units":units,"explorerVersion":1,"armies":armies,"deployments":{},"explored":explored,"visionClock":0,"clock":0,"battle":null,"winner":null,"lakeOutletsV275":true,"naturalShoreV278":true}
+	return {"version":4,"unitBalanceVersion":99,"roadKeyCols":Grid.COLS,"hydrologyVersion":2,"tempo":"normal","strategyPacingV125":true,"researchBalanceVersion":2,"mapExpansionVersion":2,"worldScaleVersion":2,"geographyVersion":0 if world_type=="inland" else 4 if world_type in ["continents","archipelago"] else 7,"coastalStartsVersion":1,"seed":seed,"type":world_type,"difficulty":"normal","time":0,"research":research,"ages":ages,"cities":[],"settlers":settlers,"nextSettler":slots,"units":units,"explorerVersion":1,"armies":armies,"deployments":{},"explored":explored,"visionClock":0,"clock":0,"battle":null,"winner":null,"lakeOutletsV275":true,"naturalShoreV278":true}
 
 static func opponents(state: Dictionary) -> Array:
 	return range(1, Setup.opponent_count(state) + 1)
