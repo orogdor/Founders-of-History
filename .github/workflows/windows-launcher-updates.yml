@@ -54,29 +54,63 @@ jobs:
           update_tag="windows-launcher-update-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
           release_root="https://github.com/$GITHUB_REPOSITORY/releases/download"
           patch=null
+          deltas='[]'
+          channel=refs/heads/windows-launcher-channel
+          parent=()
+          recent_revisions=()
+          if git ls-remote --exit-code --heads origin "$channel" >/dev/null; then
+            git fetch --depth=2 origin "$channel"
+            if previous=$(git show FETCH_HEAD:manifest.json | jq -er '.revision'); then
+              if (( previous > GITHUB_RUN_NUMBER )); then exit 0; fi
+            fi
+            parent=(-p FETCH_HEAD)
+            mapfile -t recent_revisions < <(git log -2 --format=%H FETCH_HEAD)
+          fi
           if gh release view "$base_tag" --json tagName >/dev/null 2>&1; then
             gh release download "$base_tag" --pattern windows-base.pck --dir "$bundle"
             "$godot_bin" --headless --path . --export-patch "Windows Desktop" "$bundle/windows-patch.pck" --patches "$bundle/windows-base.pck"
             test -s "$bundle/windows-patch.pck"
             test "$(stat -c%s "$bundle/windows-patch.pck")" -le 1610612736
-            gh release create "$update_tag" "$bundle/windows-patch.pck" --target "$GITHUB_SHA" --prerelease --latest=false --title "Windows update $GITHUB_RUN_NUMBER" --notes "Windows launcher content for $GITHUB_SHA."
+            base_hash=$(sha256sum "$bundle/windows-base.pck" | cut -d' ' -f1)
+            previous_tags=()
+            for revision in "${recent_revisions[@]}"; do
+              previous_patch=$(git show "$revision:manifest.json" | jq -c --arg base "$base_hash" 'select(.base.sha256 == $base) | .patch // empty')
+              if [[ -z "$previous_patch" ]]; then continue; fi
+              url=$(jq -er '.url' <<<"$previous_patch")
+              if [[ "$url" != "$release_root/"* ]]; then continue; fi
+              suffix=${url#"$release_root/"}
+              if [[ ! "$suffix" =~ ^windows-launcher-update-([0-9]+-[0-9]+)/windows-patch\.pck$ ]]; then continue; fi
+              version=${BASH_REMATCH[1]}
+              tag="windows-launcher-update-$version"
+              if [[ "$tag" == "$update_tag" || " ${previous_tags[*]} " == *" $tag "* ]]; then continue; fi
+              previous_tags+=("$tag")
+              earlier="$bundle/previous.pck"
+              delta="$bundle/windows-delta-$version.bin"
+              if gh release download "$tag" --pattern windows-patch.pck --output "$earlier" &&
+                [[ $(stat -c%s "$earlier") == "$(jq -r '.size' <<<"$previous_patch")" ]] &&
+                [[ $(sha256sum "$earlier" | cut -d' ' -f1) == "$(jq -r '.sha256' <<<"$previous_patch")" ]] &&
+                python tools/windows_pack_delta.py "$earlier" "$bundle/windows-patch.pck" "$delta"; then
+                if [[ -s "$delta" ]]; then
+                  deltas=$(jq -c --argjson old "$previous_patch" --arg url "$release_root/$update_tag/${delta##*/}" \
+                    --arg sha "$(sha256sum "$delta" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$delta")" \
+                    '. + [{url:$url,sha256:$sha,size:$size,from:$old}]' <<<"$deltas")
+                fi
+              else
+                rm -f "$delta"
+                echo "::warning::Unable to build a Windows delta from $tag"
+              fi
+              rm -f "$earlier"
+            done
+            shopt -s nullglob
+            gh release create "$update_tag" "$bundle/windows-patch.pck" "$bundle"/windows-delta-*.bin --target "$GITHUB_SHA" --prerelease --latest=false --title "Windows update $GITHUB_RUN_NUMBER" --notes "Windows launcher content for $GITHUB_SHA."
             patch=$(jq -n --arg url "$release_root/$update_tag/windows-patch.pck" --arg sha "$(sha256sum "$bundle/windows-patch.pck" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$bundle/windows-patch.pck")" '{url:$url,sha256:$sha,size:$size}')
           else
             "$godot_bin" --headless --path . --export-pack "Windows Desktop" "$bundle/windows-base.pck"
             test -s "$bundle/windows-base.pck"
             gh release create "$base_tag" "$bundle/windows-base.pck" --target "$GITHUB_SHA" --prerelease --latest=false --title "Windows launcher game data" --notes "Initial game pack for the Windows launcher."
           fi
-          jq -n --argjson revision "$GITHUB_RUN_NUMBER" --arg source "$GITHUB_SHA" --arg url "$release_root/$base_tag/windows-base.pck" --arg sha "$(sha256sum "$bundle/windows-base.pck" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$bundle/windows-base.pck")" --argjson patch "$patch" '{schema:1,runtime:"godot-4.7.2-windows-v1",revision:$revision,source:$source,base:{url:$url,sha256:$sha,size:$size},patch:$patch}' > "$bundle/manifest.json"
+          jq -n --argjson revision "$GITHUB_RUN_NUMBER" --arg source "$GITHUB_SHA" --arg url "$release_root/$base_tag/windows-base.pck" --arg sha "$(sha256sum "$bundle/windows-base.pck" | cut -d' ' -f1)" --argjson size "$(stat -c%s "$bundle/windows-base.pck")" --argjson patch "$patch" --argjson deltas "$deltas" '{schema:1,runtime:"godot-4.7.2-windows-v1",revision:$revision,source:$source,base:{url:$url,sha256:$sha,size:$size},patch:$patch,deltas:$deltas}' > "$bundle/manifest.json"
 
-          channel=refs/heads/windows-launcher-channel
-          parent=()
-          if git ls-remote --exit-code --heads origin "$channel" >/dev/null; then
-            git fetch --depth=1 origin "$channel"
-            if previous=$(git show FETCH_HEAD:manifest.json | jq -er '.revision'); then
-              if (( previous > GITHUB_RUN_NUMBER )); then exit 0; fi
-            fi
-            parent=(-p FETCH_HEAD)
-          fi
           blob=$(git hash-object -w "$bundle/manifest.json")
           tree=$(printf '100644 blob %s\tmanifest.json\n' "$blob" | git mktree)
           commit=$(git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit-tree "$tree" "${parent[@]}" -m "Publish Windows game revision $GITHUB_RUN_NUMBER")
