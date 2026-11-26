@@ -5,7 +5,7 @@ const Visual=preload("res://scripts/visual_river.gd")
 func _initialize():call_deferred("run")
 func run():
  load("res://scripts/mobile_profile.gd").active=true
- var game:Node=load("res://main.tscn").instantiate();root.add_child(game);game.paused=true
+ var game:Node=load("res://campaign.tscn").instantiate();root.add_child(game);game.paused=true
  await process_frame
  var edges=0;var max_seam=0.0;var max_hill=0.0;var sea_changed=0
  for r in range(25,145,12):

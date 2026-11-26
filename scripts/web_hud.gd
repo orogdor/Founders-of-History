@@ -170,7 +170,7 @@ func build_hud() -> void:
 	var hint:=text_item("status_line","",15)
 	hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_color_override("font_outline_color",Color("101820"));hint.add_theme_constant_override("outline_size",4)
-	hotspot("world_toggle","Vaheta kaardivaadet",func():host.toggle_detail())
+	hotspot("world_toggle","Vaheta kaardivaadet",func():host.request_detail_view())
 	for key in ["gold","food","stone"]:hotspot(key+"_button","Kuningriigi varud",open_stores.bind(key))
 	hotspot("population_button","Linnad ja asunikud",func():stores_panel.visible=false;dock_menu.open_menu("cities"))
 	hotspot("science_button","Uurimine",open_research)
@@ -221,7 +221,7 @@ void fragment() {
 	image_button("center","ui-art-v303_map_center","Keskenda valikule",func():host.focus_selected_entity())
 	image_button("layers","ui-art-v303_map_layers","Kaardi tegevused",show_map_actions)
 	image_button("resource_layer","ui-art-v291_map_show","Näita või peida maardlaid",toggle_resource_layer)
-	image_button("map_switch","ui-art-v263_cmd_map","Vaheta kaardivaadet",func():host.toggle_detail())
+	image_button("map_switch","ui-art-v263_cmd_map","Vaheta kaardivaadet",func():host.request_detail_view())
 	image_button("walk","ui-art-v303_action_move","Kõnni detailkaardil esimese isiku vaates",func():host.fpv_walker.start())
 	image_button("wall_shape","ui-art-v263_bld_stonewall","Müüri kuju (C)",host.toggle_wall_shape)
 	image_button("wall_tier","ui-art-v263_cmd_build","Palissaadi kõrgus (T)",host.toggle_wall_tier)
@@ -506,7 +506,7 @@ func map_action(id: int) -> void:
 				host.select_player_settler()
 				if not host.detail_mode:host.toggle_detail()
 		4:host.begin_army_order()
-		5:host.open_selected_tile()
+		5:host.request_detail_view(true)
 		6:dock_menu.open_menu("cities")
 		7:
 			host.refresh_army_options()
@@ -525,7 +525,7 @@ func open_visible_rival() -> void:
 			if int(person.team)!=0 and Campaign.visible_now(host.game,0,person):target=person;break
 	if target==null:host.update_status("Vastast pole veel avastatud. Saada avastaja.");return
 	if host.detail_mode:host.toggle_detail()
-	host.selected=Vector2i(int(target.c),int(target.r));host.open_selected_tile()
+	host.selected=Vector2i(int(target.c),int(target.r));host.request_detail_view(true)
 
 func open_research() -> void:
 	legacy_panel.visible=false

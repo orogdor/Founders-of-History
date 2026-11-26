@@ -2,7 +2,7 @@ extends SceneTree
 const AI=preload("res://scripts/ai_settlement.gd")
 func _initialize():call_deferred("run_test")
 func run_test():
- var scene=load("res://main.tscn").instantiate();root.add_child(scene);current_scene=scene
+ var scene=load("res://campaign.tscn").instantiate();root.add_child(scene);current_scene=scene
  await process_frame
  var menu=scene.game_hud.game_menu;menu.open_menu();menu.seed.text="20261123"
  for i in menu.world_type.item_count:

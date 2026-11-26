@@ -8,7 +8,7 @@ func run_test() -> void:
   var args:=OS.get_cmdline_user_args();var type_filtered:bool="inland" in args or "continents" in args or "tectonic" in args
   if type_filtered and sample.type not in args:continue
   if "seed=12345" in args and sample.seed!="12345":continue
-  var scene=load("res://main.tscn").instantiate();root.add_child(scene);current_scene=scene
+  var scene=load("res://campaign.tscn").instantiate();root.add_child(scene);current_scene=scene
   await process_frame
   var menu=scene.game_hud.game_menu;menu.open_menu();menu.seed.text=sample.seed
   for i in menu.world_type.item_count:

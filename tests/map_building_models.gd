@@ -58,7 +58,7 @@ func run() -> void:
 		assert(gate_mesh!=null and gate_mesh.get_aabb().size.x>=6.4)
 	var fieldstone:=StoneSurface.material("stone",true,true)
 	assert(fieldstone.get_shader_parameter("stone_texture")==StoneSurface.FIELDSTONE)
-	assert(fieldstone.get_shader_parameter("mesh_uv") and float(fieldstone.get_shader_parameter("relief_amount"))<0.015)
+	assert(fieldstone.get_shader_parameter("mesh_uv") and float(fieldstone.get_shader_parameter("relief_amount"))<0.025)
 	var wall_model:=Models.create("stonewall",2)
 	var found_stone:=false
 	for part in wall_model.find_children("*","MeshInstance3D",true,false):

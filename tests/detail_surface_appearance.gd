@@ -10,7 +10,7 @@ func run() -> void:
 	verify_legacy_forest()
 	Mobile.active=OS.get_environment("FOH_VISUAL_DESKTOP").is_empty()
 	root.size=Vector2i(1536,691)
-	var game: Node=load("res://main.tscn").instantiate()
+	var game: Node=load("res://campaign.tscn").instantiate()
 	root.add_child(game);game.paused=true
 	await process_frame
 	game.game_hud.game_menu.close_menu()

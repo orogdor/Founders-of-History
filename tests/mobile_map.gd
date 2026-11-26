@@ -8,7 +8,7 @@ func _initialize() -> void:
 func run() -> void:
 	Mobile.active=true
 	root.size=Vector2i(1440,810)
-	var game=load("res://main.tscn").instantiate()
+	var game=load("res://campaign.tscn").instantiate()
 	root.add_child(game)
 	game.paused=true
 	await process_frame

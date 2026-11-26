@@ -40,6 +40,7 @@ var edge_vision_revision: int=-1
 var map_focus:=Vector2.ZERO
 var road_stamp: int=-1
 var road_edges: Array=[]
+var changing_parent:=false
 
 func setup(host: Node,center: Vector2i) -> void:
 	host_node=host
@@ -54,6 +55,37 @@ func setup(host: Node,center: Vector2i) -> void:
 	for at in neighborhood(center):area[at]=true
 	set_wanted(area,center)
 	refresh_cloud_edges(vision_stamp())
+
+func move_to(parent: Node) -> void:
+	changing_parent=true
+	reparent(parent,false)
+	changing_parent=false
+
+func park() -> void:
+	stop_stream()
+	for at: Vector2i in tiles.keys():
+		var distance:=(at-anchor).abs()
+		if maxi(distance.x,distance.y)>1:remove_tile(at,false)
+	var nearby: Dictionary={}
+	for at in neighborhood(anchor):nearby[at]=true
+	set_wanted(nearby,anchor)
+	process_mode=Node.PROCESS_MODE_DISABLED
+	hide()
+
+func resume(view: Node3D,center: Vector2i) -> void:
+	if center!=anchor:recenter(center)
+	move_to(view)
+	edge_vision_revision=-1
+	map_vision_revision=-1
+	map_rect=Rect2i()
+	process_mode=Node.PROCESS_MODE_INHERIT
+	show()
+	refresh_cloud_edges(vision_stamp())
+
+func prefetched_world(at: Vector2i) -> Dictionary:
+	var tile: Node=tiles.get(at)
+	var nature:=tile.get_node_or_null("Nature") if tile!=null else null
+	return nature.world_data if nature!=null else stages.get(at,{})
 
 func recenter(center: Vector2i) -> void:
 	var shift:=tile_offset(center)
@@ -117,8 +149,8 @@ func update_stream(point: Vector2,direction: Vector2) -> void:
 	if not walking:detail_fog.hide()
 	walking=true
 	var center:=coords_at(point)
-	var ahead:=coords_at(point+direction*72.0)
-	focus=point+direction*42.0
+	var ahead:=coords_at(point+direction*108.0)
+	focus=point+direction*67.0
 	var revision:=vision_stamp()
 	refresh_cloud_edges(revision)
 	if center==walked_tile and ahead==look_ahead and revision==vision_revision:return
@@ -153,7 +185,7 @@ func update_map_view(camera: Camera3D,point: Vector2) -> void:
 	var bounds:=Rect2i(center-Vector2i.ONE,Vector2i(3,3))
 	var direction: Vector2=(point-map_focus).normalized()
 	map_focus=point
-	var ahead:=coords_at(point+direction*85.0)
+	var ahead:=coords_at(point+direction*110.0)
 	bounds=bounds.merge(Rect2i(ahead-Vector2i.ONE,Vector2i(3,3)))
 	var plane:=Plane(Vector3.UP,-20.0)
 	for corner in [viewport.position,Vector2(viewport.end.x,viewport.position.y),Vector2(viewport.position.x,viewport.end.y),viewport.end]:
@@ -163,7 +195,7 @@ func update_map_view(camera: Camera3D,point: Vector2) -> void:
 			at=at.clamp(center-Vector2i(3,3),center+Vector2i(3,3))
 			bounds=bounds.merge(Rect2i(at,Vector2i.ONE))
 	detail_fog.position=Vector3(point.x,-20.0,point.y)
-	focus=point+direction*38.0
+	focus=point+direction*58.0
 	if bounds==map_rect and center==map_center and revision==map_vision_revision:return
 	map_rect=bounds;map_center=center;map_vision_revision=revision
 	var area: Dictionary={}
@@ -318,20 +350,23 @@ func start_worker(at: Vector2i) -> void:
 	var atlas: PackedFloat32Array=host_node.world_height_samples
 	var seed:=int(host_node.game.seed)
 	var biome: String=host_node.visual_biome(index_of(at))
-	var prepare:=func() -> Dictionary:
-		var result: Dictionary={"world":{}}
-		if make_surface:
-			result.heights=Terrain.tile_heights(cells,at.x,at.y)
-			result.visual=VisualRiver.color_heights(cells,atlas,at.x,at.y,seed,graph)
-			result.mesh=Terrain.mesh_arrays(result.heights,Vector2.ZERO,result.visual)
-		if not cell.is_empty():result.world=DetailWorld.create(cells,cell,biome,seed)
-		return result
+	var prepare:=prepare_chunk.bind(cells,graph,atlas,seed,at,make_surface,cell,biome)
 	active_at=at;active_revision=revision_stamp()
 	worker=Thread.new()
 	if worker.start(prepare)!=OK:
 		worker=null;active_at=INACTIVE_TILE;pending[at]=true
 
+static func prepare_chunk(cells: Array,graph: Dictionary,atlas: PackedFloat32Array,seed: int,at: Vector2i,make_surface: bool,cell: Dictionary,biome: String) -> Dictionary:
+	var result: Dictionary={"world":{}}
+	if make_surface:
+		result.heights=Terrain.tile_heights(cells,at.x,at.y)
+		result.visual=VisualRiver.color_heights(cells,atlas,at.x,at.y,seed,graph)
+		result.mesh=Terrain.mesh_arrays(result.heights,Vector2.ZERO,result.visual)
+	if not cell.is_empty():result.world=DetailWorld.create(cells,cell,biome,seed)
+	return result
+
 func _exit_tree() -> void:
+	if changing_parent:return
 	if worker!=null:
 		worker.wait_to_finish();worker=null
 		if wanted.has(active_at):pending[active_at]=true

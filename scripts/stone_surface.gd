@@ -2,6 +2,7 @@ extends RefCounted
 ## Shared masonry finishes for the house editor and imported town buildings.
 
 const STONE=preload("res://scripts/stone_surface.gdshader")
+const SurfaceDetail=preload("res://scripts/surface_detail.gd")
 const FIELDSTONE=preload("res://assets/house_designer/atlas-stone.webp")
 const CUTSTONE=preload("res://assets/house_designer/proc-cutstone.webp")
 const LIMESTONE=preload("res://assets/house_designer/proc-limestone.webp")
@@ -49,7 +50,12 @@ static func material(style: String,mapped: bool,relief: bool) -> ShaderMaterial:
 	surface.set_shader_parameter("stone_tint",source[2])
 	surface.set_shader_parameter("tiling",source[3])
 	surface.set_shader_parameter("mesh_uv",mapped)
-	surface.set_shader_parameter("relief_amount",0.007 if relief else 0.0)
+	if relief:
+		var height:=SurfaceDetail.matching_height(source[0])
+		if height!=null:
+			surface.set_shader_parameter("stone_height",height)
+			surface.set_shader_parameter("has_height_map",true)
+		surface.set_shader_parameter("relief_amount",0.018 if height!=null else 0.007)
 	materials[key]=surface
 	return surface
 

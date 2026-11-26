@@ -1,5 +1,13 @@
 extends Node3D
 
+signal loading_progress(stage: String, amount: float)
+signal launch_finished(error: String)
+const LoadingScreen=preload("res://scripts/loading_screen.gd")
+var launch_request: Dictionary = {}
+var generation_screen: Control
+var loading_save:=false
+var generation_seed_text := ""
+
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 const WorldSetup = preload("res://scripts/world_setup.gd")
 const FactionPalette = preload("res://scripts/faction_palette.gd")
@@ -174,10 +182,13 @@ var battle_nav: Variant=null
 var battle_sim: Variant=null
 var battle_view: Node3D=null
 var detail_root: Node3D
-var detail_loading_overlay: ColorRect
-var detail_loading_initial:=false
-var detail_loading_previous:=false
-var detail_loading_seconds:=0.0
+var requested_detail := false
+var detail_recenter := false
+var parked_neighbors: Node3D
+var parked_revision := ""
+var parked_at_time := 0.0
+const DetailWarmup = preload("res://scripts/detail_warmup.gd")
+var detail_warmup := DetailWarmup.new()
 var detail_button: Button
 var found_button: Button
 var research_row: VBoxContainer
@@ -294,10 +305,12 @@ var map_touch := MapTouch.new()
 func _ready() -> void:
 	Grid.active_size = Grid.DEFAULT_SIZE
 	FactionPalette.use_campaign({})
-	DetailView.request_nature_assets()
-	DetailGroundMaterial.request_assets()
+	DetailGroundMaterial.request_world_assets()
 	var settings:=ConfigFile.new()
 	if settings.load("user://kuningriigid_godot_settings.cfg")==OK:reveal_all=bool(settings.get_value("interface","reveal_all",false))
+	if not launch_request.is_empty():
+		setup_campaign_request()
+		return
 	var raw := FileAccess.get_file_as_string(DATA_PATH)
 	var data: Variant = JSON.parse_string(raw)
 	if not data is Dictionary or not data.has("heights"):
@@ -342,6 +355,34 @@ func _ready() -> void:
 	update_status("Puuduta ruutu või suumi kahe sõrmega." if MobileProfile.active else "Vali hiirega naaberruut või kaugem maismaaruut.")
 	call_deferred("open_initial_menu")
 
+func setup_campaign_request() -> void:
+	paused=true
+	menu_open=true
+	generation_thread=Thread.new()
+	var task: Callable
+	if launch_request.has("path"):
+		loading_save=true
+		task=load_saved_worker.bind(str(launch_request.path))
+	else:
+		generation_seed_text=str(launch_request.get("seed","")).strip_edges()
+		pending_tempo=str(launch_request.get("tempo","normal"))
+		pending_difficulty=str(launch_request.get("difficulty","normal"))
+		var value:=Campaign.seed_from_text(generation_seed_text) if not generation_seed_text.is_empty() else (randi() & 0x7fffffff)
+		task=generate_worker.bind(value,{},str(launch_request.get("type","tectonic")),launch_request.get("settings",{}))
+	if generation_thread.start(task)!=OK:generation_failed("Mängu laadimist ei saanud käivitada.")
+
+func finish_launch() -> void:
+	launch_request={}
+	paused=false
+	menu_open=false
+
+func report_loading(stage: String,amount: float) -> void:
+	loading_progress.emit(stage,amount)
+	if is_instance_valid(generation_screen):generation_screen.set_stage(stage,amount)
+
+func show_generation(title: String,stage: String) -> void:
+	if is_instance_valid(generation_screen):generation_screen.begin(title,stage)
+
 func open_initial_menu() -> void:
 	if get_tree().current_scene!=self:return
 	var had_save:=FileAccess.file_exists(SAVE_FILE) or FileAccess.file_exists(SAVE_FILE+".bak")
@@ -355,13 +396,12 @@ func cell_position(p: Vector2i) -> Vector3:
 	return Vector3((p.x - Grid.COLS / 2.0) * CELL_SIZE, 0, (p.y - Grid.ROWS / 2.0) * CELL_SIZE)
 
 func visual_biome(i: int) -> String:
-	var cell: Dictionary = grid[i]
+	return biome_at(grid[i],latitudes[i],moisture[i],heat[i])
+
+static func biome_at(cell: Dictionary,lat: float,wet: float,temperature: float) -> String:
 	var h: float = cell.h
 	if cell.get("webGeneratedV331",false) and cell.has("visualBiome"):return str(cell.visualBiome)
 	if not cell.land: return "sea"
-	var lat: float = latitudes[i]
-	var wet: float = moisture[i]
-	var temperature: float = heat[i]
 	var dry := clampf(1-wet*0.92+0.08,0,1)
 	if cell.mountain:
 		if lat > 0.72 or h > 36: return "snow_mountain"
@@ -377,33 +417,36 @@ func visual_biome(i: int) -> String:
 	return "grassland"
 
 func is_forest_core(i:int)->bool:
-	var cell:Dictionary=grid[i]
+	return forest_at(grid[i],moisture[i],int(game.seed))
+
+static func forest_at(cell: Dictionary,wet: float,seed: int) -> bool:
 	if cell.get("legacyBiomeV250",false) or cell.get("webGeneratedV331",false):return str(cell.get("biome",""))=="forest"
-	return not cell.get("mountain",false) and moisture[i]+(Geography.noise(int(cell.c)+40,int(cell.r)+60,int(game.seed))-0.5)*0.12>0.66
+	return not cell.get("mountain",false) and wet+(Geography.noise(int(cell.c)+40,int(cell.r)+60,seed)-0.5)*0.12>0.66
 
 func terrain_color(i: int, include_forest_cover := false) -> Color:
+	return terrain_tint(visual_biome(i),grid[i].land and is_forest_core(i),include_forest_cover)
+
+static func terrain_tint(biome: String,forest: bool,include_forest_cover: bool) -> Color:
 	var palette := {"sea":"315d70","snow_mountain":"8b928a","mesa":"978067","mountain":"737b6c","snow":"dfe2d9","taiga":"53694c","tundra":"8e9780","desert":"b9a573","jungle":"426640","forest":"4b6945","steppe":"8b9561","lush_river":"718f52","grassland":"768d55"}
 	var wooded: Dictionary={"grassland":"4c6946","lush_river":"4d7046","steppe":"596f48","desert":"a59a6d","tundra":"78836b","taiga":"475e47","jungle":"375f39"}
-	var biome:=visual_biome(i);var cell: Dictionary=grid[i]
-	var forest: bool=cell.land and is_forest_core(i)
 	var color := Color(wooded[biome] if forest and wooded.has(biome) else palette[biome])
 	if include_forest_cover:color.a=1.0 if forest else 0.0
 	return color
 
-func build_world() -> void:
+func build_world(prepared: Dictionary={}) -> void:
 	river_navigation_cache.clear()
 	detail_pick_heights.clear()
 	detail_visual_cache.clear()
 	clear_detail_landscape_cache()
 	detail_mesh_cache.clear()
 	detail_ocean_cache.clear()
-	world_height_samples=WorldTerrain.samples(grid)
-	var colors:=PackedColorArray();colors.resize(grid.size())
-	for i in colors.size():colors[i]=terrain_color(i,true)
-	var mesh:=WorldTerrain.build(grid,world_height_samples,colors,true,int(game.seed),2 if MobileProfile.active else WorldTerrain.SUBDIVISIONS)
-	world_mesh_samples=mesh.get_meta("atlas_sampler",mesh.get_meta("atlas_heights",PackedFloat32Array()))
-	world_river_graph=WorldRivers.prepare(grid,int(game.seed))
-	WorldRivers.add_surface(mesh,grid,world_height_samples,int(game.seed),world_river_graph)
+	var geometry:=prepared
+	if geometry.is_empty():geometry=prepare_world_geometry(grid,latitudes,moisture,heat,int(game.seed))
+	world_height_samples=geometry.samples
+	world_river_graph=geometry.rivers
+	world_mesh_samples=geometry.terrain.sampler
+	var mesh:=WorldTerrain.mesh_from_data(geometry.terrain)
+	for surface in geometry.river_meshes:mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,surface)
 	var mesh_instance:=MeshInstance3D.new();terrain=mesh_instance;mesh_instance.mesh=mesh
 	var ground:=ShaderMaterial.new()
 	ground.shader=load("res://scripts/mobile_ground.gdshader" if MobileProfile.active else "res://scripts/world_terrain.gdshader")
@@ -417,12 +460,29 @@ func build_world() -> void:
 		var banks:=ShaderMaterial.new();banks.shader=load("res://scripts/world_river_banks.gdshader")
 		mesh_instance.set_surface_override_material(2,banks)
 	add_child(mesh_instance)
-	var ocean:=MeshInstance3D.new();ocean.mesh=WorldTerrain.build_ocean(mesh)
+	var ocean:=MeshInstance3D.new()
+	var ocean_mesh:=ArrayMesh.new()
+	if not geometry.water[Mesh.ARRAY_INDEX].is_empty():
+		ocean_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,geometry.water)
+	ocean.mesh=ocean_mesh
 	var water:=ShaderMaterial.new()
 	water.shader=load("res://scripts/mobile_water.gdshader" if MobileProfile.active else "res://scripts/world_ocean.gdshader")
 	if MobileProfile.active:water.set_shader_parameter("overview",true)
 	ocean.material_override=water;mesh_instance.add_child(ocean)
 	if fog!=null:rebuild_fog_mesh();update_fog_symbols()
+
+static func prepare_world_geometry(cells: Array,latitude: Array,humidity: Array,temperature: Array,seed: int) -> Dictionary:
+	var samples:=WorldTerrain.samples(cells)
+	var colors:=PackedColorArray()
+	colors.resize(cells.size())
+	for i in colors.size():
+		var cell: Dictionary=cells[i]
+		colors[i]=terrain_tint(biome_at(cell,latitude[i],humidity[i],temperature[i]),cell.land and forest_at(cell,humidity[i],seed),true)
+	var terrain_data:=WorldTerrain.prepare_mesh(cells,samples,colors,true,seed,2 if MobileProfile.active else WorldTerrain.SUBDIVISIONS)
+	var rivers:=WorldRivers.prepare(cells,seed)
+	var river_meshes:=WorldRivers.prepare_surfaces(cells,samples,rivers,terrain_data.sampler)
+	var water:=WorldTerrain.ocean_arrays(terrain_data.arrays,terrain_data.heights)
+	return {"samples":samples,"terrain":terrain_data,"rivers":rivers,"river_meshes":river_meshes,"water":water}
 
 func build_environment() -> void:
 	var env := WorldEnvironment.new()
@@ -1631,9 +1691,10 @@ func build_ui() -> void:
 	layer.add_child(hud)
 	layer.move_child(panel,layer.get_child_count()-1)
 	panel.visible=false
-	var loading_layer:=CanvasLayer.new();loading_layer.layer=30;add_child(loading_layer)
-	detail_loading_overlay=ColorRect.new();detail_loading_overlay.color=Color(0.03,0.06,0.09,0.96);detail_loading_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);detail_loading_overlay.visible=false;loading_layer.add_child(detail_loading_overlay)
-	var loading_text:=Label.new();loading_text.text="Detailkaardi maastik ja mets laadivad…";loading_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;loading_text.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;loading_text.add_theme_font_size_override("font_size",24);loading_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);detail_loading_overlay.add_child(loading_text)
+	var loading_layer:=CanvasLayer.new();loading_layer.layer=72;add_child(loading_layer)
+	generation_screen=LoadingScreen.new()
+	loading_layer.add_child(generation_screen)
+
 
 func toggle_simulation_pause() -> void:
 	simulation_paused=not simulation_paused
@@ -1654,6 +1715,7 @@ func update_status(message: String) -> void:
 	status.text = "%s: %d, %d  |  %s" % [subject,location.x,location.y,message]
 
 func _unhandled_input(event: InputEvent) -> void:
+	if generation_thread!=null or requested_detail or not launch_request.is_empty():return
 	if is_instance_valid(house_designer_layer):return
 	if is_instance_valid(fpv_walker) and fpv_walker.handle_input(event):get_viewport().set_input_as_handled();return
 	if event is InputEventMouse and event.device==InputEvent.DEVICE_ID_EMULATION:return
@@ -1664,6 +1726,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	handle_map_input(event)
 
 func _input(event: InputEvent) -> void:
+	if generation_thread!=null or requested_detail or not launch_request.is_empty():return
 	if map_touch.track(event,self):get_viewport().set_input_as_handled()
 
 func cancel_map_pointer() -> void:
@@ -1733,9 +1796,9 @@ func handle_map_input(event: InputEvent) -> void:
 				elif selected_entity=="ship":stop_selected_ship()
 				elif selected_entity=="settler":stop_selected_settler()
 			KEY_F:focus_selected_entity()
-			KEY_G:toggle_detail()
+			KEY_G:request_detail_view()
 			KEY_ENTER:
-				if not detail_mode:open_selected_tile()
+				if not detail_mode:request_detail_view(true)
 			KEY_SPACE:toggle_simulation_pause()
 			KEY_EQUAL,KEY_KP_ADD:zoom=clampf(zoom-(7.67 if detail_mode else 3.27),21.1 if detail_mode else 4.9,430.5 if detail_mode else 294.6);update_camera()
 			KEY_MINUS,KEY_KP_SUBTRACT:zoom=clampf(zoom+(7.67 if detail_mode else 3.27),21.1 if detail_mode else 4.9,430.5 if detail_mode else 294.6);update_camera()
@@ -1782,7 +1845,7 @@ func handle_map_input(event: InputEvent) -> void:
 				if not drag_moved:
 					var open_tile: bool=drag_double_click and not detail_mode and not (army_command_mode or settler_command_mode or ship_command_mode or build_placement_mode)
 					select_destination(event.position)
-					if open_tile:open_selected_tile()
+					if open_tile:request_detail_view(true)
 				drag_button=0
 				drag_double_click=false
 	elif event is InputEventMouseMotion:
@@ -2227,20 +2290,15 @@ func _process(delta: float) -> void:
 		# variable refresh rates. Bound long stalls before advancing navigation.
 		delta = minf(float(now-previous_frame_usec)*0.000001,0.25)*Engine.time_scale
 	previous_frame_usec = now
-	DetailView.poll_nature_assets();DetailView.poll_tree_assets();DetailGroundMaterial.poll()
-	if is_instance_valid(detail_loading_overlay) and not MobileProfile.active:
-		if detail_mode and not detail_loading_previous:detail_loading_initial=true;detail_loading_seconds=0.0
-		if detail_mode and detail_loading_initial and is_instance_valid(detail_root):
-			var waiting: bool=bool(detail_root.tree_pending) or detail_root.forest_fill!=null or not detail_root.tree_lod_queue.is_empty() or (not detail_root.tree_counts.is_empty() and bool(detail_root.tree_lod_dirty))
-			detail_loading_seconds+=delta
-			detail_loading_overlay.visible=waiting and detail_loading_seconds<15.0
-			if not detail_loading_overlay.visible:detail_loading_initial=false
-		else:detail_loading_overlay.visible=false
-		detail_loading_previous=detail_mode
+	DetailGroundMaterial.poll()
+	if detail_mode or requested_detail:
+		DetailView.poll_nature_assets()
+		DetailView.poll_tree_assets()
+	if generation_thread==null and not game.is_empty():update_detail_warmup()
 	if is_instance_valid(building_preview) and (not build_placement_mode or not detail_mode or not city_created or settler_mode):clear_building_preview()
 	if is_instance_valid(fpv_walker):fpv_walker.update(delta)
 	if not is_instance_valid(fpv_walker) or not fpv_walker.active:
-		update_camera_keys(delta)
+		if generation_thread==null:update_camera_keys(delta)
 		follow_detail_camera()
 	if settler.is_empty() or paused or simulation_paused or menu_open or (game.get("winner")!=null and game.get("battle")==null):
 		return
@@ -2521,6 +2579,9 @@ func start_generation() -> void:
 		return
 	pending_tempo=tempo_select.get_item_metadata(tempo_select.selected)
 	var value := seed_input.text.strip_edges()
+	generation_seed_text=value
+	loading_save=false
+	show_generation("Uue maailma loomine","Maailma ettevalmistamine")
 	var world_seed := Campaign.seed_from_text(value) if not value.is_empty() else (randi() & 0x7fffffff)
 	paused = true
 	generate_button.disabled = true
@@ -2532,7 +2593,8 @@ func start_generation() -> void:
 	if error != OK:
 		generation_failed("Maailma loomist ei saanud käivitada.")
 
-func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic", options: Dictionary={}) -> void:
+func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic", options: Dictionary={},save: Dictionary={},from_backup:=false) -> void:
+	call_deferred("report_loading","Mandrite ja maastiku loomine",0.40)
 	var settings := restored if not restored.is_empty() else options
 	var size := WorldSetup.dimensions(settings)
 	Grid.stage_size(size)
@@ -2541,7 +2603,8 @@ func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic", 
 		if imported.has("error"):call_deferred("generation_failed",str(imported.error));return
 		imported.dimensions=size
 		imported.world_type=str(restored.get("type","tectonic"))
-		call_deferred("finish_generation",imported);return
+		prepare_generated_world(imported,save,from_backup)
+		return
 	if not restored.is_empty():world_type=str(restored.get("type","tectonic"))
 	var data:Dictionary
 	if world_type=="inland":data=preload("res://scripts/legacy_world.gd").new(value).generate()
@@ -2564,7 +2627,15 @@ func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic", 
 	data.world_type=world_type
 	data.dimensions=size
 	data.setup=settings
-	call_deferred("finish_generation", data)
+	prepare_generated_world(data,save,from_backup)
+
+func prepare_generated_world(data: Dictionary,save: Dictionary,from_backup: bool) -> void:
+	call_deferred("report_loading","Ranniku, maastiku ja jõgede ettevalmistamine",0.64)
+	if not save.is_empty():BridgeRules.restore(data.grid,save.game.get("cities",[]))
+	data.geometry=prepare_world_geometry(data.grid,data.lat,data.moisture,data.heat,int(data.seed))
+	data.save=save
+	data.from_backup=from_backup
+	call_deferred("finish_generation",data)
 
 static func valid_start_positions(positions: Variant, size: Vector2i, players: int) -> bool:
 	if not positions is Array or positions.size() != players:
@@ -2585,6 +2656,12 @@ func finish_generation(data: Dictionary) -> void:
 	generation_thread.wait_to_finish()
 	generation_thread = null
 	Grid.finish_staging()
+	pending_load=data.get("save",{})
+	pending_from_backup=bool(data.get("from_backup",false))
+	var opening:=not launch_request.is_empty()
+	report_loading("Maailmakaardi kuvamine",0.89)
+	detail_warmup.clear()
+	discard_parked_detail()
 	var dimensions: Vector2i = data.dimensions
 	var resize := Grid.active_size != dimensions
 	if resize:finish_ai_survey_threads()
@@ -2608,7 +2685,7 @@ func finish_generation(data: Dictionary) -> void:
 	apply_faction_palette(pending_load.game if not pending_load.is_empty() else game)
 	game.tempo=pending_tempo
 	game.difficulty=pending_difficulty
-	game.seedInputText=seed_input.text.strip_edges()
+	game.seedInputText=generation_seed_text
 	Campaign.apply_coastal_starts(game,starts)
 	game.migrationV274 = {"until":120}
 	game.peaceUntilV276 = 1200
@@ -2630,6 +2707,24 @@ func finish_generation(data: Dictionary) -> void:
 	army_command_mode=false
 	if army_row!=null:army_row.visible=false
 	autosave_clock=0.0;autosave_pending=false
+	if is_instance_valid(terrain):
+		terrain.hide()
+		terrain.queue_free()
+	if resize and is_instance_valid(fog):
+		fog.hide()
+		fog.queue_free()
+		fog=null
+	build_world(data.get("geometry",{}))
+	if fog==null:build_fog()
+	if opening:
+		build_environment()
+		build_camera()
+		build_marker()
+		build_ui()
+		fpv_walker=preload("res://scripts/fpv_walker.gd").new();fpv_walker.host=self;add_child(fpv_walker)
+		seed_input.text=generation_seed_text
+		for i in tempo_select.item_count:
+			if str(tempo_select.get_item_metadata(i))==pending_tempo:tempo_select.select(i);break
 	simulation_paused=false
 	simulation_pause_button.text="Peata mäng"
 	labor_dialog.hide();resources_dialog.hide();training_dialog.hide()
@@ -2644,20 +2739,12 @@ func finish_generation(data: Dictionary) -> void:
 	city_river_nav = null
 	for a in game.settlers: Campaign.reveal(game,int(a.team),int(a.c),int(a.r))
 	elapsed = 0.0
-	terrain.queue_free()
-	if resize and is_instance_valid(fog):
-		fog.queue_free()
-		fog = null
-	if not pending_load.is_empty():BridgeRules.restore(grid,pending_load.game.get("cities",[]))
-	build_world()
-	if resize:
-		build_fog()
 	refresh_fog()
 	camera_target = cell_position(player)+Vector3(1,0,1)
 	update_camera()
 	update_marker()
-	paused = false
-	generate_button.disabled = false
+	paused=opening
+	generate_button.disabled=false
 	if not pending_load.is_empty():
 		apply_loaded_game()
 	else:
@@ -2665,8 +2752,11 @@ func finish_generation(data: Dictionary) -> void:
 		update_status("Uus maailm valmis; vali asunikule sihtkoht.")
 	if game_hud != null and game_hud.game_menu != null:
 		game_hud.game_menu.finish_new_game("")
+	if is_instance_valid(generation_screen):generation_screen.hide()
+	if opening:launch_finished.emit("")
 
 func _exit_tree() -> void:
+	detail_warmup.clear()
 	finish_ai_survey_threads()
 	if generation_thread != null and generation_thread.is_started():
 		generation_thread.wait_to_finish()
@@ -2705,6 +2795,77 @@ static func prepare_geography(world_heights: PackedFloat32Array, seed_value: int
 	return cells
 
 
+func update_detail_warmup() -> void:
+	detail_warmup.poll()
+	if is_instance_valid(parked_neighbors) and float(Time.get_ticks_msec())/1000.0-parked_at_time>18.0:
+		discard_parked_detail()
+	if detail_mode or menu_open or paused or requested_detail or zoom>42.0:return
+	DetailGroundMaterial.request_assets()
+	DetailView.request_nature_assets()
+	for at: Vector2i in [selected,player]:
+		if not detail_tile_visible(at):continue
+		var key:=detail_visual_key(at.x,at.y)
+		if detail_mesh_cache.has(key) or detail_warmup.ready.has(key):continue
+		detail_warmup.begin(self,at)
+		break
+
+func detail_tile_visible(at: Vector2i) -> bool:
+	return DetailNeighbors.in_bounds(at) and (reveal_all or game.explored[0].has("%d:%d" % [at.x,at.y]))
+
+func request_detail_view(selected_tile:=false) -> void:
+	if generation_thread!=null or requested_detail or game.is_empty() or battle_view!=null:return
+	if detail_mode:
+		if not selected_tile:toggle_detail()
+		return
+	var at:=selected if selected_tile else player
+	if not detail_tile_visible(at):
+		if selected_tile:open_selected_tile()
+		else:toggle_detail()
+		return
+	var key:=detail_visual_key(at.x,at.y)
+	var warm: bool=detail_mesh_cache.has(key) and is_instance_valid(parked_neighbors) and parked_neighbors.anchor==at and parked_revision==key
+	if warm:
+		if selected_tile:open_selected_tile()
+		else:toggle_detail()
+		return
+	requested_detail=true
+	DetailGroundMaterial.request_assets()
+	DetailView.request_nature_assets()
+	show_generation("Detailkaart","Maastiku ettevalmistamine")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var deadline:=Time.get_ticks_msec()+1500
+	while not detail_mesh_cache.has(key) and not detail_warmup.ready.has(key) and Time.get_ticks_msec()<deadline:
+		detail_warmup.begin(self,at)
+		await get_tree().process_frame
+	report_loading("Maastiku ja asula kuvamine",0.76)
+	await get_tree().process_frame
+	if selected_tile:
+		selected=at
+		open_selected_tile()
+	else:toggle_detail()
+	if detail_mode:
+		report_loading("Detailkaart on valmis",1.0)
+		await get_tree().process_frame
+	requested_detail=false
+	if is_instance_valid(generation_screen):generation_screen.hide()
+
+func park_detail_neighbors() -> void:
+	var stream:=detail_root.get_node_or_null("NeighborTiles")
+	if stream==null:return
+	discard_parked_detail()
+	parked_neighbors=stream
+	var at: Vector2i=stream.anchor
+	parked_revision=detail_visual_key(at.x,at.y)
+	parked_at_time=float(Time.get_ticks_msec())/1000.0
+	stream.move_to(self)
+	stream.park()
+
+func discard_parked_detail() -> void:
+	if is_instance_valid(parked_neighbors):parked_neighbors.queue_free()
+	parked_neighbors=null
+	parked_revision=""
+
 func open_selected_tile(inspection_only:=false) -> void:
 	if detail_mode or selected.x<0 or selected.y<0:return
 	var key:=str(selected.x)+":"+str(selected.y)
@@ -2738,6 +2899,8 @@ func open_selected_tile(inspection_only:=false) -> void:
 	if not observed_city.is_empty():tile_world=observed_city.world
 	else:
 		tile_world=game.tileWorlds.get(key,{})
+		if tile_world.is_empty() and inspection_only:
+			if retained_detail_stream!=null:tile_world=retained_detail_stream.prefetched_world(selected)
 		if tile_world.is_empty():
 			tile_world=DetailWorldScript.create(grid,city_cell_data({"c":selected.x,"r":selected.y},inspection_only),visual_biome(index),int(game.seed))
 			if not inspection_only:game.tileWorlds[key]=tile_world
@@ -2830,12 +2993,13 @@ func toggle_detail() -> void:
 		field_drag_start=null;field_preview=null;build_placement_mode=false;wall_stroke=[];clear_wall_preview()
 		selected_building_index=-1
 		update_selected_building()
+		if not detail_recenter:park_detail_neighbors()
 		detail_root.hide();detail_root.queue_free()
 		detail_root = null
 		detail_district={}
 		if selected_entity=="detail_unit":selected_entity="army" if selected_army()!=null else "city"
 		detail_unit_source=-1;detail_unit_order=false
-		if city_created and not settler_mode:prepare_city_navigation(game.cities[active_city_index])
+		if city_created and not settler_mode and not detail_recenter:prepare_city_navigation(game.cities[active_city_index])
 		terrain.visible = true
 		fog.visible = not reveal_all
 		marker.visible = true
@@ -2849,6 +3013,7 @@ func toggle_detail() -> void:
 		zoom = world_zoom
 		detail_button.text = "Ava linna detailkaart" if city_created and not settler_mode else "Ava asuniku detailkaart"
 		update_status("Vali asunikule sihtkoht." if not city_created or settler_mode else "Vali vägi ja selle sihtkoht.")
+	if detail_recenter:return
 	update_camera()
 	update_marker()
 	update_army_markers()
@@ -2941,9 +3106,11 @@ func finish_city_visuals(city: Dictionary,from_migration:=false) -> void:
 
 func attach_detail_neighbors(center: Vector2i) -> void:
 	if retained_detail_stream!=null:
-		retained_detail_stream.recenter(center)
-		retained_detail_stream.reparent(detail_root,false)
+		retained_detail_stream.resume(detail_root,center)
 		retained_detail_stream=null
+	elif is_instance_valid(parked_neighbors) and parked_neighbors.anchor==center and parked_revision==detail_visual_key(center.x,center.y):
+		parked_neighbors.resume(detail_root,center)
+		parked_neighbors=null
 	else:
 		var neighbors:=DetailNeighbors.new();neighbors.name="NeighborTiles"
 		detail_root.add_child(neighbors);neighbors.setup(self,center)
@@ -2966,8 +3133,12 @@ func transition_detail_tile(next: Vector2i,delta: Vector2i,roaming:=false) -> bo
 	retained_detail_stream=detail_root.get_node_or_null("NeighborTiles")
 	if retained_detail_stream!=null:
 		retained_detail_stream.keep_previous_center(detail_root,next)
-		retained_detail_stream.reparent(self,false)
-	toggle_detail();selected=next;open_selected_tile(inspection_only)
+		retained_detail_stream.move_to(self)
+	detail_recenter=true
+	toggle_detail()
+	selected=next
+	open_selected_tile(inspection_only)
+	detail_recenter=false
 	if not detail_mode:
 		selected=old_center;open_selected_tile(walking)
 		if detail_mode:camera_target=previous_target;zoom=previous_zoom;update_camera()
@@ -3002,7 +3173,7 @@ func follow_detail_camera() -> void:
 		update_camera()
 	neighbors.update_map_view(camera,point)
 	var delta: Vector2i=next-neighbors.anchor
-	if maxi(absi(delta.x),absi(delta.y))>=3 and neighbors.can_enter(next) and neighbors.worker==null:
+	if maxi(absi(delta.x),absi(delta.y))>=3 and neighbors.can_enter(next):
 		transition_detail_tile(next,delta,true)
 
 # Find the live view of a visible neighbouring city without changing selection.
@@ -3291,7 +3462,9 @@ func detail_visual_for(c: int,r: int,precomputed:=PackedVector4Array()) -> Packe
 		var cached: PackedVector4Array=detail_visual_cache[key]
 		detail_visual_cache.erase(key);detail_visual_cache[key]=cached
 		return cached
-	var values:=precomputed if not precomputed.is_empty() else VisualRiver.color_heights(grid,world_height_samples,c,r,int(game.seed),world_river_graph)
+	var values:=precomputed
+	if values.is_empty():values=detail_warmup.ready.get(key,{}).get("visual",PackedVector4Array())
+	if values.is_empty():values=VisualRiver.color_heights(grid,world_height_samples,c,r,int(game.seed),world_river_graph)
 	detail_visual_cache[key]=values
 	while detail_visual_cache.size()>100:detail_visual_cache.erase(detail_visual_cache.keys()[0])
 	return values
@@ -3302,11 +3475,13 @@ func detail_mesh_for(c: int,r: int,heights: Array,visual: PackedVector4Array,pre
 		var cached: ArrayMesh=detail_mesh_cache[key]
 		detail_mesh_cache.erase(key);detail_mesh_cache[key]=cached
 		return cached
+	var arrays:=precomputed
+	if arrays.is_empty():arrays=detail_warmup.ready.get(key,{}).get("mesh",[])
 	var mesh: ArrayMesh
-	if precomputed.is_empty():mesh=DetailTerrainScript.build_mesh(heights,Vector2.ZERO,visual)
+	if arrays.is_empty():mesh=DetailTerrainScript.build_mesh(heights,Vector2.ZERO,visual)
 	else:
 		mesh=ArrayMesh.new()
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,precomputed)
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	detail_mesh_cache[key]=mesh
 	while detail_mesh_cache.size()>60:detail_mesh_cache.erase(detail_mesh_cache.keys()[0])
 	return mesh
@@ -3497,30 +3672,34 @@ func save_partial(automatic := false,destination: String=SAVE_FILE) -> bool:
 	return true
 
 func load_partial(destination: String=SAVE_FILE) -> void:
-	if generation_thread != null and generation_thread.is_started(): return
-	if not FileAccess.file_exists(destination) and not FileAccess.file_exists(destination+".bak"):
-		update_status("Godoti vaheversiooni salvestust ei leitud.")
-		return
-	pending_from_backup = false
-	var data: Variant = normalize_saved_game(read_partial_json(destination)) if FileAccess.file_exists(destination) else null
-	if not valid_partial_save(data):
-		var backup: Variant = normalize_saved_game(read_partial_json(destination+".bak")) if FileAccess.file_exists(destination+".bak") else null
-		if not valid_partial_save(backup):
-			update_status("Salvestus ja varukoopia on vigased või ei sobi selle vaheversiooniga.")
-			return
-		data = backup
-		pending_from_backup = true
+	if generation_thread!=null:return
 	if battle_view!=null:clear_battle_view()
 	battle_nav=null;battle_sim=null
-	if detail_mode: toggle_detail()
+	if detail_mode:toggle_detail()
 	labor_dialog.hide();resources_dialog.hide();training_dialog.hide()
-	pending_load = data
-	paused = true
-	generate_button.disabled = true
-	update_status("Salvestatud maailma loomine käib…")
-	generation_thread = Thread.new()
-	if generation_thread.start(generate_worker.bind(int(data.game.seed),data.game)) != OK:
-		generation_failed("Salvestatud maailma laadimist ei saanud käivitada.")
+	loading_save=true
+	paused=true
+	generate_button.disabled=true
+	show_generation("Salvestuse laadimine","Salvestuse kontrollimine")
+	generation_thread=Thread.new()
+	if generation_thread.start(load_saved_worker.bind(destination))!=OK:
+		generation_failed("Salvestuse laadimist ei saanud käivitada.")
+
+func load_saved_worker(destination: String) -> void:
+	call_deferred("report_loading","Salvestuse kontrollimine",0.30)
+	var data: Variant=null
+	var from_backup:=false
+	for path in [destination,destination+".bak"]:
+		if FileAccess.file_exists(path):
+			var candidate: Variant=normalize_saved_game(read_partial_json(path))
+			if valid_partial_save(candidate):
+				data=candidate
+				from_backup=path!=destination
+				break
+	if data==null:
+		call_deferred("generation_failed","Salvestust ei leitud või salvestus ja varukoopia ei sobi.")
+		return
+	generate_worker(int(data.game.seed),data.game,"tectonic",{},data,from_backup)
 
 func apply_loaded_game() -> void:
 	var data := pending_load
@@ -3891,11 +4070,19 @@ func generation_failed(message: String) -> void:
 	Grid.finish_staging()
 	generation_thread = null
 	pending_load = {}
-	paused = false
-	generate_button.disabled = false
+	paused=false
+	if is_instance_valid(generation_screen):generation_screen.hide()
+	if not launch_request.is_empty():
+		launch_finished.emit(message)
+		return
+	generate_button.disabled=false
 	update_status(message)
-	if game_hud != null and game_hud.game_menu != null:
-		game_hud.game_menu.finish_new_game(message)
+	if game_hud!=null and game_hud.game_menu!=null:
+		if loading_save:
+			game_hud.game_menu.open_menu()
+			game_hud.game_menu.show_page("saves")
+			game_hud.game_menu.menu_status.text=message
+		else:game_hud.game_menu.finish_new_game(message)
 
 
 func is_coast(c: int,r: int) -> bool:
@@ -4066,7 +4253,7 @@ func place_city_building() -> void:
 
 
 
-func valid_partial_save(data: Variant) -> bool:
+static func valid_partial_save(data: Variant) -> bool:
 	if not data is Dictionary or data.get("schema")!=1 or data.get("source")!="2d9ff3999235ba8c95afa57d0cc0a245090ffc9d":return false
 	var saved: Variant=data.get("game")
 	if not saved is Dictionary:return false

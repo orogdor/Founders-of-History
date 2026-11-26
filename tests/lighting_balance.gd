@@ -7,7 +7,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	Mobile.active=OS.get_environment("FOH_VISUAL_DESKTOP").is_empty()
-	var game=load("res://main.tscn").instantiate()
+	var game=load("res://campaign.tscn").instantiate()
 	root.add_child(game)
 	game.paused=true
 	await process_frame

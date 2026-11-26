@@ -5,7 +5,7 @@ func _initialize():
  call_deferred("run_test")
 
 func run_test():
- var scene=load("res://main.tscn").instantiate()
+ var scene=load("res://campaign.tscn").instantiate()
  root.add_child(scene)
  scene.paused=true
  for team in [1,2,3]:

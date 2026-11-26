@@ -3,7 +3,7 @@ extends SceneTree
 const Economy = preload("res://scripts/economy_rules.gd")
 const Flows = preload("res://scripts/city_resource_flows.gd")
 const Needs = preload("res://scripts/city_needs.gd")
-const GameScene = preload("res://main.tscn")
+const GameScene = preload("res://campaign.tscn")
 const Mobile = preload("res://scripts/mobile_profile.gd")
 
 func _initialize() -> void:

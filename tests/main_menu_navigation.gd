@@ -9,7 +9,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	root.size=Vector2i(1280,720)
-	var game=load("res://main.tscn").instantiate()
+	var game=load("res://campaign.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	var legacy := {"schema":1, "source":"2d9ff3999235ba8c95afa57d0cc0a245090ffc9d", "game":game.game}

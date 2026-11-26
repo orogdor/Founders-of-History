@@ -15,7 +15,7 @@ func run() -> void:
 	updates.add_child(launcher);updates.launcher=launcher
 	launcher.mounted={"revision":5,"source":"0123456789abcdef"}
 	launcher.active={"revision":6}
-	var game: Node=load("res://main.tscn").instantiate()
+	var game: Node=load("res://campaign.tscn").instantiate()
 	root.add_child(game);game.paused=true
 	await process_frame
 	assert(game.game_hud.labels.game_version.text=="Mäng v5")

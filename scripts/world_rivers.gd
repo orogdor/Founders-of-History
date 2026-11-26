@@ -131,7 +131,10 @@ static func bank_strip(surface: SurfaceTool,points: Array,colors: Array) -> void
 
 static func add_surface(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Array,seed: int,graph: Dictionary={}) -> void:
 	if graph.is_empty():graph=prepare(cells,seed)
-	var terrain_samples: Variant=mesh.get_meta("atlas_sampler",mesh.get_meta("atlas_heights",PackedFloat32Array()))
+	for surface in prepare_surfaces(cells,heights,graph,mesh.get_meta("atlas_sampler",mesh.get_meta("atlas_heights",PackedFloat32Array()))):
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,surface)
+
+static func prepare_surfaces(cells: Array,heights: PackedFloat32Array,graph: Dictionary,terrain_samples: Variant) -> Array:
 	var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var banks:=SurfaceTool.new();banks.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var total:=0
@@ -175,4 +178,4 @@ static func add_surface(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Array
 			var alpha: Array=[a.opacity,a.opacity,b.opacity,b.opacity,a.opacity,b.opacity]
 			for j in vertices.size():
 				surface.set_color(Color(1,1,1,float(alpha[j])));surface.set_normal(Vector3.UP);surface.set_uv(uvs[j]);surface.add_vertex(vertices[j]);total+=1
-	if total>0:surface.commit(mesh);banks.commit(mesh)
+	return [surface.commit_to_arrays(),banks.commit_to_arrays()] if total>0 else []

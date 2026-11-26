@@ -127,6 +127,16 @@ static func coast_height(heights: PackedFloat32Array,x: float,z: float,seed: int
 	return lerpf(h,average,minf(1.0,(h-34.0)/20.0)*0.55)
 
 static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,adaptive:=true,seed:=0,subdivisions:=SUBDIVISIONS) -> ArrayMesh:
+	return mesh_from_data(prepare_mesh(cells,heights,colors,adaptive,seed,subdivisions))
+
+static func mesh_from_data(data: Dictionary) -> ArrayMesh:
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,data.arrays)
+	mesh.set_meta("atlas_heights",data.heights)
+	mesh.set_meta("atlas_sampler",data.sampler)
+	return mesh
+
+static func prepare_mesh(cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,adaptive:=true,seed:=0,subdivisions:=SUBDIVISIONS) -> Dictionary:
 	var width:=Grid.COLS*subdivisions+1;var depth:=Grid.ROWS*subdivisions+1
 	var mask:=coast_mask(cells)
 	var count:=width*depth
@@ -162,18 +172,14 @@ static func build(cells: Array,heights: PackedFloat32Array,colors: PackedColorAr
 			for index in [a,d,b,b,d,e]:indices[at]=index;at+=1
 	var arrays:=[];arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=elevation_uv;arrays[Mesh.ARRAY_INDEX]=indices
-	var mesh:=ArrayMesh.new();mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	mesh.set_meta("atlas_heights",sampled_heights)
-	if adaptive:return refine_coasts(mesh,cells,heights,colors,seed,mask,subdivisions)
-	mesh.set_meta("atlas_sampler",{"base":sampled_heights,"cells":{},"subdivisions":subdivisions})
-	return mesh
+	if adaptive:return refine_coasts(arrays,sampled_heights,cells,heights,colors,seed,mask,subdivisions)
+	return {"arrays":arrays,"heights":sampled_heights,"sampler":{"base":sampled_heights,"cells":{},"subdivisions":subdivisions}}
 
 # Refine only the coarse quads crossed by sea level. Neighbouring quads add
 # matching edge vertices so there are no cracks where the two densities meet.
-static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,seed:=0,mask:=PackedByteArray(),subdivisions:=SUBDIVISIONS) -> ArrayMesh:
+static func refine_coasts(arrays: Array,base: PackedFloat32Array,cells: Array,heights: PackedFloat32Array,colors: PackedColorArray,seed: int,mask: PackedByteArray,subdivisions: int) -> Dictionary:
 	var width:=Grid.COLS*subdivisions+1;var depth:=Grid.ROWS*subdivisions+1
-	var cols:=width-1;var rows:=depth-1;var base: PackedFloat32Array=mesh.get_meta("atlas_heights")
-	var arrays: Array=mesh.surface_get_arrays(0)
+	var cols:=width-1;var rows:=depth-1
 	var context: Dictionary={"width":width,"subdivisions":subdivisions,"heights":heights,"cells":cells,"colors":colors,"seed":seed,"mask":mask,"vertices":arrays[Mesh.ARRAY_VERTEX],"extra":[],"cache":{}}
 	var flags:=PackedByteArray();flags.resize(cols*rows)
 	for r in rows:
@@ -226,9 +232,7 @@ static func refine_coasts(mesh: ArrayMesh,cells: Array,heights: PackedFloat32Arr
 			triangles.append((p.x-ox)/step);triangles.append((p.z-oz)/step);triangles.append(p.y)
 		sampled[key]=triangles
 	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TANGENT]=null;arrays[Mesh.ARRAY_TEX_UV]=uv;arrays[Mesh.ARRAY_INDEX]=indices
-	var result:=ArrayMesh.new();result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	result.set_meta("atlas_heights",raw);result.set_meta("atlas_sampler",{"base":base,"cells":sampled,"subdivisions":subdivisions})
-	return result
+	return {"arrays":arrays,"heights":raw,"sampler":{"base":base,"cells":sampled,"subdivisions":subdivisions}}
 
 static func coast_vertex(context: Dictionary,gx: int,gz: int) -> int:
 	var width:=int(context.width)
@@ -250,9 +254,12 @@ static func coast_vertex(context: Dictionary,gx: int,gz: int) -> int:
 
 
 static func build_ocean(terrain: ArrayMesh) -> ArrayMesh:
-	var source: Array=terrain.surface_get_arrays(0)
-	var heights: PackedFloat32Array=terrain.get_meta("atlas_heights")
-	var vertices: PackedVector3Array=source[Mesh.ARRAY_VERTEX]
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,ocean_arrays(terrain.surface_get_arrays(0),terrain.get_meta("atlas_heights")))
+	return mesh
+
+static func ocean_arrays(source: Array,heights: PackedFloat32Array) -> Array:
+	var vertices: PackedVector3Array=source[Mesh.ARRAY_VERTEX].duplicate()
 	var old_indices: PackedInt32Array=source[Mesh.ARRAY_INDEX]
 	var colors:=PackedColorArray();colors.resize(vertices.size())
 	var normals:=PackedVector3Array();normals.resize(vertices.size())
@@ -265,5 +272,4 @@ static func build_ocean(terrain: ArrayMesh) -> ArrayMesh:
 			indices.append(a);indices.append(b);indices.append(c)
 	var arrays:=[];arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_INDEX]=indices
-	var mesh:=ArrayMesh.new();mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	return mesh
+	return arrays

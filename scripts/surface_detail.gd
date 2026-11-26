@@ -7,12 +7,7 @@ static var read_sources := false
 static func apply(material: StandardMaterial3D, use_height: bool) -> void:
 	if material.albedo_texture == null or material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
 		return
-	if not read_sources:
-		var manifest = JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "materials.json")) if FileAccess.file_exists(FOLDER + "materials.json") else null
-		if manifest is Dictionary:
-			sources = manifest
-		read_sources = true
-	var key: String = sources.get(material.albedo_texture.resource_path.trim_prefix("res://"), "")
+	var key:=texture_key(material.albedo_texture)
 	if key.is_empty():
 		return
 	var normal_path := FOLDER + key + "-normal.png"
@@ -27,6 +22,19 @@ static func apply(material: StandardMaterial3D, use_height: bool) -> void:
 		material.heightmap_enabled = true
 		material.heightmap_scale = 1.2
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+
+static func texture_key(texture: Texture2D) -> String:
+	if not read_sources:
+		var manifest: Variant=JSON.parse_string(FileAccess.get_file_as_string(FOLDER+"materials.json")) if FileAccess.file_exists(FOLDER+"materials.json") else null
+		if manifest is Dictionary:sources=manifest
+		read_sources=true
+	return str(sources.get(texture.resource_path.trim_prefix("res://"),""))
+
+static func matching_height(texture: Texture2D) -> Texture2D:
+	var key:=texture_key(texture)
+	if key.is_empty():return null
+	var path:=FOLDER+key+"-height.png"
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
 
 static func refine_architecture(material: StandardMaterial3D, style: String = "", use_height := true) -> void:
 	if material.albedo_texture == null or material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:

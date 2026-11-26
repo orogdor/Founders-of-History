@@ -5,7 +5,8 @@ const MOBILE_SHADER=preload("res://scripts/mobile_ground.gdshader")
 const Mobile=preload("res://scripts/mobile_profile.gd")
 const KINDS:=["grass","soil","forest"]
 const CHANNELS:=["color","normal","rough"]
-static var requested:=false
+static var world_requested:=false
+static var detail_requested:=false
 static var requests: Dictionary={}
 static var textures: Dictionary={}
 static var waiting: Array=[]
@@ -13,25 +14,38 @@ static var waiting_world: Array[WeakRef]=[]
 static var poll_frame: int=-1
 static var materials: Dictionary={}
 
+static func request_world_assets() -> void:
+	if world_requested:return
+	world_requested=true
+	request_texture("ground_height_maps","res://assets/ground/ground-height.webp")
+	for kind in KINDS:request_texture(kind+"_color","res://assets/ground/"+kind+"-color.webp")
+
 static func request_assets() -> void:
-	if requested:return
-	requested=true
-	var paths := {"ground_height_maps":"res://assets/ground/ground-height.webp"}
+	request_world_assets()
+	if detail_requested:return
+	detail_requested=true
 	for kind in KINDS:
 		for channel in channels():
-			paths[kind+"_"+channel]="res://assets/ground/"+kind+"-"+channel+".webp"
-	for key in paths:
-		var path: String=paths[key]
+			if channel!="color":request_texture(kind+"_"+channel,"res://assets/ground/"+kind+"-"+channel+".webp")
+
+static func request_texture(key: String,path: String) -> void:
+	if ResourceLoader.exists(path):
 		requests[key]={"path":path,"error":ResourceLoader.load_threaded_request(path,"Texture2D",false)}
 
 static func channels() -> Array:
 	return ["color"] if Mobile.active else CHANNELS
 
+static func world_assets_ready() -> bool:
+	if not textures.has("ground_height_maps"):return false
+	for kind in KINDS:
+		if not textures.has(kind+"_color"):return false
+	return true
+
 static func assets_ready() -> bool:
-	return requests.is_empty() and textures.size()==KINDS.size()*channels().size()+1
+	return textures.size()==KINDS.size()*channels().size()+1
 
 static func poll() -> void:
-	request_assets()
+	if not world_requested:return
 	var frame:=Engine.get_process_frames()
 	if poll_frame==frame:return
 	poll_frame=frame
@@ -50,11 +64,12 @@ static func poll() -> void:
 			var fallback: Texture2D=load(path)
 			if fallback!=null:textures[key]=fallback
 			requests.erase(key)
+	if world_assets_ready():
+		for pending in waiting_world:
+			var world_material: ShaderMaterial=pending.get_ref()
+			if world_material!=null:apply_world_textures(world_material)
+		waiting_world.clear()
 	if not assets_ready():return
-	for pending in waiting_world:
-		var world_material: ShaderMaterial=pending.get_ref()
-		if world_material!=null:apply_world_textures(world_material)
-	waiting_world.clear()
 	var applied:=0
 	while not waiting.is_empty() and applied<4:
 		var entry: Dictionary=waiting.pop_front();var instance: Variant=entry.node.get_ref()
@@ -84,8 +99,8 @@ static func attach(instance: MeshInstance3D,color: Color,forest: float,tile: Vec
 	waiting.append({"node":weakref(instance),"color":color,"forest":forest})
 
 static func attach_world(material: ShaderMaterial) -> void:
-	request_assets()
-	if assets_ready():
+	request_world_assets()
+	if world_assets_ready():
 		apply_world_textures(material)
 	else:
 		waiting_world.append(weakref(material))

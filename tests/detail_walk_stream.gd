@@ -11,7 +11,7 @@ func _initialize() -> void:
 func run() -> void:
 	Mobile.active=OS.get_environment("FPV_TEST_DESKTOP").is_empty()
 	root.size=Vector2i(1280,720)
-	var game: Node=load("res://main.tscn").instantiate()
+	var game: Node=load("res://campaign.tscn").instantiate()
 	root.add_child(game)
 	game.paused=true
 	await process_frame

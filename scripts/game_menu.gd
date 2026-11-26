@@ -1,5 +1,8 @@
 extends Control
 
+signal campaign_requested(request: Dictionary)
+const AUTO_SAVE := "user://kuningriigid_godot_partial_v1.json"
+
 const InterfaceTheme = preload("res://scripts/interface_theme.gd")
 const MenuArt = preload("res://scripts/main_menu_art.gd")
 const Mobile = preload("res://scripts/mobile_profile.gd")
@@ -63,6 +66,7 @@ var title_bottom: Label
 var home_status: Label
 var back_compact: Button
 var current_page := ""
+var startup_scale := 1.0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -112,12 +116,16 @@ func _ready() -> void:
 	var utilities:=VBoxContainer.new();utilities.add_theme_constant_override("separation",7);extras.add_child(utilities)
 	reveal_button=add_button(utilities,"",toggle_reveal);reveal_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var controls:=add_button(utilities,"⚙ Mängu juhtpaneel",open_controls);controls.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	utilities.visible=host!=null
 	options_body=VBoxContainer.new();options_body.add_theme_constant_override("separation",6);content.add_child(options_body);pages["options"]=options_body
 	add_label(options_body,"Kasutajaliidese suurus",13,Color("d9e4d8"))
 	scale_select=OptionButton.new();scale_select.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	var ui_settings:=ConfigFile.new()
+	ui_settings.load(SETTINGS_PATH)
+	startup_scale=float(ui_settings.get_value("interface","scale",0.9 if Mobile.active else 1.0))
 	for percent in [70,80,90,100,110,125,150]:
 		scale_select.add_item(str(percent)+"%");scale_select.set_item_metadata(scale_select.item_count-1,percent)
-		if absf(float(percent)/100.0-hud.user_ui_scale)<0.001:scale_select.select(scale_select.item_count-1)
+		if absf(float(percent)/100.0-(startup_scale if hud==null else hud.user_ui_scale))<0.001:scale_select.select(scale_select.item_count-1)
 	scale_select.item_selected.connect(change_ui_scale);options_body.add_child(scale_select)
 	if not Mobile.active:add_graphics_option("display","Kuvarežiim",[["Aken","windowed"],["Täisekraan","fullscreen"],["Ääristeta täisekraan","borderless"]])
 	add_graphics_option("resolution","Resolutsiooniskaala",[["50%",50],["70%",70],["75%",75],["85%",85],["100%",100],["125%",125],["150%",150]])
@@ -131,10 +139,10 @@ func _ready() -> void:
 	create_performance_overlay()
 	load_graphics_settings()
 	saves_body=VBoxContainer.new();saves_body.add_theme_constant_override("separation",6);content.add_child(saves_body);pages["saves"]=saves_body
-	add_button(saves_body,"Salvesta mäng",save_game)
-	add_button(saves_body,"Laadi automaatsalvestus",load_game)
+	add_button(saves_body,"Salvesta mäng",save_game).visible=host!=null
+	add_button(saves_body,"Laadi automaatsalvestus",load_game).disabled=host==null and not save_exists(AUTO_SAVE)
 	slots=VBoxContainer.new();saves_body.add_child(slots)
-	add_button(saves_body,"↓ Ekspordi Godoti salvestus (.json)",func():export_dialog.popup_centered_ratio(0.8))
+	add_button(saves_body,"↓ Ekspordi Godoti salvestus (.json)",func():export_dialog.popup_centered_ratio(0.8)).visible=host!=null
 	add_button(saves_body,"↑ Impordi veebi või Godoti salvestus (.json)",func():import_dialog.popup_centered_ratio(0.8))
 	export_dialog=FileDialog.new();export_dialog.access=FileDialog.ACCESS_FILESYSTEM
 	export_dialog.file_mode=FileDialog.FILE_MODE_SAVE_FILE;export_dialog.add_filter("*.json ; JSON-fail")
@@ -191,9 +199,7 @@ func build_world_setup() -> void:
 	var rules := add_field_grid()
 	rules.name = "RuleFields"
 	difficulty = add_choice(rules, "Raskus", [["Lihtne", "easy"], ["Tavaline", "normal"], ["Raske", "hard"]])
-	var tempos := []
-	for i in host.tempo_select.item_count:
-		tempos.append([host.tempo_select.get_item_text(i), host.tempo_select.get_item_metadata(i)])
+	var tempos: Array=[["Kiire","fast"],["Tavaline","normal"],["Eepiline","epic"]]
 	tempo = add_choice(rules, "Mängu tempo", tempos)
 	add_label(world_body, "Maailma seeme (valikuline)", 13, Color("d9e4d8"))
 	seed = LineEdit.new()
@@ -202,7 +208,7 @@ func build_world_setup() -> void:
 	seed.custom_minimum_size.y = 32
 	world_body.add_child(seed)
 	new_game_button = add_button(world_body, "Loo maailm", start_new, true)
-	use_campaign_setup(host.game)
+	use_campaign_setup({} if host==null else host.game)
 
 func add_setup_heading(caption: String, icon: Texture2D) -> void:
 	var row := HBoxContainer.new()
@@ -396,6 +402,7 @@ func add_nav(key: String, caption: String) -> void:
 
 func show_page(key: String) -> void:
 	current_page=key
+	if key=="saves":refresh_slots()
 	home.visible=key.is_empty()
 	menu_card.visible=not key.is_empty()
 	for page in pages:pages[page].visible=page==key
@@ -424,11 +431,19 @@ func add_section(parent: Node,text: String,action: Callable) -> Button:
 	return button
 
 func open_menu() -> void:
+	if host==null:
+		visible=true
+		continue_button.disabled=not save_exists(AUTO_SAVE)
+		home_continue.disabled=continue_button.disabled
+		var redraw: Callable=home_continue.get_meta("refresh")
+		redraw.call()
+		show_page("")
+		return
 	was_loading=host.generation_thread!=null
 	seed.text=host.seed_input.text
-	use_campaign_setup(host.game)
+	use_campaign_setup({} if host==null else host.game)
 	menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
-	update_reveal();refresh_slots();show_page("");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
+	update_reveal();show_page("");hud.legacy_panel.visible=false;visible=true;host.menu_open=true
 	performance_layer.hide()
 
 func _process(_delta: float) -> void:
@@ -437,7 +452,7 @@ func _process(_delta: float) -> void:
 		if performance_clock>=1.0:
 			performance_clock=0.0
 			performance_label.text="FPS %d · joonistusi %d · kolmnurki %d" % [Engine.get_frames_per_second(),int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))]
-	if not visible:return
+	if not visible or host==null:return
 	var loading: bool=host.generation_thread!=null
 	continue_button.disabled=loading
 	new_game_button.disabled=loading
@@ -445,15 +460,18 @@ func _process(_delta: float) -> void:
 		home_continue.disabled=loading
 		var refresh: Callable=home_continue.get_meta("refresh")
 		refresh.call()
-	if loading:menu_status.text="Salvestatud maailma laadimine käib…" if not host.pending_load.is_empty() else "Maailma loomine käib…"
+	if loading:menu_status.text="Salvestatud maailma laadimine käib…" if host.loading_save else "Maailma loomine käib…"
 	elif was_loading and not creating_world and not menu_status.has_meta("generation_error"):
 		menu_status.text="Praegune maailm · seeme "+str(host.game.get("seed",""))
 		seed.text=host.seed_input.text
-		use_campaign_setup(host.game)
+		use_campaign_setup({} if host==null else host.game)
 	home_status.text=menu_status.text if loading or host.autosave_suspended else ""
 	was_loading=loading
 
 func close_menu() -> void:
+	if host==null:
+		if save_exists(AUTO_SAVE):campaign_requested.emit({"path":AUTO_SAVE})
+		return
 	visible=false;host.menu_open=false
 	performance_layer.show()
 
@@ -464,18 +482,24 @@ func update_reveal() -> void:
 	reveal_button.text="🗺 Kogu kaart: "+("sees" if host.reveal_all else "väljas")
 
 func start_new() -> void:
-	if host.generation_thread!=null:menu_status.text="Oota, kuni maailma laadimine lõpeb.";return
+	if host!=null and host.generation_thread!=null:menu_status.text="Oota, kuni maailma laadimine lõpeb.";return
 	if menu_status.has_meta("generation_error"):
 		menu_status.remove_meta("generation_error")
+	var settings:={
+		"worldSize":world_size.get_selected_metadata(),
+		"opponentCount":opponents.get_selected_metadata(),
+		"factionColors":selected_colors(),
+	}
+	var taste:=str(difficulty.get_selected_metadata())
+	var geography:=str(world_type.get_selected_metadata())
+	if host==null:
+		campaign_requested.emit({"seed":seed.text,"tempo":tempo.get_selected_metadata(),"difficulty":taste,"type":geography,"settings":settings})
+		return
 	creating_world=true
 	host.seed_input.text=seed.text;host.tempo_select.select(tempo.selected)
-	host.pending_difficulty=str(difficulty.get_item_metadata(difficulty.selected))
-	host.pending_world_type=str(world_type.get_item_metadata(world_type.selected))
-	host.pending_world_settings={
-		"worldSize": world_size.get_selected_metadata(),
-		"opponentCount": opponents.get_selected_metadata(),
-		"factionColors": selected_colors(),
-	}
+	host.pending_difficulty=taste
+	host.pending_world_type=geography
+	host.pending_world_settings=settings
 	host.start_generation()
 
 func finish_new_game(error: String) -> void:
@@ -493,10 +517,23 @@ func save_game() -> void:
 	menu_status.text="Mäng salvestatud." if host.save_partial() else "Salvestamine ebaõnnestus."
 
 func load_game() -> void:
-	close_menu();host.load_partial()
+	request_save(AUTO_SAVE)
+
+func request_save(path: String) -> void:
+	if host==null:campaign_requested.emit({"path":path})
+	else:
+		close_menu()
+		host.load_partial(path)
 
 func change_ui_scale(index: int) -> void:
-	hud.set_user_ui_scale(float(scale_select.get_item_metadata(index))/100.0)
+	var scale:=float(scale_select.get_item_metadata(index))/100.0
+	if hud!=null:hud.set_user_ui_scale(scale)
+	else:
+		startup_scale=scale
+		var config:=ConfigFile.new()
+		config.load(SETTINGS_PATH)
+		config.set_value("interface","scale",scale)
+		config.save(SETTINGS_PATH)
 
 func add_graphics_option(key: String,label_text: String,choices: Array) -> void:
 	add_label(options_body,label_text,13,Color("d9e4d8"))
@@ -522,14 +559,20 @@ func apply_graphics_settings(save: bool) -> void:
 	var selected={}
 	for key in graphics_controls:
 		var option:OptionButton=graphics_controls[key];selected[key]=option.get_item_metadata(option.selected)
-	Engine.max_fps=int(selected.fps);host.graphics_shadows=bool(selected.shadows);host.graphics_soldier_names=bool(selected.names)
+	Engine.max_fps=int(selected.fps)
+	if host!=null:
+		host.graphics_shadows=bool(selected.shadows)
+		host.graphics_soldier_names=bool(selected.names)
 	get_viewport().scaling_3d_scale=float(selected.resolution)/100.0
 	get_viewport().msaa_3d=Viewport.MSAA_4X if int(selected.antialias)==4 else Viewport.MSAA_2X if int(selected.antialias)==2 else Viewport.MSAA_DISABLED
 	var mode:=DisplayServer.WINDOW_MODE_WINDOWED
 	if selected.get("display","windowed")=="fullscreen":mode=DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 	elif selected.get("display","windowed")=="borderless":mode=DisplayServer.WINDOW_MODE_FULLSCREEN
 	if not Mobile.active and DisplayServer.window_get_mode()!=mode:DisplayServer.window_set_mode(mode)
-	host.graphics_daylight=str(selected.daylight);host.graphics_ambient=str(selected.ambient);host.update_daylight()
+	if host!=null:
+		host.graphics_daylight=str(selected.daylight)
+		host.graphics_ambient=str(selected.ambient)
+		host.update_daylight()
 	if performance_label!=null:performance_label.visible=bool(selected.performance)
 	if save:
 		var config:=ConfigFile.new();config.load(SETTINGS_PATH)
@@ -545,16 +588,19 @@ func set_graphics_value(key: String,value: Variant) -> void:
 func slot_path(index: int) -> String:
 	return "user://kuningriigid_godot_slot_%d.json" % index
 
+static func save_exists(path: String) -> bool:
+	return FileAccess.file_exists(path) or FileAccess.file_exists(path+".bak")
+
 func refresh_slots() -> void:
 	for child in slots.get_children():slots.remove_child(child);child.queue_free()
 	for index in range(1,4):
 		var row:=HBoxContainer.new();row.add_theme_constant_override("separation",6);slots.add_child(row)
-		var path:=slot_path(index);var data: Variant=host.read_partial_json(path) if FileAccess.file_exists(path) else null
-		var valid: bool=host.valid_partial_save(data)
-		var caption: String="%d. %s" % [index,"Käik %d" % (floori(float(data.game.time)/60.0)+1) if valid else "Vigane" if data!=null else "Tühi"]
+		var path:=slot_path(index)
+		var occupied:=save_exists(path)
+		var caption: String="%d. %s" % [index,"Salvestatud mäng" if occupied else "Tühi"]
 		var label:=add_label(row,caption,13,Color("dde6dc"));label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-		add_button(row,"Salvesta",save_slot.bind(index))
-		var load_button:=add_button(row,"Laadi",load_slot.bind(index));load_button.disabled=not valid
+		add_button(row,"Salvesta",save_slot.bind(index)).visible=host!=null
+		var load_button:=add_button(row,"Laadi",load_slot.bind(index));load_button.disabled=not occupied
 
 func save_slot(index: int) -> void:
 	if host.save_partial(false,slot_path(index)):menu_status.text="Salvestatud kohta %d." % index
@@ -562,16 +608,13 @@ func save_slot(index: int) -> void:
 	refresh_slots()
 
 func load_slot(index: int) -> void:
-	close_menu();host.load_partial(slot_path(index))
+	request_save(slot_path(index))
 
 func export_game(path: String) -> void:
 	menu_status.text="Salvestus eksporditud." if host.save_partial(false,path) else "Eksport ebaõnnestus."
 
 func import_game(path: String) -> void:
-	var data: Variant=host.normalize_saved_game(host.read_partial_json(path))
-	if not host.valid_partial_save(data):
-		menu_status.text="Salvestus ei sobi, kaasatud maailm puudub või lahing on pooleli.";return
-	close_menu();host.load_partial(path)
+	request_save(path)
 
 func open_controls() -> void:
 	close_menu();hud.legacy_panel.visible=true
@@ -579,11 +622,12 @@ func open_controls() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if visible and event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
 		if not current_page.is_empty():show_page("")
-		elif not continue_button.disabled:close_menu()
+		elif host!=null and not continue_button.disabled:close_menu()
 		get_viewport().set_input_as_handled()
 
 func create_performance_overlay() -> void:
-	performance_layer=CanvasLayer.new();performance_layer.layer=30;host.add_child(performance_layer)
+	performance_layer=CanvasLayer.new();performance_layer.layer=30
+	(self if host==null else host).add_child(performance_layer)
 	performance_label=Label.new();performance_label.text="FPS --";performance_label.visible=false;performance_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	performance_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);performance_label.position=Vector2(8,-110)
 	performance_label.add_theme_font_size_override("font_size",14);performance_label.add_theme_color_override("font_color",Color("d7efdd"))
