@@ -11,17 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: d7a70f7f85c5fefb5bbdd0f41bef996e718b67f1
-          fetch-depth: 1
       - name: Download verified Windows build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run watch 46061408109 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
-          gh run download 46061408109 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
+          gh run watch 46064731008 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
+          gh run download 46064731008 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
           find /tmp/game -maxdepth 3 -type f -printf '%P %s\n'
           cd /tmp/game
           zip -q -r /tmp/Founders-of-History-Windows.zip .
@@ -31,4 +27,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create windows-jahionn-puud-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target d7a70f7f85c5fefb5bbdd0f41bef996e718b67f1 --title "Founders of History Windows" --notes "Parandatud jahionni seinad ja külavaate puud." --latest=false
+          gh release create windows-puitvallid-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target 94ab759ecbf39cc74daf7f9590b3f360234b8c50 --title "Founders of History Windows" --notes "Jahionni punutis räästani, uued maailmakaardi elamud ning ehitatavad puitvallid ja vahitornid." --latest=false
