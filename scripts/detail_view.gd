@@ -221,6 +221,17 @@ func create_designed_building(type: String,age: int,design: Dictionary={},tier:=
 		raw.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
 		raw.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
 	var wrapper:=Node3D.new()
+	# Generated palisades use the editable plan's length. The baked stock
+	# segment has its own seven-metre fit.
+	if type=="palisade" and raw is HousePlanModel:
+		var plan:=design if saved_design_id(type,design)==id else Period.get_plan(id)
+		var fences:Array=plan.get("fences",[])
+		if fences.size()==1 and fences[0].kind=="palisadeLine":
+			var start:=HousePlanModel.Plan.point(fences[0].a)
+			var end:=HousePlanModel.Plan.point(fences[0].b)
+			var span:=absf(end.x-start.x)/HousePlanModel.Plan.PX_PER_M*raw.scale.x
+			if is_equal_approx(start.y,end.y) and span>0.1:
+				wrapper.set_meta("palisade_model_span",span)
 	wrapper.set_meta("designer_id",id)
 	wrapper.set_meta("material_variant",variation)
 	if type in ["fisher","harbor"]:
@@ -466,7 +477,7 @@ func construction_tempo() -> float:
 func configure_wall_transform(model: Node3D,b: Dictionary) -> void:
 	if b.type in ["palisade","stonewall","reinforced_wall"] and float(b.get("palisadeSpanV167",0))>0:
 		var start_embed:=float(b.get("cliffEmbedStartV179",0));var end_embed:=float(b.get("cliffEmbedEndV179",0));var shift:float=(end_embed-start_embed)/2.0;var angle:=float(b.get("wallAngleV175",0))
-		model.scale.x=(float(b.palisadeSpanV167)+start_embed+end_embed)/7.0;model.position.x+=cos(angle)*shift;model.position.z-=sin(angle)*shift
+		model.scale.x=(float(b.palisadeSpanV167)+start_embed+end_embed)/float(model.get_meta("palisade_model_span",7.0));model.position.x+=cos(angle)*shift;model.position.z-=sin(angle)*shift
 	elif b.get("extendedPalisadeV166",false) and b.type in ["palisade","woodgate","gatehouse"]:model.scale.x=2.0
 	var default_angle:=PI/2 if b.get("wallAxis",false) and b.type in ["palisade","stonewall","reinforced_wall","woodgate","gatehouse"] else 0.0
 	model.rotation.y=float(b.get("buildingRotationV228",b.get("wallAngleV175",b.get("shoreAngle",default_angle))))
