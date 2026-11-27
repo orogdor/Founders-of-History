@@ -1,5 +1,6 @@
 extends Node3D
 const Terrain = preload("res://scripts/detail_terrain.gd")
+const RiverCrossing = preload("res://scripts/period_river_crossing.gd")
 const Landscape = preload("res://scripts/detail_landscape.gd")
 const GroundMaterial = preload("res://scripts/detail_ground_material.gd")
 const DetailOcean = preload("res://scripts/detail_ocean.gd")
@@ -11,6 +12,7 @@ const Equipment = preload("res://scripts/human_equipment.gd")
 const Motion = preload("res://scripts/human_motion.gd")
 const Humans = preload("res://scripts/human_factory.gd")
 const Forest = preload("res://scripts/forest_scatter.gd")
+const PaintedTrees = preload("res://scripts/painted_tree_models.gd")
 const ForestFill = preload("res://scripts/detail_forest_fill.gd")
 const VisualRiver=preload("res://scripts/visual_river.gd")
 const HUMAN = preload("res://assets/people/human_far.glb")
@@ -19,10 +21,10 @@ const PINE = preload("res://assets/world/pine_high.glb")
 const PALM = preload("res://assets/world/palm_high.glb")
 const ROCK = preload("res://assets/world/rock_high.glb")
 const HousePlanModel=preload("res://scripts/house_plan_model.gd")
+const Period = preload("res://scripts/house_period_styles.gd")
+const HOUSE_DESIGNS = preload("res://data/house_default_designs.json")
 const MODEL_FITS = preload("res://data/building_fits.json")
-const MODEL_ANIMATIONS = preload("res://data/procedural_animations.json")
-const TOWN_SHADER = preload("res://scripts/town_material.gdshader")
-const FALLBACK_MODEL_TYPES=["nitrate","oilwell","refinery","powerplant","autofactory","airfield","master_workshop","infirmary","keep"]
+const PaintedMaterials = preload("res://scripts/painted_building_materials.gd")
 const BUILD_RULES = preload("res://data/build_rules.json")
 const EconomyData=preload("res://data/economy.json")
 const EconomyRulesScript=preload("res://scripts/economy_rules.gd")
@@ -31,7 +33,7 @@ var visual_heights:=PackedVector4Array()
 var resources: Array = []
 var world_data: Dictionary = {}
 var person: Node3D
-const TREE_REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.09630,"palm":13.54984}
+const TREE_REFERENCE_HEIGHTS=PaintedTrees.HEIGHTS
 var tree_instances: Dictionary={}
 var tree_lod_levels: Dictionary={}
 var tree_lod_dirty:=true
@@ -50,16 +52,9 @@ var river_segments: Array=[]
 var ground_cover: Node3D
 var village_life: Node3D
 var city_lights: Node3D
+var visual_period:=0
 var tree_temperature:=0.5
 var tree_moisture:=0.5
-var tree_textures: Dictionary={}
-static var shared_tree_meshes: Dictionary={}
-static var shared_tree_textures: Dictionary={}
-static var tree_asset_frame: int=-1
-static var tree_poll_frame: int=-1
-static var tree_requests: Dictionary={}
-static var tree_scenes: Dictionary={}
-static var tree_failed: Dictionary={}
 static var fill_frame: int=-1
 static var fill_frame_work:=0
 const NATURE_FILES:=["poosas_low","poosas_high","hirv_low","hirv_high"]
@@ -83,11 +78,12 @@ var fish_models: Dictionary={}
 var worker_models: Dictionary = {}
 var worker_motions: Dictionary = {}
 var vertex_materials: Dictionary = {}
-var town_material: ShaderMaterial
 var vertex_color_surfaces: Dictionary = {}
 var building_root: Node3D
-var building_animations: Array=[]
+var period_building_ground: Array[PackedVector2Array] = []
+var river_crossings: Array[Node] = []
 var construction_models: Array=[]
+var mill_rotors: Array[Node3D]=[]
 var hall_model: Node3D
 var builder_person: Node3D
 var builder_people: Array[Node3D]=[]
@@ -109,7 +105,7 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 		visual_heights=cache_host.detail_visual_for(c,r) if cache_host!=null and cache_host.has_method("detail_visual_for") else VisualRiver.color_heights(cells,world_heights,c,r,seed,river_graph)
 	else:visual_heights=PackedVector4Array()
 	instance.mesh=cache_host.detail_mesh_for(c,r,heights,visual_heights) if cache_host!=null and cache_host.has_method("detail_mesh_for") else Terrain.build_mesh(heights,Vector2.ZERO,visual_heights)
-	GroundMaterial.attach(instance,terrain_color,1.0 if core_forest else 0.0)
+	GroundMaterial.attach(instance,terrain_color,1.0 if core_forest else 0.0,Vector2i(c,r))
 	if cache_host!=null and cache_host.has_method("terrain_color") and cache_host.has_method("is_forest_core"):
 		var neighbours={"ground_w":Vector2i(-1,0),"ground_e":Vector2i(1,0),"ground_n":Vector2i(0,-1),"ground_s":Vector2i(0,1),"ground_nw":Vector2i(-1,-1),"ground_ne":Vector2i(1,-1),"ground_sw":Vector2i(-1,1),"ground_se":Vector2i(1,1)}
 		for key in neighbours:
@@ -128,6 +124,7 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 	add_child(water)
 	var host:=get_parent()
 	river_segments=host.detail_landscape_for(self,c,r,heights,visual_heights) if host!=null and host.has_method("detail_landscape_for") else Landscape.build(self,cells,c,r,heights,seed,world_heights,river_graph,true,visual_heights)
+	river_crossings=find_children("BridgeCrossing*","Node3D",true,false)
 	person = Humans.create("man",0,"settler",1)
 	person.scale = Vector3.ONE * 1.66
 	person.position = Vector3(0,maxf(0,display_height(0,0)),0)
@@ -182,36 +179,52 @@ func apply_vertex_colors(node: Node) -> void:
 	for child in node.get_children():apply_vertex_colors(child)
 
 static func designer_id(type: String,age: int) -> String:
-	var tier:=clampi(age,0,2)
-	for era in range(tier,0,-1):
-		var candidate:=type+"@"+str(era)
-		if MODEL_FITS.data.has(candidate):return candidate
-	if MODEL_FITS.data.has(type):return type
-	for era in range(tier+1,3):
-		var candidate:=type+"@"+str(era)
-		if MODEL_FITS.data.has(candidate):return candidate
-	return ""
+	return Period.designer_id(type,age)
 
-func create_designed_building(type: String,age: int,design: Dictionary={},tier:=1) -> Node3D:
-	var building_age:=maxi(int(BUILD_RULES.data.age.get(type,0)),age)
-	var id:=designer_id(type,building_age)
-	if type=="palisade" and tier==2 and id=="palisade" and design.is_empty():id="palisade-tier2"
-	var procedural: String="procedural_"+type+"@"+str(clampi(building_age,0,6))
-	if (building_age>=3 or id.is_empty()) and ResourceLoader.exists("res://assets/buildings/"+procedural+".glb"):id=procedural
-	if id.is_empty():return null
-	var file: String="res://assets/buildings/"+id+".glb"
-	if not ResourceLoader.exists(file):return null
+# Older saves can contain a custom plan from an earlier age.
+static func saved_design_id(type: String, design: Dictionary) -> String:
+	var id := str(design.get("id",""))
+	return id if id.get_slice("@",0)==type and HOUSE_DESIGNS.data.has(id) else ""
+
+static func building_design_id(type: String,age: int,design: Dictionary,tier:=1) -> String:
+	var saved := saved_design_id(type,design)
+	if not saved.is_empty():
+		return saved
+	var id := designer_id(type,maxi(int(BUILD_RULES.data.age.get(type,0)),age))
+	return "palisade-tier2" if id=="palisade" and tier==2 else id
+
+func create_designed_building(type: String,age: int,design: Dictionary={},tier:=1,variation:=0) -> Node3D:
+	var id := building_design_id(type,age,design,tier)
+	if id.is_empty():
+		return null
+	var file := "res://assets/buildings/"+id+".glb"
 	var raw: Node3D
-	if not design.is_empty() and str(design.get("id",""))==id and building_age<=2:raw=HousePlanModel.from_design(design)
-	else:raw=load(file).instantiate()
-	if id.begins_with("procedural_") and type not in FALLBACK_MODEL_TYPES:apply_town_material(raw)
-	else:apply_vertex_colors(raw)
+	if saved_design_id(type, design)==id:
+		raw=HousePlanModel.from_design(design,variation,true)
+	elif Period.age_of(id)>0:
+		raw=HousePlanModel.from_design(Period.get_plan(id),variation,true)
+	elif ResourceLoader.exists(file):
+		raw=load(file).instantiate()
+		apply_vertex_colors(raw)
+		if HOUSE_DESIGNS.data.has(id):
+			var facade:=HousePlanModel.new()
+			facade.add_facade_to_baked_design(HOUSE_DESIGNS.data[id],variation)
+			raw.add_child(facade)
+	elif HOUSE_DESIGNS.data.has(id):
+		raw=HousePlanModel.from_design(Period.get_plan(id),variation,true)
+	else:
+		return null
+	PaintedMaterials.apply_stock(raw,variation)
 	if MODEL_FITS.data.has(id):
 		var fit: Dictionary=MODEL_FITS.data[id]
 		raw.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
 		raw.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
 	var wrapper:=Node3D.new()
 	wrapper.set_meta("designer_id",id)
+	wrapper.set_meta("material_variant",variation)
+	if type in ["fisher","harbor"]:
+		var visual_plan:=design if saved_design_id(type,design)==id else Period.get_plan(id)
+		wrapper.set_meta("coast_art_yaw",Period.coast_yaw(visual_plan))
 	wrapper.add_child(raw)
 	return wrapper
 
@@ -219,13 +232,16 @@ func create_designed_building(type: String,age: int,design: Dictionary={},tier:=
 # Duplicate the mesh because cached designs can be reused at different sites.
 func conform_designed_yard(model: Node3D) -> void:
 	for candidate in model.find_children("*","MeshInstance3D",true,false):
-		if candidate.name not in ["WeatheredYard","CourtyardPaving"] or not candidate.mesh is ArrayMesh:continue
+		if candidate.name not in ["WeatheredYard","CourtyardPaving","WornEntrancePath"] or not candidate.mesh is ArrayMesh:continue
+		var lift:=0.038 if candidate.name=="WornEntrancePath" else 0.025
+		if candidate.name=="CourtyardPaving" and Period.age_of(str(model.get_meta("designer_id","")))==2:
+			lift=0.051
 		var original:ArrayMesh=candidate.mesh;var adjusted:=ArrayMesh.new()
 		for surface in original.get_surface_count():
 			var arrays:=original.surface_get_arrays(surface);var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
 			var to_detail:Transform3D=global_transform.affine_inverse()*candidate.global_transform;var to_yard:=to_detail.affine_inverse()
 			for i in vertices.size():
-				var at:Vector3=to_detail*vertices[i];at.y=display_height(at.x,at.z)+0.025;vertices[i]=to_yard*at
+				var at:Vector3=to_detail*vertices[i];at.y=display_height(at.x,at.z)+lift;vertices[i]=to_yard*at
 			arrays[Mesh.ARRAY_VERTEX]=vertices;adjusted.add_surface_from_arrays(original.surface_get_primitive_type(surface),arrays);adjusted.surface_set_material(surface,original.surface_get_material(surface))
 		candidate.mesh=adjusted
 
@@ -271,7 +287,6 @@ func ensure_fish(resource: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	GroundMaterial.poll()
-	poll_tree_assets()
 	process_forest_fill()
 	var created:=0
 	for key in pending_nature.keys():
@@ -316,21 +331,6 @@ static func request_nature_assets() -> void:
 static func poll_nature_assets() -> void:
 	for name in NATURE_FILES:nature_scene(name)
 
-static func poll_tree_assets() -> void:
-	var frame:=Engine.get_process_frames()
-	if tree_poll_frame==frame:return
-	tree_poll_frame=frame
-	for key in tree_requests.keys():
-		var path: String=tree_requests[key]
-		var status:=ResourceLoader.load_threaded_get_status(path)
-		if status==ResourceLoader.THREAD_LOAD_LOADED:
-			var scene: PackedScene=ResourceLoader.load_threaded_get(path)
-			if scene!=null:tree_scenes[key]=scene
-			else:tree_failed[key]=true
-			tree_requests.erase(key)
-		elif status==ResourceLoader.THREAD_LOAD_FAILED or status==ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			tree_failed[key]=true;tree_requests.erase(key)
-
 static func finish_asset_requests() -> void:
 	for name in nature_requests:
 		if nature_scenes.has(name) or int(nature_requests[name])!=OK:continue
@@ -339,12 +339,6 @@ static func finish_asset_requests() -> void:
 		if status in [ResourceLoader.THREAD_LOAD_IN_PROGRESS,ResourceLoader.THREAD_LOAD_LOADED]:
 			var scene: PackedScene=ResourceLoader.load_threaded_get(path)
 			if scene!=null:nature_scenes[name]=scene
-	for key in tree_requests.keys():
-		var path: String=tree_requests[key];var status:=ResourceLoader.load_threaded_get_status(path)
-		if status in [ResourceLoader.THREAD_LOAD_IN_PROGRESS,ResourceLoader.THREAD_LOAD_LOADED]:
-			var scene: PackedScene=ResourceLoader.load_threaded_get(path)
-			if scene!=null:tree_scenes[key]=scene
-		tree_requests.erase(key)
 
 static func nature_scene(name: String) -> PackedScene:
 	if nature_scenes.has(name):return nature_scenes[name]
@@ -359,7 +353,30 @@ static func nature_scene(name: String) -> PackedScene:
 	return null
 
 func nature_hidden(resource: Dictionary) -> bool:
+	if resource.get("kind","")=="berry":
+		var position_2d:=Vector2(resource.x,resource.z)
+		for polygon in period_building_ground:
+			if Geometry2D.is_point_in_polygon(position_2d,polygon):return true
 	return tree_mountain or display_height(resource.x,resource.z)<=0.0 or Landscape.near_water(Vector2(resource.x,resource.z),river_segments,1.55)
+
+func add_period_building_ground(model: Node3D, saved_plan: Dictionary) -> void:
+	var id:=str(model.get_meta("designer_id",""))
+	if Period.age_of(id) not in [1,2]:return
+	var design:=saved_plan if saved_plan.get("id","")==id else Period.get_plan(id)
+	var outlines: Array = HousePlanModel.Plan.plan_geometry(design).floors
+	if design.get("yard") is Array:
+		var yard:=PackedVector2Array()
+		for vertex in design.yard:yard.append(HousePlanModel.Plan.point(vertex))
+		outlines.append(yard)
+	var origin_2d:=HousePlanModel.PlanCollision.origin(design)
+	var placement:Transform3D=model.transform*model.get_child(0).transform
+	for outline in outlines:
+		var world_outline:=PackedVector2Array()
+		for vertex: Vector2 in outline:
+			var offset:Vector2=(vertex-origin_2d)/HousePlanModel.Plan.PX_PER_M
+			var location:=placement*Vector3(offset.x,0,offset.y)
+			world_outline.append(Vector2(location.x,location.z))
+		if world_outline.size()>=3:period_building_ground.append(world_outline)
 
 func ensure_berry(resource: Dictionary) -> void:
 	if berry_models.has(resource.id):return
@@ -420,6 +437,7 @@ func add_instances(scene: PackedScene, transforms: Array[Transform3D]) -> MultiM
 
 
 func place_hall(x: float, z: float,age:=0,rotation:=0.0,design: Dictionary={}) -> void:
+	visual_period=clampi(age,0,6)
 	if ground_cover!=null:ground_cover.clear_area(x,z,7.0,6.5)
 	for resource in resources:
 		if resource.kind != "tree": continue
@@ -429,7 +447,7 @@ func place_hall(x: float, z: float,age:=0,rotation:=0.0,design: Dictionary={}) -
 			resource.amount = 0
 			hide_tree(resource.id)
 	if hall_model!=null:hall_model.queue_free()
-	hall_model=create_designed_building("hall",age,design)
+	hall_model=create_designed_building("hall",age,design,1,PaintedMaterials.variant_at(tree_cell,Vector2(x,z),"hall"))
 	if hall_model==null:return
 	hall_model.position = Vector3(x,display_height(x,z),z)
 	hall_model.rotation.y=rotation
@@ -451,11 +469,20 @@ func configure_wall_transform(model: Node3D,b: Dictionary) -> void:
 	elif b.get("extendedPalisadeV166",false) and b.type in ["palisade","woodgate","gatehouse"]:model.scale.x=2.0
 	var default_angle:=PI/2 if b.get("wallAxis",false) and b.type in ["palisade","stonewall","reinforced_wall","woodgate","gatehouse"] else 0.0
 	model.rotation.y=float(b.get("buildingRotationV228",b.get("wallAngleV175",b.get("shoreAngle",default_angle))))
+	if b.has("shoreAngle"):
+		model.rotation.y+=float(model.get_meta("coast_art_yaw",0.0))
 
 func sync_buildings(city: Dictionary,age:=0) -> void:
+	visual_period=clampi(age,0,6)
+	var had_period_buildings:=not period_building_ground.is_empty()
+	period_building_ground.clear()
+	for crossing in river_crossings:
+		if crossing.get_meta("crossing_tile",Vector2i(-1,-1))==tree_cell:
+			RiverCrossing.set_period(crossing,age)
 	if building_root != null: building_root.queue_free()
 	building_root=Node3D.new()
-	building_animations.clear();construction_models.clear()
+	construction_models.clear()
+	mill_rotors.clear()
 	add_child(building_root)
 	var cover_areas: Array=[]
 	for building_index in city.economy.buildings.size():
@@ -469,46 +496,60 @@ func sync_buildings(city: Dictionary,age:=0) -> void:
 				var angle:=float(b.get("buildingRotationV228",0));var cs:=absf(cos(angle));var sn:=absf(sin(angle))
 				rx=width*cs+depth*sn+2;rz=width*sn+depth*cs+2
 			cover_areas.append({"x":float(b.x),"z":float(b.z),"rx":rx,"rz":rz})
+		if b.type=="hall" and is_instance_valid(hall_model) and not b.get("virtual",false) and float(b.get("hp",0))>0:
+			add_period_building_ground(hall_model,b.get("houseDesignV354",{}))
 		if b.type=="hall" or (b.type=="bridge" and b.get("ready",false)) or b.get("virtual",false) or float(b.get("hp",0))<=0:continue
 		clear_area(b.x,b.z,LocalNavigation.clearance(b))
 		var y := display_height(b.x,b.z)
-		if not b.get("ready",false):
-			if b.type in ["palisade","stonewall","reinforced_wall"]:
-				var partial:=create_designed_building(b.type,age,b.get("houseDesignV354",{}),int(b.get("woodFortTierV1757",1)))
-				if partial!=null:
-					var duration:float=float(b.get("buildTimeV1757",EconomyData.data.buildings[b.type].time))*construction_tempo()
-					partial.scale.y=0.15+0.85*clampf(float(b.get("progress",0))/maxf(1.0,duration),0,1)
-					partial.position=Vector3(b.x,y,b.z);configure_wall_transform(partial,b);building_root.add_child(partial);partial.set_meta("building_index",building_index)
-					construction_models.append({"model":partial,"building":b,"duration":duration})
-			else:
-				var marker:=MeshInstance3D.new()
-				var box:=BoxMesh.new();box.size=Vector3(float(b.get("width",4)),0.12,float(b.get("depth",4))) if b.type=="field" else Vector3(4,0.12,4);marker.mesh=box
-				var mat:=StandardMaterial3D.new();mat.albedo_color=Color("c9a35e");marker.material_override=mat
-				marker.position=Vector3(b.x,y+0.1,b.z);marker.rotation.y=float(b.get("buildingRotationV228",b.get("shoreAngle",0)));building_root.add_child(marker)
-				marker.set_meta("building_index",building_index)
-		else:
-			var model:=create_designed_building(b.type,age,b.get("houseDesignV354",{}),int(b.get("woodFortTierV1757",1)))
-			if model!=null:
-				if b.type=="field":model.scale=Vector3(float(b.get("width",16))/16.0,1,float(b.get("depth",16))/16.0)
-				elif b.type=="house" and int(b.get("houseUpgradeLevelV218",0))>=1:model.scale*=Vector3(1.12,1.42,1.10)
-				if b.has("baseY"):
-					y=y+float(b.baseY)-Terrain.detail_height(heights,b.x,b.z) if b.get("riverBankV276",false) else float(b.baseY)
-				model.position=Vector3(b.x,y+(0.12 if b.type=="field" else 0.0),b.z)
-				configure_wall_transform(model,b);building_root.add_child(model);conform_designed_yard(model)
-				model.set_meta("building_index",building_index)
-				var id: String=model.get_meta("designer_id","")
-				for entry in MODEL_ANIMATIONS.data.get(id,[]):
-					var part: Node=model.find_child("part_"+str(int(entry.index)),true,false)
-					if part is Node3D:building_animations.append({"part":part,"building":b,"data":entry})
+		var variation:=PaintedMaterials.variant_at(tree_cell,Vector2(b.x,b.z),b.type)
+		var model := create_designed_building(b.type,age,b.get("houseDesignV354",{}),int(b.get("woodFortTierV1757",1)),variation)
+		if model==null:
+			continue
+		if b.type=="field":
+			model.scale=Vector3(float(b.get("width",16))/16.0,1,float(b.get("depth",16))/16.0)
+		elif b.type=="house" and int(b.get("houseUpgradeLevelV218",0))>=1:
+			model.scale*=Vector3(1.12,1.42,1.10)
+		if b.has("baseY"):
+			y=y+float(b.baseY)-Terrain.detail_height(heights,b.x,b.z) if b.get("riverBankV276",false) else float(b.baseY)
+		model.position=Vector3(b.x,y+(0.12 if b.type=="field" else 0.0),b.z)
+		configure_wall_transform(model,b)
+		building_root.add_child(model)
+		add_period_building_ground(model,b.get("houseDesignV354",{}))
+		model.set_meta("building_index",building_index)
+		var ready: bool=b.get("ready",false)
+		if not ready:
+			var duration := float(b.get("buildTimeV1757",EconomyData.data.buildings[b.type].time))*construction_tempo()
+			var base_scale := model.scale.y
+			model.scale.y=base_scale*(0.15+0.85*clampf(float(b.get("progress",0))/maxf(1.0,duration),0,1))
+			construction_models.append({"model":model,"building":b,"duration":duration,"base_scale":base_scale})
+		conform_designed_yard(model)
+		if ready and b.type in ["watermill","windmill"]:
+			var pattern := "IronMillWheel*" if b.type=="watermill" else "MillSails"
+			for rotor in model.find_children(pattern,"Node3D",true,false):
+				mill_rotors.append(rotor)
+
 	if ground_cover!=null:ground_cover.set_areas(cover_areas)
+	if had_period_buildings or not period_building_ground.is_empty():
+		for resource in resources:
+			if resource.kind=="berry" and berry_models.has(resource.id):
+				berry_models[resource.id].visible=not resource.get("removed",false) and float(resource.get("amount",0))>0 and not nature_hidden(resource)
+	if visual_period>0:
+		tree_sync_buildings=city.economy.buildings
+		tree_pending=true
 
 func mesh_hit_distance(node: Node,origin: Vector3,direction: Vector3) -> float:
 	var nearest:=INF
 	if node is MeshInstance3D and node.is_visible_in_tree() and node.mesh!=null and absf(node.global_transform.basis.determinant())>0.00000001:
 		var inverse: Transform3D=node.global_transform.affine_inverse()
 		var local_origin: Vector3=inverse*origin;var local_direction: Vector3=inverse.basis*direction
-		var hit: Variant=node.get_aabb().intersects_ray(local_origin,local_direction)
-		if hit!=null:nearest=origin.distance_to(node.global_transform*hit)
+		var broad_hit: Variant=node.get_aabb().intersects_ray(local_origin,local_direction)
+		if broad_hit!=null:
+			var parts: Array=node.get_meta("period_pick_bounds",[])
+			if parts.is_empty():
+				nearest=origin.distance_to(node.global_transform*broad_hit)
+			for part: Dictionary in parts:
+				var part_hit: Variant=part.box.intersects_ray(part.inverse*local_origin,part.inverse.basis*local_direction)
+				if part_hit!=null:nearest=minf(nearest,origin.distance_to(node.global_transform*(part.pose*part_hit)))
 	for child in node.get_children():nearest=minf(nearest,mesh_hit_distance(child,origin,direction))
 	return nearest
 
@@ -645,44 +686,9 @@ func register_tree(resource: Dictionary) -> void:
 
 func ensure_tree_group(key: String) -> void:
 	if tree_instances.has(key):return
-	var parts:=key.split(":");var kind: String=parts[0];var variant:=int(parts[1])+1
+	var parts:=key.split(":")
 	var level: String=parts[2] if parts.size()>2 else "mid"
-	var base_key:=kind+":"+str(variant-1)
-	if parts.size()>2 and level=="mid" and shared_tree_meshes.has(base_key):shared_tree_meshes[key]=shared_tree_meshes[base_key]
-	if not shared_tree_meshes.has(key):
-		var path: String="res://assets/sapling-trees/%s_%02d/%s.glb" % [kind,variant,level]
-		if not tree_scenes.has(key):
-			if tree_failed.has(key):
-				var fallback: PackedScene=load(path)
-				if fallback==null:return
-				tree_scenes[key]=fallback;tree_failed.erase(key)
-			elif not tree_requests.has(key):
-				var frame:=Engine.get_process_frames()
-				if tree_asset_frame==frame:return
-				tree_asset_frame=frame
-				var error:=ResourceLoader.load_threaded_request(path,"PackedScene",false)
-				if error==OK:tree_requests[key]=path
-				else:tree_failed[key]=true
-				return
-			else:return
-		var scene: PackedScene=tree_scenes[key]
-		var model: Node=scene.instantiate()
-		var source:=first_mesh(model)
-		if source==null:model.free();return
-		var mesh: Mesh=source.mesh.duplicate()
-		for surface in mesh.get_surface_count():
-			var original: Material=mesh.surface_get_material(surface)
-			if not original is BaseMaterial3D:continue
-			var material: BaseMaterial3D=original.duplicate()
-			if material.albedo_texture!=null and level!="far":
-				if not shared_tree_textures.has(kind):shared_tree_textures[kind]=material.albedo_texture
-				material.albedo_texture=shared_tree_textures[kind]
-			if level=="far":material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-			elif material.resource_name.to_lower().contains("foliage"):material.albedo_color=Color(0.55,0.70,0.55)
-			material.cull_mode=BaseMaterial3D.CULL_DISABLED
-			mesh.surface_set_material(surface,material)
-		shared_tree_meshes[key]=mesh;model.free();tree_scenes.erase(key)
-	var mesh: Mesh=shared_tree_meshes[key]
+	var mesh:=PaintedTrees.mesh_for(parts[0],int(parts[1]),level)
 	var multi:=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D;multi.mesh=mesh
 	var node:=MultiMeshInstance3D.new();node.multimesh=multi;node.visible=parts.size()>2;add_child(node);tree_instances[key]=node
 
@@ -779,11 +785,12 @@ func sync_tree_instances(now: float,buildings: Array=[]) -> void:
 
 func sync_forest_fill(buildings: Array,force:=false) -> void:
 	var footprints: Array=[];var stamp:=str(world_data.get("revision",0))
+	var margin:=2.75 if visual_period>0 else 1.5
 	for building in buildings:
 		if building.get("virtual",false) or float(building.get("hp",0))<=0:continue
 		var clearance: Variant={"rx":float(building.get("width",16))/2.0,"rz":float(building.get("depth",16))/2.0} if building.type=="field" else LocalNavigation.clearance(building)
 		if clearance==null:continue
-		var box: Array=[float(building.x),float(building.z),float(clearance.rx)+1.5,float(clearance.rz)+1.5]
+		var box: Array=[float(building.x),float(building.z),float(clearance.rx)+margin,float(clearance.rz)+margin]
 		footprints.append(box);stamp+=":"+str(box)
 	if stamp==fill_stamp and not force:return
 	fill_stamp=stamp
@@ -903,23 +910,7 @@ func update_workers(city: Dictionary,time: float,age:=0) -> void:
 
 
 func update_building_animations(time: float) -> void:
+	for rotor in mill_rotors:
+		if is_instance_valid(rotor):rotor.rotation.z=time*0.9
 	for entry in construction_models:
-		if is_instance_valid(entry.model):entry.model.scale.y=0.15+0.85*clampf(float(entry.building.get("progress",0))/maxf(1.0,float(entry.duration)),0,1)
-	for entry in building_animations:
-		var building: Dictionary=entry.building;var data: Dictionary=entry.data
-		if not building.get("ready",false) or (data.get("workOnly",false) and building.get("status","")!="Toodab"):continue
-		var axis:=Vector3.RIGHT if data.axis=="x" else Vector3.UP if data.axis=="y" else Vector3.BACK
-		var basis:=Basis(axis,time*float(data.speed));var raw: Array=data.pivot;var pivot:=Vector3(raw[0],raw[1],raw[2])
-		entry.part.transform=Transform3D(basis,pivot-basis*pivot)
-
-func apply_town_material(node: Node) -> void:
-	if node is MeshInstance3D and node.mesh!=null:
-		for surface in node.mesh.get_surface_count():
-			var surface_key:=str(node.mesh.get_instance_id())+":"+str(surface)
-			if not vertex_color_surfaces.has(surface_key):
-				var arrays: Array=node.mesh.surface_get_arrays(surface)
-				vertex_color_surfaces[surface_key]=arrays[Mesh.ARRAY_COLOR]!=null and not arrays[Mesh.ARRAY_COLOR].is_empty()
-			if not vertex_color_surfaces[surface_key]:continue
-			if town_material==null:town_material=ShaderMaterial.new();town_material.shader=TOWN_SHADER
-			node.set_surface_override_material(surface,town_material)
-	for child in node.get_children():apply_town_material(child)
+		if is_instance_valid(entry.model):entry.model.scale.y=float(entry.base_scale)*(0.15+0.85*clampf(float(entry.building.get("progress",0))/maxf(1.0,float(entry.duration)),0,1))

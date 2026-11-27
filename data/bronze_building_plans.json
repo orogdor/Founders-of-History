@@ -1,0 +1,301 @@
+{
+  "hall": {
+    "family": "civic",
+    "height": 180,
+    "porch": true,
+    "rooms": [[311,118,630,406],[193,172,311,380,0.7],[630,166,767,389,0.72]],
+    "doors": [[478,406],[254,380],[701,389]],
+    "windows": [[380,118],[559,118],[193,264],[767,275]],
+    "partitions": [[311,172,311,380,311,276],[630,166,630,389,630,259]],
+    "fences": [["stoneLine",167,417,167,530],["stoneLine",167,530,363,530],["stoneLine",601,530,799,530],["stoneLine",799,530,799,398]],
+    "props": [["fire",469,244],["table",590,205],["bench",395,198],["bench",399,298],["bronzePaintedJar",270,234],["chest",652,307],["banner",365,474],["banner",590,474]]
+  },
+  "library": {
+    "family": "scribe",
+    "height": 158,
+    "porch": true,
+    "rooms": [[214,118,540,335],[540,118,745,296,0.77],[214,335,318,445,0.71]],
+    "doors": [[412,335],[650,296],[318,391]],
+    "windows": [[338,118],[465,118],[745,211]],
+    "partitions": [[540,118,540,296,540,200]],
+    "props": [["bookshelf",331,166],["bookshelf",454,166],["bookshelf",611,165],["periodWriting",368,246],["desk",523,235],["bench",390,401],["householdJar",704,396],["crate",239,379]]
+  },
+  "scriptorium": {
+    "family": "scribe",
+    "height": 143,
+    "porch": true,
+    "rooms": [[274,152,525,381],[525,152,687,335,0.78]],
+    "doors": [[410,381],[605,335]],
+    "windows": [[346,152],[535,152],[687,235]],
+    "partitions": [[525,152,525,335,525,243]],
+    "props": [["desk",369,210],["desk",531,204],["periodWriting",608,277],["scrolls",490,337],["bench",365,326],["householdJar",651,408],["rack",304,464]]
+  },
+  "study": {
+    "family": "scribe",
+    "height": 143,
+    "rooms": [[285,185,562,378],[562,185,670,297,0.75]],
+    "doors": [[433,378],[620,297]],
+    "windows": [[359,185],[516,185]],
+    "props": [["table",447,254],["bench",386,213],["bench",527,254],["shelf",477,205],["periodWriting",614,232],["householdJar",620,374],["bench",395,447]],
+    "partitions": [[562,185,562,297,562,243]]
+  },
+  "market": {
+    "family": "trade",
+    "height": 150,
+    "rooms": [[226,143,430,260],[537,143,735,263,0.76]],
+    "doors": [[350,260],[641,263]],
+    "windows": [[226,207],[735,212]],
+    "fences": [["stoneLine",184,265,184,481],["stoneLine",184,481,259,481],["stoneLine",702,481,774,481]],
+    "props": [["stall",299,360],["stall",483,360],["stall",668,360],["aegeanAmphoraRack",608,210],["householdJar",297,203],["householdJar",354,220],["basket",379,427],["bronzeCargo",676,451],["cart",300,466],["signpost",532,470]]
+  },
+  "warehouse": {
+    "family": "store",
+    "height": 169,
+    "rooms": [[213,134,503,374],[503,134,747,314,0.78]],
+    "doors": [[369,374],[623,314]],
+    "windows": [[213,208],[718,134]],
+    "partitions": [[503,134,503,314,503,233]],
+    "props": [["bronzeCargo",293,207],["bronzeCargo",438,212],["aegeanAmphoraRack",625,182],["grain",607,254],["householdJar",684,245],["bronzeCargo",664,413],["cart",354,431],["crate",257,439],["basket",511,416]]
+  },
+  "cellar": {
+    "family": "store",
+    "height": 115,
+    "rooms": [[326,164,634,366]],
+    "doors": [[468,366]],
+    "windows": [[572,164]],
+    "props": [["householdJar",393,222],["householdJar",458,217],["householdJar",525,215],["householdJar",577,263],["grain",378,303],["crate",555,327],["shelf",479,191],["basket",571,423]]
+  },
+  "vegetable_garden": {
+    "family": "field",
+    "props": [["vegBed",343,166],["vegBed",600,166],["vegBed",343,261],["vegBed",600,261],["vegBed",343,355],["vegBed",600,355],["basket",696,441],["tools",243,458],["householdJar",749,397]]
+  },
+  "flax_farm": {
+    "family": "field",
+    "fences": [["rail",141,103,141,471],["rail",141,471,248,471]],
+    "props": [["flaxRow",318,151],["flaxRow",641,151],["flaxRow",318,233],["flaxRow",641,233],["flaxRow",318,315],["flaxRow",641,315],["clothRack",340,435],["hay",536,451],["tools",699,449]]
+  },
+  "weaver": {
+    "family": "craft",
+    "height": 153,
+    "rooms": [[382,99,639,286],[226,159,367,294,0.71]],
+    "doors": [[516,286],[302,294]],
+    "windows": [[473,99],[597,99],[226,236]],
+    "props": [["loom",465,195],["loom",564,205],["bench",499,251],["clothRack",332,448],["clothRack",619,450],["basket",446,438],["flaxRow",711,528],["periodWeaving",681,296],["householdJar",595,348]]
+  },
+  "cartwright": {
+    "family": "craft",
+    "height": 152,
+    "rooms": [[523,98,809,279],[210,112,433,253,0.72]],
+    "doors": [[651,279],[336,253]],
+    "windows": [[738,98],[211,182]],
+    "props": [["workbench",309,210],["shelf",618,135],["wheelParts",289,310],["wheelParts",405,371],["wheelParts",631,353],["logs",709,408],["cart",536,474],["tools",643,498],["bench",598,219]]
+  },
+  "coppermine": {
+    "family": "mine",
+    "props": [["shaft",342,229],["ore",672,182],["ore",733,324],["bronzeSledge",377,448],["basket",618,443],["tools",209,451],["canopy",632,442]]
+  },
+  "tinmine": {
+    "family": "mine",
+    "props": [["shaft",590,246],["ore",276,187],["ore",246,323],["bronzeBlocks",360,433],["basket",512,450],["tools",699,445],["stockShelter",267,408]]
+  },
+  "bronze_foundry": {
+    "family": "forge",
+    "height": 164,
+    "rooms": [[204,93,448,297],[591,94,798,248,0.74]],
+    "doors": [[322,297],[690,248]],
+    "windows": [[204,188],[798,170]],
+    "fences": [["stoneLine",183,317,183,497],["stoneLine",183,497,263,497]],
+    "props": [["shelf",268,142],["ingots",384,221],["bronzeHearth",523,386],["bronzeMoulds",726,209],["bronzeToolBench",674,153],["bronzeCrucibleRack",292,437],["bronzeQuenchTrough",653,406],["ore",234,366],["coalPile",468,493],["ingots",713,482],["anvil",641,297]]
+  },
+  "road_depot": {
+    "family": "store",
+    "height": 147,
+    "rooms": [[217,94,482,270],[562,103,800,246,0.73]],
+    "doors": [[348,270],[679,246]],
+    "windows": [[417,94],[800,172]],
+    "props": [["workbench",649,177],["roadStones",686,344],["roadStones",678,418],["bronzeSledge",307,423],["crate",377,175],["shelf",275,140],["cart",499,498],["tools",743,198]]
+  },
+  "harbor": {
+    "family": "dock",
+    "height": 157,
+    "rooms": [[196,118,477,301],[477,118,600,235,0.76]],
+    "doors": [[338,301],[539,235]],
+    "windows": [[263,118],[599,169]],
+    "partitions": [[477,118,477,235,477,180]],
+    "props": [["workbench",597,306],["bronzeNet",727,323],["bronzeBoatFrame",640,467],["bronzeCargo",339,458],["bronzeCargo",398,183],["crate",268,182],["logs",775,459],["bronzeBoat",716,600],["householdJar",533,268]]
+  },
+  "bridge": {
+    "family": "bridge",
+    "props": [["bridgeSpan",480,310]]
+  },
+  "forester": {
+    "family": "wood",
+    "height": 138,
+    "rooms": [[296,156,507,377],[507,156,665,321,0.76]],
+    "doors": [[415,377],[584,321]],
+    "windows": [[358,156],[665,225]],
+    "partitions": [[507,156,507,321,507,248]],
+    "props": [["bed",374,193],["logs",339,478],["saplings",462,484],["saplings",607,484],["workbench",574,210],["tools",652,429],["basket",387,318],["fire",463,276]]
+  },
+  "saw": {
+    "family": "wood",
+    "height": 137,
+    "rooms": [[182,101,432,303]],
+    "doors": [[325,303]],
+    "windows": [[182,209],[344,101]],
+    "fences": [["rail",191,352,191,499]],
+    "props": [["sawBench",631,220],["logs",591,344],["logs",610,464],["logs",311,416],["shelf",252,164],["crate",367,222],["tools",738,244],["longShelter",630,209]]
+  },
+  "mill": {
+    "family": "farm",
+    "height": 141,
+    "rooms": [[247,116,475,323],[562,125,767,297,0.75]],
+    "doors": [[375,323],[670,297]],
+    "windows": [[247,208],[623,125]],
+    "props": [["saddleQuern",300,423],["saddleQuern",390,452],["millstone",612,258],["grain",648,169],["grain",722,184],["shelf",307,151],["basket",402,225],["grain",686,431],["householdJar",522,441]]
+  },
+  "bakery": {
+    "family": "kiln",
+    "height": 145,
+    "rooms": [[595,218,803,458],[221,108,426,261,0.74]],
+    "doors": [[687,458],[329,261]],
+    "windows": [[803,290],[220,172]],
+    "props": [["oven",477,369],["breadBoard",291,367],["table",340,186],["saddleQuern",322,474],["logs",541,505],["grain",704,496],["householdJar",733,316],["shelf",656,249],["basket",398,447]]
+  },
+  "gatehouse": {
+    "family": "fort",
+    "props": [["spears",230,250],["barrel",740,360],["lionGate",480,300],["periodGuard",286,440]]
+  },
+  "reinforced_wall": {
+    "family": "fort",
+    "props": []
+  },
+  "stonewall": {
+    "family": "fort",
+    "props": []
+  },
+  "stonetower": {
+    "family": "fort",
+    "props": [["spears",480,210],["barrel",570,380],["ladder",400,332]]
+  },
+  "hunter": {
+    "family": "farm",
+    "height": 139,
+    "rooms": [[479,310,142]],
+    "doors": [[479,452]],
+    "windows": [[621,310]],
+    "props": [["hide",427,303],["fire",515,351],["bed",411,253],["rack",371,497],["spears",558,275],["basket",583,513],["periodDrying",589,462]]
+  },
+  "fisher": {
+    "family": "dock",
+    "height": 143,
+    "rooms": [[301,198,512,418],[512,206,661,367,0.76]],
+    "doors": [[432,418],[586,367]],
+    "windows": [[367,198],[661,269]],
+    "partitions": [[512,206,512,367,512,286]],
+    "props": [["bed",551,248],["bronzeNet",360,481],["rack",605,475],["fish",628,524],["basket",330,364],["periodFish",391,320],["net",549,482],["bench",570,335]]
+  },
+  "farm": {
+    "family": "farm",
+    "height": 149,
+    "rooms": [[246,181,551,439],[551,181,729,379,0.72]],
+    "doors": [[398,439],[637,379]],
+    "windows": [[310,181],[729,267]],
+    "partitions": [[551,181,551,379,551,279]],
+    "fences": [["rail",178,423,178,544],["rail",178,544,345,544],["rail",725,520,787,521]],
+    "props": [["bed",344,228],["fire",427,302],["table",346,320],["grain",643,266],["grain",652,335],["saddleQuern",591,469],["trough",533,529],["hay",654,512],["householdJar",691,456],["manger",652,207]]
+  },
+  "lumber": {
+    "family": "wood",
+    "height": 138,
+    "rooms": [[214,105,455,295]],
+    "doors": [[377,295]],
+    "windows": [[214,202],[381,105]],
+    "props": [["sideShelter",702,222],["logs",302,439],["logs",348,499],["logs",671,395],["logs",712,490],["workbench",374,180],["tools",501,477],["basket",272,222]]
+  },
+  "mason": {
+    "family": "mine",
+    "props": [["bronzeOutcrop",306,207],["bronzeCrane",210,296],["bronzeBlocks",643,330],["bronzeSledge",408,445],["stone",197,436],["workbench",711,221],["basket",768,415],["canopy",691,181]]
+  },
+  "pottery_kiln": {
+    "family": "kiln",
+    "height": 154,
+    "rooms": [[424,218,114],[605,124,792,289,0.72]],
+    "doors": [[424,332],[688,289]],
+    "windows": [[538,218],[792,202]],
+    "props": [["kiln",570,409],["workbench",683,254],["householdJar",506,470],["householdJar",443,475],["householdJar",680,440],["householdJar",746,426],["aegeanAmphoraRack",312,428],["periodPottery",254,253],["basket",426,521]]
+  },
+  "barracks": {
+    "family": "guard",
+    "height": 160,
+    "rooms": [[224,160,478,405],[478,160,739,318,0.78]],
+    "doors": [[361,405],[603,318]],
+    "windows": [[269,160],[415,160],[739,249]],
+    "partitions": [[478,160,478,318,478,236]],
+    "fences": [["palisadeLine",179,418,179,508],["palisadeLine",179,508,288,508]],
+    "props": [["bench",315,235],["spears",305,312],["spears",661,293],["bench",500,271],["bed",636,180],["bed",691,224],["fire",432,353],["banner",366,491],["periodGuard",661,485]]
+  },
+  "archery": {
+    "family": "guard",
+    "props": [["target",321,206],["target",476,206],["target",635,206],["spears",265,411],["bench",685,405],["canopy",657,419]]
+  },
+  "woodgate": {
+    "family": "fort",
+    "props": [["banner",397,289]],
+    "yard": [254,265,705,365]
+  },
+  "quarry": {
+    "family": "mine",
+    "props": [["quarrySite",368,281],["bronzeSledge",617,391],["bronzeBlocks",620,256],["tools",522,379],["stone",249,408]]
+  },
+  "claypit": {
+    "family": "mine",
+    "props": [["claySite",420,286],["basket",385,406],["householdJar",576,289],["tools",562,395],["canopy",593,395]]
+  },
+  "well": {
+    "family": "well",
+    "props": [["wellRoof",483,306],["householdJar",409,375],["householdJar",548,357],["bench",462,422],["basket",549,267]]
+  },
+  "pasture": {
+    "family": "field",
+    "props": [["trough",335,264],["trough",540,264],["manger",629,209],["hay",301,202],["canopy",626,233],["basket",664,362]]
+  },
+  "field": {
+    "family": "field",
+    "props": [["grain",677,412],["tools",304,417]]
+  },
+  "bronze_town": {
+    "family": "court",
+    "height": 151,
+    "rooms": [[168,116,418,291],[537,115,783,269,0.79],[179,362,365,504,0.73],[567,368,786,496,0.85]],
+    "doors": [[310,291],[647,269],[365,427],[567,429]],
+    "windows": [[237,116],[729,115],[233,504],[724,496]],
+    "yard": [125,78,834,557],
+    "fences": [["stoneLine",141,316,141,516],["stoneLine",141,516,237,516],["stoneLine",803,292,803,502]],
+    "props": [["fire",292,205],["bed",226,167],["shelf",603,164],["householdJar",605,242],["bronzePaintedJar",660,315],["saddleQuern",336,321],["loom",266,413],["bronzeCargo",624,439],["bench",491,282],["well",470,397]]
+  },
+  "courtyard_house": {
+    "family": "court",
+    "height": 139,
+    "props": [["bed",308,207],["householdJar",628,375],["bronzePaintedJar",532,327],["well",497,420],["fruitTree",452,354],["basket",656,342],["chest",651,193],["table",590,206],["bench",523,322]]
+  },
+  "bronze_noble_house": {
+    "family": "court",
+    "height": 169,
+    "porch": true,
+    "rooms": [[287,112,457,354,0.72],[457,109,676,388],[676,145,755,297,0.69]],
+    "doors": [[533,388],[371,354]],
+    "windows": [[327,112],[598,109],[676,327]],
+    "partitions": [[457,112,457,354,457,247],[676,145,676,297,676,216]],
+    "fences": [["stoneLine",239,352,239,491],["stoneLine",239,491,373,491],["stoneLine",637,491,741,491],["stoneLine",741,491,741,368]],
+    "props": [["bed",335,160],["chest",356,288],["table",518,190],["bench",589,239],["householdJar",593,354],["bronzePaintedJar",334,450],["bronzePaintedJar",645,444],["fruitTree",701,439],["saddleQuern",613,484]]
+  },
+  "palisade": {
+    "family": "fort",
+    "props": []
+  },
+  "watchtower": {
+    "family": "fort",
+    "props": [["tower",480,309]]
+  }
+}

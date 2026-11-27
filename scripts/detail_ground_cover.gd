@@ -2,6 +2,7 @@ extends Node3D
 
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const Landscape=preload("res://scripts/detail_landscape.gd")
+const PaintedTrees=preload("res://scripts/painted_tree_models.gd")
 static var meshes: Dictionary={}
 var heights: Array=[]
 var visual_heights:=PackedVector4Array()
@@ -31,6 +32,7 @@ static func fbm(x: float,z: float,seed: float) -> float:
 	return noise(x,z,seed)*0.6+noise(x*2.1,z*2.1,seed+7)*0.3+noise(x*4.3,z*4.3,seed+13)*0.1
 
 static func mesh_for(name: String) -> Mesh:
+	if name in ["grass","tall"]:return PaintedTrees.grass_mesh(name=="tall")
 	if meshes.has(name):return meshes[name]
 	var path: String="res://assets/world/ground_cover/"+name+".glb"
 	if not ResourceLoader.exists(path):return null
@@ -57,9 +59,9 @@ func setup(c: int,r: int,visual_biome: String,tile_heights: Array,water: Array,s
 	var grass:=0.12 if arid else 0.55 if cold else 0.7 if biome=="jungle" else 1.0
 	var tall:=0.05 if arid else 1.5 if biome=="steppe" else 0.2 if cold else 1.0
 	var flower:=0.0 if arid else 0.2 if cold else 0.45 if biome=="steppe" else 1.25 if biome=="grassland" else 1.0
-	add_job("grass",3400*grass);add_job("tall",520*tall)
+	add_job("grass",2800*grass);add_job("tall",375*tall)
 	var flowers:=["f4f1e6","f2d24a","b58ad6","e6795c","8fb1e6","f3a6c4"]
-	for k in flowers.size():add_job("flower_"+flowers[k],200*flower/6.0*(1.6 if k<2 else 0.8),k)
+	for k in flowers.size():add_job("flower_"+flowers[k],145*flower/6.0*(1.6 if k<2 else 0.8),k)
 	add_job("stone",90*(2.2 if arid else 1.9 if cold else 2.0 if biome in ["mountain","snow_mountain","hills"] else 1.0))
 	add_job("drybush" if arid else "shrub",36*(1.6 if woods or arid else 0.8 if cold else 0.6 if biome=="steppe" else 1.35 if biome=="grassland" else 1.0))
 	if not dry:add_job("fern",50*(2.2 if woods else 0.6)*(1.6 if biome=="jungle" else 1.0))
@@ -103,7 +105,7 @@ func _process(_delta: float) -> void:
 func chance(name: String,x: float,z: float,meadow: float,variant: int) -> float:
 	var stony:=fbm(x/30,z/30,seed_value+47)
 	match name:
-		"grass":return 0.25+meadow*0.9
+		"grass":return 0.14+meadow*0.93
 		"tall":return maxf(0,meadow-0.45)*2.4
 		"stone":return 0.15+maxf(0,stony-0.4)*1.8
 		"shrub","drybush":return 0.2+maxf(0,0.55-meadow)*1.5
@@ -117,7 +119,7 @@ func chance(name: String,x: float,z: float,meadow: float,variant: int) -> float:
 
 func scale_for(name: String,i: int) -> float:
 	if name in ["grass","tall"]:return 0.8+hash_value(i,seed_value,7 if name=="grass" else 8)*0.65
-	if name.begins_with("flower_"):return 1.3+hash_value(i,seed_value,9)*0.8
+	if name.begins_with("flower_"):return 0.76+hash_value(i,seed_value,9)*0.62
 	match name:
 		"stone":return 0.18+pow(hash_value(i,seed_value,11),3)*(1.6 if biome in ["mountain","snow_mountain","hills"] else 0.9)
 		"shrub":return 0.6+hash_value(i,seed_value,13)*0.8

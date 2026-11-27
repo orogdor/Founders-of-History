@@ -6,6 +6,10 @@ const WARRIORS=[preload("res://assets/people/spearman_v262.glb"),preload("res://
 const Motion=preload("res://scripts/human_motion.gd")
 const Dog=preload("res://scripts/scout_dog.gd")
 const Fits=preload("res://data/building_fits.json")
+const PeriodFreight=preload("res://scripts/period_freight_visuals.gd")
+const PeriodShips=preload("res://scripts/period_ship_visuals.gd")
+const PeriodLod=preload("res://scripts/house_period_city_lod.gd")
+const PaintedMaterials=preload("res://scripts/painted_building_materials.gd")
 const TEAM_COLORS:=["88bdb1","d27b61","b095dc","e2c164"]
 static var materials: Dictionary={}
 static var vertex_surfaces: Dictionary={}
@@ -68,16 +72,30 @@ static func add_building(parent: Node3D,type: String,age: int,position: Vector3,
 	var wrapper:=Node3D.new();wrapper.position=position;wrapper.scale=Vector3.ONE*scale_factor
 	model.scale=Vector3(fit.scale[0],fit.scale[1],fit.scale[2])
 	model.position=Vector3(fit.offset[0],fit.offset[1],fit.offset[2])
-	apply_colors(model);wrapper.add_child(model);parent.add_child(wrapper)
+	var variant:=PaintedMaterials.variant_at(Vector2i.ZERO,Vector2(position.x,position.z),type)
+	apply_colors(model);PaintedMaterials.apply_stock(model,variant);wrapper.add_child(model);parent.add_child(wrapper)
 
 static func add_city(parent: Node3D,name: String,team: int,age: int) -> void:
 	var path: String="res://assets/world/settlements/settlement_%d_%d.glb" % [clampi(team,0,3),clampi(age,0,6)]
-	if ResourceLoader.exists(path):
+	if age in [1,2]:
+		var marker := MeshInstance3D.new()
+		marker.name = "CityModel"
+		marker.scale = Vector3.ONE * 0.04
+		var sites := {"bronze_town":Vector2.ZERO} if age==1 else {"hall":Vector2(-3,-3),"house":Vector2(4,2),"market":Vector2(-4,4)}
+		for kind: String in sites:
+			var court := MeshInstance3D.new()
+			court.mesh = PeriodLod.mesh(age,PeriodLod.category(kind,age))
+			var bounds := court.mesh.get_aabb()
+			var at: Vector2=sites[kind]
+			court.position = Vector3(at.x-bounds.get_center().x,-bounds.position.y,at.y-bounds.get_center().z)
+			marker.add_child(court)
+		parent.add_child(marker)
+	elif ResourceLoader.exists(path):
 		var source: Node=load(path).instantiate();var original:=find_mesh(source)
 		if original!=null:
 			var model:=MeshInstance3D.new();model.name="CityModel";model.mesh=original.mesh
-			var material:=StandardMaterial3D.new();material.vertex_color_use_as_albedo=true;material.roughness=0.95;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-			model.material_override=material;model.scale=Vector3.ONE*0.04;parent.add_child(model)
+			model.material_override=PaintedMaterials.world_material();model.scale=Vector3.ONE*0.04;parent.add_child(model)
+			model.set_instance_shader_parameter("painted_building_variant",float(PaintedMaterials.variant_at(Vector2i(team,age),Vector2.ZERO,name)))
 		source.free()
 	var label:=Label3D.new();label.name="CityName";label.text=name;label.font_size=28;label.pixel_size=0.008
 	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED;label.no_depth_test=true
@@ -125,6 +143,10 @@ static func ship_box(parent: Node3D,at: Vector3,dimensions: Vector3,color: Strin
 	node.material_override=mat;parent.add_child(node)
 
 static func add_ship(parent: Node3D,kind: String,team: int,upgrade: int) -> void:
+	if upgrade>0:
+		var variant:=posmod(hash([kind,team,upgrade]),PaintedMaterials.VARIANTS)
+		parent.add_child(PeriodShips.visual(kind,team,upgrade,0.04,variant))
+		return
 	var hull:=MeshInstance3D.new();var cylinder:=CylinderMesh.new();cylinder.top_radius=8*0.04;cylinder.bottom_radius=5*0.04;cylinder.height=24*0.04;cylinder.radial_segments=8
 	hull.mesh=cylinder;hull.rotation.x=PI/2;hull.scale.x=0.75;hull.position.y=4*0.04
 	var wood:=StandardMaterial3D.new();wood.albedo_color=Color("765134");wood.roughness=0.8;hull.material_override=wood;parent.add_child(hull)
@@ -154,7 +176,9 @@ static func add_ship(parent: Node3D,kind: String,team: int,upgrade: int) -> void
 	if upgrade>=3:ship_box(parent,Vector3(0,11,-7),Vector3(8,6,7),"95734b")
 
 # The source world markers add the same simple wagon, train and plane shapes to a traveller.
-static func add_freight(parent: Node3D,kind: String,team: int) -> void:
+static func add_freight(parent: Node3D,kind: String,team: int,age:=0) -> void:
+	if PeriodFreight.freight(parent,kind,age,team):
+		return
 	add_people(parent,"caravan",team)
 	freight_box(parent,Vector3(0,0.5,-1),Vector3(0.95,0.65,1.1),"8d714a")
 	for side in [-1,1]:

@@ -11,7 +11,10 @@ static func preview(city: Dictionary,cell: Dictionary,angle: Variant=null) -> Di
   if minf(a,PI-a)>PI/12:return {"error":"Sild peab ulatuma mõlemale jõekaldale."}
  var pending:=0
  for b in city.economy.buildings:
-  if not b.get("ready",false) and float(b.get("hp",0))>0:pending+=1
+  if float(b.get("hp",0))<=0:continue
+  if b.get("type","")=="bridge":
+   return {"error":"Sellel ruudul on sild juba olemas." if b.get("ready",false) else "Selle ruudu sild on juba ehitusjärjekorras."}
+  if not b.get("ready",false):pending+=1
  if pending>=12:return {"error":"Linna ühises ehitusjärjekorras on juba 12 hoonet."}
  if not Econ.can_afford(city.economy.realms[city.team].resources,Econ.DATA.data.buildings.bridge.cost):return {"error":"Silla jaoks napib materjale."}
  return {"point":Vector2.ZERO}

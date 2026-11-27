@@ -6,6 +6,7 @@ const Research=preload("res://scripts/research_rules.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
 const Diplomacy=preload("res://scripts/diplomacy_rules.gd")
 const Availability=preload("res://scripts/era_availability.gd")
+const Period=preload("res://scripts/house_period_styles.gd")
 const CityOverview=preload("res://scripts/city_overview.gd")
 const BUILD_ORDER=preload("res://data/build_catalog_order.json")
 const UI:="res://assets/ui/"
@@ -248,6 +249,7 @@ func make_card(title: String,art_name: String,subtitle: String,action: Callable,
 	var image:=TextureRect.new()
 	var path:=UI+"ui-art-v263_"+art_name+".webp"
 	if art_name.begins_with("tech/"):path=UI+art_name+".webp"
+	if art_name.begins_with("res://"):path=art_name
 	if ResourceLoader.exists(path):image.texture=load(path)
 	image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -441,14 +443,17 @@ func populate_buildings(filter: String) -> void:
 		for key in definition.get("cost",{}):cost.append("%s %.0f" % [Economy.DATA.data.resource_names.get(key,key),float(definition.cost[key])])
 		var cost_line:=", ".join(cost) if not cost.is_empty() else "Tasuta"
 		var subtitle: String=cost_line+("\n"+rule if not rule.is_empty() else "\nPuuduvad materjalid" if not can_pay else "")
-		var local_art: String="bld_"+type
-		if not ResourceLoader.exists(UI+"ui-art-v263_"+local_art+".webp"):
-			local_art="tech/"+str(Research.DATA.data.build_tech.get(type,"settlement"))
+		var designer_id: String=host.house_designer_id(type,city)
+		var local_art:=Period.portrait_path(designer_id)
+		if local_art.is_empty():
+			local_art="bld_"+type
+			if not ResourceLoader.exists(UI+"ui-art-v263_"+local_art+".webp"):
+				local_art="tech/"+str(Research.DATA.data.build_tech.get(type,"settlement"))
 		if visible_count%2==0:
 			column=VBoxContainer.new();column.add_theme_constant_override("separation",6);row.add_child(column)
 		var card:=make_card(str(definition.name),local_art,subtitle,choose_building.bind(i),rule.is_empty(),true)
 		column.add_child(card)
-		if not host.house_designer_id(type,city).is_empty():
+		if not designer_id.is_empty():
 			var design:=Button.new();design.text="✎";design.tooltip_text="Kujunda uute hoonete plaan";design.set_anchors_preset(Control.PRESET_TOP_RIGHT);design.position=Vector2(-25,2);design.custom_minimum_size=Vector2(23,23);design.pressed.connect(host.open_type_house_designer.bind(type,i));card.add_child(design)
 		visible_count+=1
 	if visible_count==0:add_card("Ehitisi ei leitud","cmd_build","Muuda otsingut või kategooriat",func():pass,false)

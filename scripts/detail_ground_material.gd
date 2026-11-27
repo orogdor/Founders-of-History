@@ -1,8 +1,8 @@
 extends RefCounted
 
 const SHADER=preload("res://scripts/ground_blend.gdshader")
-const KINDS:=["grass","soil","forest"]
-const CHANNELS:=["color","normal","rough"]
+const PaintedMaterials=preload("res://scripts/painted_building_materials.gd")
+const FAMILIES=[PaintedMaterials.MEADOW,PaintedMaterials.FOREST,PaintedMaterials.SOIL,PaintedMaterials.STONE]
 static var requested:=false
 static var requests: Dictionary={}
 static var textures: Dictionary={}
@@ -13,11 +13,9 @@ static var materials: Dictionary={}
 static func request_assets() -> void:
 	if requested:return
 	requested=true
-	for kind in KINDS:
-		for channel in CHANNELS:
-			var key: String=kind+"_"+channel
-			var path: String="res://assets/ground/"+kind+"-"+channel+".webp"
-			requests[key]={"path":path,"error":ResourceLoader.load_threaded_request(path,"Texture2D",false)}
+	for family in FAMILIES:
+		var path: String=PaintedMaterials.ROOT+family+"_atlas.png"
+		requests[family]={"path":path,"error":ResourceLoader.load_threaded_request(path,"Texture2D",false)}
 
 static func poll() -> void:
 	request_assets()
@@ -39,7 +37,7 @@ static func poll() -> void:
 			var fallback: Texture2D=load(path)
 			if fallback!=null:textures[key]=fallback
 			requests.erase(key)
-	if not requests.is_empty() or textures.size()!=KINDS.size()*CHANNELS.size():return
+	if not requests.is_empty() or not textures.has(PaintedMaterials.MEADOW):return
 	var applied:=0
 	while not waiting.is_empty() and applied<4:
 		var entry: Dictionary=waiting.pop_front();var instance: Variant=entry.node.get_ref()
@@ -50,14 +48,17 @@ static func make_material(color: Color,forest: float) -> ShaderMaterial:
 	var key:=color.to_html()+":"+str(forest)
 	if materials.has(key):return materials[key]
 	var material:=ShaderMaterial.new();material.shader=SHADER
-	for kind in KINDS:
-		for channel in CHANNELS:material.set_shader_parameter(kind+"_"+channel,textures[kind+"_"+channel])
+	for family in FAMILIES:
+		var atlas: Texture2D=textures.get(family)
+		if atlas==null:atlas=PaintedMaterials.atlas(family)
+		material.set_shader_parameter("painted_"+family,atlas)
 	material.set_shader_parameter("forest_factor",forest);material.set_shader_parameter("base_color",color)
 	materials[key]=material;return material
 
-static func attach(instance: MeshInstance3D,color: Color,forest: float) -> void:
+static func attach(instance: MeshInstance3D,color: Color,forest: float,tile:=Vector2i.ZERO) -> void:
 	request_assets()
-	if requests.is_empty() and textures.size()==KINDS.size()*CHANNELS.size():
+	instance.set_instance_shader_parameter("painted_world_origin",Vector2(tile)*Vector2(225,195))
+	if requests.is_empty() and textures.has(PaintedMaterials.MEADOW):
 		instance.material_override=make_material(color,forest);return
 	var fallback:=StandardMaterial3D.new();fallback.albedo_color=color;fallback.roughness=1.0;fallback.cull_mode=BaseMaterial3D.CULL_DISABLED
 	instance.material_override=fallback

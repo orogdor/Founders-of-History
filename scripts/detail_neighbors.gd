@@ -8,7 +8,7 @@ const Grid=preload("res://scripts/campaign_grid.gd")
 const Detail=preload("res://scripts/detail_view.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
 const Campaign=preload("res://scripts/campaign_state.gd")
-const Production=preload("res://scripts/production_bonuses.gd")
+const Period=preload("res://scripts/house_period_styles.gd")
 const DetailWorld=preload("res://scripts/detail_world.gd")
 const VisualRiver=preload("res://scripts/visual_river.gd")
 var host_node: Node
@@ -30,10 +30,9 @@ func setup(host: Node,center: Vector2i) -> void:
 			var color_heights: PackedVector4Array=host.detail_visual_for(c,r)
 			tile.set_meta("visual_heights",color_heights)
 			var ground:=MeshInstance3D.new();ground.mesh=host.detail_mesh_for(c,r,heights,color_heights)
-			ground.set_instance_shader_parameter("detail_uv_offset",Vector2(dc*225,dr*195))
 			var ground_color: Color=host.terrain_color(index)
 			var ground_forest:=1.0 if host.is_forest_core(index) else 0.0
-			GroundMaterial.attach(ground,ground_color,ground_forest)
+			GroundMaterial.attach(ground,ground_color,ground_forest,Vector2i(c,r))
 			var adjacent={"ground_w":Vector2i(-1,0),"ground_e":Vector2i(1,0),"ground_n":Vector2i(0,-1),"ground_s":Vector2i(0,1),"ground_nw":Vector2i(-1,-1),"ground_ne":Vector2i(1,-1),"ground_sw":Vector2i(-1,1),"ground_se":Vector2i(1,1)}
 			for key in adjacent:
 				var pos: Vector2i=Vector2i(c,r)+adjacent[key];var tint:=ground_color;var forest:=ground_forest
@@ -103,7 +102,7 @@ func add_known_nature(host: Node,tile: Node3D,at: Vector2i,heights: Array,index:
 	nature.sync_removed_resources(world.resources,float(host.game.time),buildings)
 	if city!=null:
 		nature.person=Node3D.new();nature.add_child(nature.person)
-		var hall: Dictionary=city.economy.buildings[0];var upgrade:=Production.upgrade_level(host.game,int(city.team))
+		var hall: Dictionary=city.economy.buildings[0];var upgrade:=Period.campaign_age(host.game,int(city.team))
 		if not hall.get("virtual",false):nature.place_hall(hall.x,hall.z,upgrade,float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
 		nature.sync_buildings(city,upgrade)
 		nature.add_village_life(host,"city:"+str(city.id),int(city.team),true)

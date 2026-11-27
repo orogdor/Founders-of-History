@@ -1,5 +1,11 @@
 shader_type spatial;
 render_mode cull_disabled;
+#include "res://scripts/painted_relief.gdshaderinc"
+uniform sampler2D painted_wood : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_stone : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_plaster : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_reed : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_tile : source_color, filter_linear_mipmap, repeat_enable;
 varying vec3 local_pos;
 varying vec3 local_normal;
 float h154(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
@@ -21,5 +27,16 @@ void fragment(){
  else if(m==12){k=0.84+0.24*n154(p.xz*1.4)+0.06*n154(p.xz*9.0);}
  else if(m==13){k=0.75+0.35*n154(p.xz*3.0+p.y*2.0);}
  else if(m==14){k=0.95+0.05*n154(vec2(u*12.0,v*12.0));}
- ALBEDO=col*k;ROUGHNESS=rough;METALLIC=metal;
+ vec2 wall_uv=vec2(u,v);
+ vec2 roof_uv=vec2(p.x+p.z*0.32,p.y+p.z*0.66);
+ vec4 paint=vec4(0.22,0.22,0.22,0.5);
+ float strength=0.0;
+ if(m==2 || m==3 || m==6){paint=texture(painted_wood,wall_uv*0.63);strength=0.70;}
+ else if(m==4){paint=texture(painted_stone,wall_uv*0.34);strength=0.55;}
+ else if(m==7){paint=texture(painted_reed,roof_uv*0.52);strength=1.0;}
+ else if(m==8){paint=texture(painted_tile,roof_uv*0.47);strength=0.68;}
+ else if(m!=9 && m!=10){paint=texture(painted_plaster,wall_uv*0.36);strength=0.48;}
+ k*=mix(1.0,0.84+0.72*dot(paint.rgb,vec3(0.30,0.59,0.11)),strength);
+ NORMAL=painted_relief(VERTEX,NORMAL,paint.a,0.031*strength);
+ ALBEDO=col*k;ROUGHNESS=rough;METALLIC=metal;SPECULAR=mix(0.30,0.5,metal);
 }

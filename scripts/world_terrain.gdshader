@@ -1,9 +1,14 @@
 shader_type spatial;
 render_mode cull_disabled;
+#include "res://scripts/painted_relief.gdshaderinc"
 varying vec3 terrain_pos;
 varying vec3 terrain_normal;
 varying float source_height;
 uniform vec4 beach_color : source_color = vec4(0.8745,0.8078,0.6275,1.0);
+uniform sampler2D painted_meadow : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_forest : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_soil : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D painted_stone : source_color, filter_linear_mipmap, repeat_enable;
 float h149(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float n149(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h149(i),h149(i+vec2(1.0,0.0)),f.x),mix(h149(i+vec2(0.0,1.0)),h149(i+vec2(1.0,1.0)),f.x),f.y);}
 float f149(vec2 p){return n149(p)*0.55+n149(p*2.07+17.3)*0.30+n149(p*4.31+41.9)*0.15;}
@@ -25,6 +30,16 @@ void fragment(){
  float meadow=n149(lp*0.094+3.0)*0.6+n149(lp*0.23+7.0)*0.4;
  vec3 lush=land*vec3(0.84,1.0,0.82),dry=land*vec3(1.13,1.05,0.76)+vec3(0.035,0.02,0.0);
  land=mix(land,mix(lush,dry,smoothstep(0.38,0.74,meadow)),grassy*0.7);
+ float surface_height=0.5;
+ if(grassy>0.02){
+  float shade=1.0-smoothstep(0.09,0.20,land.g);
+  vec4 paint=shade>0.55
+    ? painted_regions(painted_forest,lp/110.0,lp/435.0)
+    : painted_regions(painted_meadow,lp/138.0,lp/420.0);
+  float brush=dot(paint.rgb,vec3(0.30,0.59,0.11));
+  land*=mix(1.0,0.91+brush*0.43+(paint.a-0.5)*0.05,grassy);
+  surface_height=mix(surface_height,paint.a,grassy);
+ }
  float heath=smoothstep(0.62,0.80,n149(lp*0.034+8.0));land=mix(land,land*vec3(0.94,0.90,0.97),heath*grassy*0.25);
  float rock_at=mix(0.42,0.20,smoothstep(30.0,95.0,elev));
  float rock=smoothstep(rock_at-0.07,rock_at+0.09,slope+(mid-0.5)*0.16)*smoothstep(16.0,34.0,elev);
@@ -34,6 +49,17 @@ void fragment(){
  rock_col=mix(rock_col,vec3(0.20,0.23,0.17),smoothstep(0.55,0.80,n149(lp*0.07+9.0))*(1.0-smoothstep(0.45,0.75,slope))*0.55);
  rock_col*=0.80+0.20*smoothstep(0.15,0.55,fissure);rock_col=mix(rock_col,rock_col*vec3(0.98,0.92,0.84),smoothstep(0.55,0.85,mid)*0.6);
  float scree=smoothstep(rock_at-0.20,rock_at-0.06,slope)*(1.0-rock)*smoothstep(26.0,44.0,elev);
+ float exposed=max(earth*(1.0-grassy),scree);
+ if(exposed>0.05){
+  vec4 dirt=painted_regions(painted_soil,lp/115.0,lp/405.0);
+  land*=mix(1.0,0.89+dot(dirt.rgb,vec3(0.30,0.59,0.11))*0.42,exposed);
+  surface_height=mix(surface_height,dirt.a,exposed);
+ }
+ if(rock>0.05){
+  vec4 stone=painted_regions(painted_stone,lp/92.0,lp/385.0);
+  rock_col*=0.86+dot(stone.rgb,vec3(0.30,0.59,0.11))*0.37;
+  surface_height=mix(surface_height,stone.a,rock);
+ }
  vec3 col=mix(land,vec3(0.34,0.32,0.29)*(0.88+fine*0.2),scree*0.75);col=mix(col,rock_col,rock);
  // The original coast blends over a finer terrain mesh; keep that soft
  // transition while the Godot mesh uses a coarser adaptive shoreline.
@@ -42,5 +68,6 @@ void fragment(){
  float snow_line=118.0+broad*22.0;float snow=smoothstep(snow_line,snow_line+12.0,elev)*(1.0-smoothstep(0.40,0.68,slope+fine*0.1));
  col=mix(col,vec3(0.84,0.86,0.90)*(0.95+fine*0.06),snow);
  vec2 cw=lp*0.0035+vec2(TIME*0.010,TIME*0.004);float cloud=smoothstep(0.52,0.78,n149(cw)*0.65+n149(cw*2.3+4.0)*0.35);
+ NORMAL=painted_relief(VERTEX,NORMAL,surface_height,0.007);
  ALBEDO=col*(1.0-cloud*0.16)+vec3(0.035,0.012,0.035)+rock*vec3(0.06);ROUGHNESS=1.0;METALLIC=0.0;
 }

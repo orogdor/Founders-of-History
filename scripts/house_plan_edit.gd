@@ -124,7 +124,9 @@ static func item_zone(design: Dictionary,type: String,p: Vector2) -> String:
  if coast:
   for corner in corners:
    if corner.y>545:return ""
- if type=="bed" and definition.get("kind","")!="Homes":return ""
+ if type=="bed" and definition.get("kind","")!="Homes":
+  var bunkhouse:bool=(design.has("bronzeFamily") and id.get_slice("@",0) in ["forester","barracks","bronze_town"]) or (design.has("ironFamily") and id.get_slice("@",0)=="barracks")
+  if not bunkhouse:return ""
  var geometry:=Plan.plan_geometry(design);var enclosed:=[]
  for room in design.get("rooms",[]):enclosed.append(Plan.room_polygon(room))
  var all_floor:=true

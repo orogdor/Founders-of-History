@@ -7,6 +7,7 @@ const SiegeRules=preload("res://scripts/battle_siege_rules.gd")
 const Battle=preload("res://scripts/battle_state.gd")
 const View=preload("res://scripts/battle_view.gd")
 const Marker=preload("res://scripts/world_marker_models.gd")
+const Freight=preload("res://scripts/period_freight_visuals.gd")
 const Motion=preload("res://scripts/human_motion.gd")
 const Human=preload("res://assets/people/human_far.glb")
 const Humans=preload("res://scripts/human_factory.gd")
@@ -56,6 +57,13 @@ func team_era(team: int) -> int:
  var ages: Array=host.game.get("ages",[])
  return int(ages[team]) if team>=0 and team<ages.size() else 0
 
+func visual_stamp(kind: String,team: int,unit: Dictionary) -> String:
+ if kind=="army":
+  return str(unit.get("kind",""))+":"+str(Battle.living(unit))
+ if kind in ["boat","caravan","rail","air","settler"]:
+  return "%s:%d" % [kind,team_era(team)]
+ return kind
+
 func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dictionary:
  var era:=team_era(team)
  var root:=Node3D.new();root.name="Traveller";root.set_meta("traveller_key",key);add_child(root)
@@ -69,26 +77,31 @@ func create_entry(key: String,kind: String,team: int,unit: Dictionary={}) -> Dic
    var person:=Humans.create(["man","woman","boy" if Humans.stable_hash(key)%2==0 else "girl"][i],era,"settler",Humans.stable_hash(key+str(i)));person.scale=Vector3.ONE*(1.66*Humans.size_factor(person));person.position=Vector3((i-1)*0.9,0,-i*0.5);root.add_child(person)
    var motion:=Motion.new();motion.phase=i*0.7;person.set_meta("traveller_motion",motion);people.append(person)
  elif kind=="boat":
-  Marker.add_ship(root,"transport",team,0);root.scale=Vector3.ONE*5.0
+  Marker.add_ship(root,"transport",team,era);root.scale=Vector3.ONE*5.0
+ elif kind in ["rail","air"]:
+  Freight.freight(root,kind,era,team);root.scale=Vector3.ONE*(4.5 if kind=="rail" else 7.8)
  else:
-  var person:=Humans.create(Humans.pick_body(key,"merchant"),era,"merchant",Humans.stable_hash(key));person.scale=Vector3.ONE*1.66;person.position=Vector3(0.8,0,0.8);root.add_child(person)
-  var motion:=Motion.new();person.set_meta("traveller_motion",motion);people.append(person)
-  var cart:=MeshInstance3D.new();var mesh:=BoxMesh.new();mesh.size=Vector3(1.4,0.7,2.0);cart.mesh=mesh;cart.position=Vector3(0,0.8,-0.4)
-  var material:=StandardMaterial3D.new();material.albedo_color=Color("8b6a44");cart.material_override=material;root.add_child(cart)
+  var variant:=Humans.stable_hash(key)
+  if era<5:
+   var person:=Humans.create(Humans.pick_body(key,"merchant"),era,"merchant",variant);person.scale=Vector3.ONE*1.66;person.position=Vector3(0.8,0,0.8);root.add_child(person)
+   var motion:=Motion.new();person.set_meta("traveller_motion",motion);people.append(person)
+  if not Freight.road_vehicle(root,era,team,1.54,variant%8):
+   var cart:=MeshInstance3D.new();var mesh:=BoxMesh.new();mesh.size=Vector3(1.4,0.7,2.0);cart.mesh=mesh;cart.position=Vector3(0,0.8,-0.4)
+   var material:=StandardMaterial3D.new();material.albedo_color=Color("8b6a44");cart.material_override=material;root.add_child(cart)
  if kind=="army" and unit.get("kind","")=="scout":
   var label:=Label3D.new();label.name="ScoutName";label.text="Avastaja";label.position.y=2.8;label.billboard=BaseMaterial3D.BILLBOARD_ENABLED;label.font_size=44;label.pixel_size=0.018
   label.modulate=Color(["f6d88b","dca58a","c4aff5","d7be73"][clampi(team,0,3)]);label.outline_size=8;root.add_child(label)
   var ring:=MeshInstance3D.new();ring.name="ScoutRing";var ring_mesh:=TorusMesh.new();ring_mesh.inner_radius=1.25;ring_mesh.outer_radius=1.55;ring_mesh.rings=24;ring.mesh=ring_mesh;ring.position.y=0.13
   var material:=StandardMaterial3D.new();material.albedo_color=label.modulate;material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ring.material_override=material;root.add_child(ring)
- var entry={"root":root,"people":people,"kind":kind,"team":team,"stamp":str(unit.get("kind",""))+":"+str(Battle.living(unit)) if kind=="army" else kind};entries[key]=entry;return entry
+ var entry={"root":root,"people":people,"kind":kind,"team":team,"stamp":visual_stamp(kind,team,unit)};entries[key]=entry;return entry
 
 func show_entry(key: String,kind: String,team: int,pose: Dictionary,unit: Dictionary={},heading:=0.0) -> void:
  var x:=float(pose.x);var z:=float(pose.z)
  if absf(x)>330 or absf(z)>285:return
  var y:float=host.detail_rendered_height(x,z)
  if kind=="boat" and y> -0.05:return
- if kind!="boat" and y< -0.15:return
- var stamp:=str(unit.get("kind",""))+":"+str(Battle.living(unit)) if kind=="army" else kind
+ if kind not in ["boat","air"] and y< -0.15:return
+ var stamp:=visual_stamp(kind,team,unit)
  var entry: Variant=entries.get(key)
  if entry!=null and (entry.stamp!=stamp or int(entry.team)!=team):entry.root.queue_free();entries.erase(key);entry=null
  if entry==null:entry=create_entry(key,kind,team,unit)
@@ -156,10 +169,31 @@ func sync() -> void:
   if not pose.moving:pose.x=float(pose.x)+14+posmod(int(settler.id),3)*4;pose.z=float(pose.z)+10+posmod(int(settler.id),2)*5
   show_entry("settler:%d" % int(settler.id),"settler",int(settler.team),pose)
  for cargo in state.get("shipments",[]):
-  if cargo.get("mode","") in ["air","rail"] or not eligible(cargo):continue
-  var pose:=travel_pose(cargo,center);var kind: String="boat" if cargo.get("mode","")=="sea" else "caravan"
-  if not pose.moving:pose.x=float(pose.x)+14+posmod(int(cargo.id),3)*4;pose.z=float(pose.z)+10+posmod(int(cargo.id),2)*5
-  show_entry("trade:%d" % int(cargo.id),kind,int(cargo.team),pose)
+  if not eligible(cargo):continue
+  var mode: String=cargo.get("mode","road")
+  var age:=team_era(int(cargo.team))
+  if mode in ["air","rail"] and age<5:continue
+  var pose:=travel_pose(cargo,center)
+  var kind: String={"sea":"boat","air":"air","rail":"rail"}.get(mode,"caravan")
+  var heading:=0.0
+  if mode=="air" and cargo.get("flightPosition") is Dictionary:
+   pose.x=(float(cargo.flightPosition.c)-center.x)*225.0
+   pose.z=(float(cargo.flightPosition.r)-center.y)*195.0
+   pose.elevation=18.0
+   heading=float(cargo.get("flightHeading",0))
+  elif not cargo.get("path",[]).is_empty() and age>0:
+   var next: Dictionary=cargo.path[0]
+   heading=atan2((float(next.c)-float(cargo.c))*225.0,(float(next.r)-float(cargo.r))*195.0)
+   if mode=="road":
+    var roads:=get_parent().get_node_or_null("DetailRoads")
+    if roads!=null:
+     var aligned: Dictionary=roads.traffic_pose(cargo,next,Vector2(pose.x,pose.z))
+     if not aligned.is_empty():
+      pose.x=aligned.point.x;pose.z=aligned.point.y;heading=aligned.heading
+  elif not pose.moving and mode not in ["air","rail"]:
+   pose.x=float(pose.x)+14+posmod(int(cargo.id),3)*4
+   pose.z=float(pose.z)+10+posmod(int(cargo.id),2)*5
+  show_entry("trade:%d" % int(cargo.id),kind,int(cargo.team),pose,{},heading)
  for key in entries.keys():
   if not entries[key].root.get_meta("alive",false):entries[key].root.queue_free();entries.erase(key)
 

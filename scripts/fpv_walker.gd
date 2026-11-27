@@ -6,7 +6,7 @@ const Navigation=preload("res://scripts/local_navigation.gd")
 const Grid=preload("res://scripts/campaign_grid.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const HouseCollision=preload("res://scripts/house_collision.gd")
-const Production=preload("res://scripts/production_bonuses.gd")
+const Period=preload("res://scripts/house_period_styles.gd")
 var host: Node
 var active:=false
 var placing:=false
@@ -150,7 +150,7 @@ func pier_height(x: float,z: float) -> Variant:
 				if building.get("type","") not in ["fisher","harbor"] or not building.get("ready",false) or float(building.get("hp",0))<=0:continue
 				var bx:=float(building.x)+dc*225.0;var bz:=float(building.z)+dr*195.0
 				if absf(x-bx)>35 or absf(z-bz)>35:continue
-				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Period.campaign_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if surface==null:continue
 				var base:float=host.detail_rendered_height(bx,bz)
 				if building.has("baseY"):
@@ -183,10 +183,10 @@ func blocked(x: float,z: float) -> bool:
 			if bounds!=null:
 				var early:float=maxf(float(bounds.rx),float(bounds.rz))*2.0+35.0
 				if absf(x-(float(b.x)+dc*225.0))>=early or absf(z-(float(b.z)+dr*195.0))>=early:continue
-				var age:=Production.upgrade_level(host.game,int(city.team))
+				var age:=Period.campaign_age(host.game,int(city.team))
 				var reach:float=maxf(maxf(float(bounds.rx),float(bounds.rz))*0.82+2.0,HouseCollision.reach(host.detail_root,b,age))
 				if absf(x-(float(b.x)+dc*225.0))>=reach or absf(z-(float(b.z)+dr*195.0))>=reach:continue
-				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.upgrade_level(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var hit:Variant=HouseCollision.hits(host.detail_root,b,Period.campaign_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
 				if hit==true:return true
 				if hit==null and b.type not in ["woodgate","gatehouse"] and absf(x-(float(b.x)+dc*225.0))<float(bounds.rx)*0.82 and absf(z-(float(b.z)+dr*195.0))<float(bounds.rz)*0.82:return true
 	return false

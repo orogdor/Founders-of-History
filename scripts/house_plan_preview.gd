@@ -5,6 +5,7 @@ const Catalog=preload("res://data/house_editor_catalog.json")
 const Fence=preload("res://scripts/house_fence.gd")
 const PlanCollision=preload("res://scripts/house_plan_collision.gd")
 const HouseModel=preload("res://scripts/house_plan_model.gd")
+const PaintedMaterials=preload("res://scripts/painted_building_materials.gd")
 var viewport: SubViewport
 var model: Node3D
 var camera: Camera3D
@@ -40,7 +41,8 @@ func _ready() -> void:
  var world:=WorldEnvironment.new();var environment:=Environment.new();environment.background_mode=Environment.BG_COLOR;environment.background_color=Color("aababc");environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;environment.ambient_light_color=Color("e8e2d1");environment.ambient_light_energy=0.5;world.environment=environment;viewport.add_child(world)
  var light:=DirectionalLight3D.new();light.rotation_degrees=Vector3(-55,-35,0);light.light_energy=0.8;light.shadow_enabled=true;viewport.add_child(light)
  var ground:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(80,80);plane.subdivide_width=92;plane.subdivide_depth=92
- var earth:=StandardMaterial3D.new();earth.albedo_texture=load("res://assets/house_designer/land-earth.webp");earth.albedo_color=Color("b4b891");earth.uv1_scale=Vector3(28.2667,28.2667,1);earth.texture_repeat=true;earth.vertex_color_use_as_albedo=true
+ var earth:=StandardMaterial3D.new();earth.albedo_texture=PaintedMaterials.texture(PaintedMaterials.MEADOW,0);earth.uv1_scale=Vector3(28.2667,28.2667,1);earth.texture_repeat=true;earth.vertex_color_use_as_albedo=true
+ PaintedMaterials.apply_height(earth,PaintedMaterials.MEADOW,0)
  var arrays:=plane.surface_get_arrays(0);var colors:=PackedColorArray()
  for p in arrays[Mesh.ARRAY_VERTEX]:
   var cover:float=clampf(0.53+0.24*sin(p.x*1.23-p.z*0.52)*cos(p.x*0.51+p.z*0.97)+0.19*sin(p.x*0.42+p.z*0.64)+0.10*cos(p.z*2.18+p.x*1.12),0.06,0.96)
@@ -55,6 +57,18 @@ func _ready() -> void:
 func coast_plane(color: String,depth: float,metallic: float) -> MeshInstance3D:
  var node:=MeshInstance3D.new();var plane:=PlaneMesh.new();plane.size=Vector2(150,depth);node.mesh=plane
  var material:=StandardMaterial3D.new();material.albedo_color=Color(color);material.roughness=0.36 if metallic>0 else 1.0;material.metallic=metallic;material.cull_mode=BaseMaterial3D.CULL_DISABLED;node.material_override=material;node.visible=false;viewport.add_child(node);return node
+
+var preview_target_height:=1.0
+
+func tallest_mesh(node: Node3D, parent_transform:=Transform3D.IDENTITY) -> float:
+ var offset: Transform3D=parent_transform*node.transform
+ var top:=0.0
+ if node is MeshInstance3D and node.mesh!=null:
+  top=(offset*node.mesh.get_aabb()).end.y
+ for child in node.get_children():
+  if child is Node3D:
+   top=maxf(top,tallest_mesh(child,offset))
+ return top
 
 func show_design(design: Dictionary) -> void:
  walk_design=design.duplicate(true);model.rebuild(design);set_roof_visible(roof_visible)
@@ -75,6 +89,11 @@ func show_design(design: Dictionary) -> void:
  var fits:=maxf(4.6,bounds.length()/Plan.PX_PER_M);var center:=PlanCollision.origin(design)
  if design.get("yard") is Array:
   for p in design.yard:fits=maxf(fits,Plan.point(p).distance_to(center)/Plan.PX_PER_M*1.52)
+ preview_target_height=1.0
+ if int(definition.get("era",0))>=3:
+  var top:=tallest_mesh(model)
+  preview_target_height=maxf(1.0,top*0.42)
+  fits=maxf(fits,Vector2(fits,top*1.1).length())
  initial_distance=fits*1.44+1.85
  if not framed:distance=initial_distance;framed=true
  elif previous_distance>0:distance=clampf(distance*initial_distance/previous_distance,4,50)
@@ -89,7 +108,7 @@ func update_camera() -> void:
   camera.position=walk_pos+Vector3.UP*1.23
   var direction:=Vector3(-sin(walk_yaw)*cos(walk_pitch),sin(walk_pitch),-cos(walk_yaw)*cos(walk_pitch))
   camera.look_at(camera.position+direction,Vector3.UP);return
- var target:=Vector3(0,1.0,0);var fit:=aspect_fit(size.x,size.y)
+ var target:=Vector3(0,preview_target_height,0);var fit:=aspect_fit(size.x,size.y)
  camera.position=target+Vector3(sin(yaw)*cos(pitch),sin(pitch),cos(yaw)*cos(pitch))*distance*fit;camera.look_at(target,Vector3.UP)
 
 func _gui_input(event: InputEvent) -> void:

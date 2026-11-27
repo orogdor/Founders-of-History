@@ -4,19 +4,20 @@ signal chunk_step
 
 const Grid=preload("res://scripts/campaign_grid.gd")
 const Scatter=preload("res://scripts/forest_scatter.gd")
+const PaintedTrees=preload("res://scripts/painted_tree_models.gd")
 const Terrain=preload("res://scripts/world_terrain.gd")
 const Rivers=preload("res://scripts/world_rivers.gd")
 const Geography=preload("res://scripts/world_geography.gd")
 const Town=preload("res://scripts/world_city_layout.gd")
+const Period=preload("res://scripts/house_period_styles.gd")
 const Campaign=preload("res://scripts/campaign_state.gd")
 const Discoveries=preload("res://scripts/world_discoveries.gd")
-const Production=preload("res://scripts/production_bonuses.gd")
 const CHUNK:=8
 const SCALE:=0.04
 const MAX_CHUNKS:=96
 const TREE_KINDS:=["oak","lime","birch","pine","spruce","palm"]
 const TREE_HEIGHTS:={"oak":2.4244623,"lime":2.3191163,"birch":2.5285895,"pine":2.95,"spruce":2.95,"palm":2.6344731}
-const REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.0963,"palm":13.54984}
+const REFERENCE_HEIGHTS=PaintedTrees.HEIGHTS
 const TINTS:=["ffffff","f3f7e6","e6efd6","fff4de","e2ead9","f7f1d4"]
 var host: Node
 var chunks: Dictionary={}
@@ -27,7 +28,6 @@ var seed_value: int=-1
 var camera_stamp: String=""
 var clock:=0.0
 var meshes: Dictionary={}
-var tree_textures: Dictionary={}
 var river_graph: Dictionary={}
 var river_buckets: Dictionary={}
 var river_samples: Dictionary={}
@@ -37,44 +37,13 @@ var building_chunk:=false
 var building_key: String=""
 var build_serial:=0
 var lod_stamp: String=""
-var near_queue: Array=[]
-var near_queued: Dictionary={}
-var near_requests: Dictionary={}
-var near_failed: Dictionary={}
 
 func _ready() -> void:
 	for kind in TREE_KINDS:
 		for variant in 5:
 			var key: String=kind+":"+str(variant)
-			var path: String="res://assets/sapling-trees/%s_%02d/mid.glb" % [kind,variant+1]
-			var model: Node=load(path).instantiate()
-			var item:=first_mesh(model)
-			if item!=null:
-				meshes[key]=item.mesh.duplicate()
-				for surface in item.mesh.get_surface_count():
-					var source_material: Material=item.mesh.surface_get_material(surface)
-					var tree_material: Material=source_material.duplicate() if source_material!=null else null
-					if tree_material is BaseMaterial3D:
-						if tree_material.albedo_texture!=null:
-							if not tree_textures.has(kind):tree_textures[kind]=tree_material.albedo_texture
-							tree_material.albedo_texture=tree_textures[kind]
-						tree_material.vertex_color_use_as_albedo=true
-						tree_material.cull_mode=BaseMaterial3D.CULL_DISABLED
-					if tree_material!=null:meshes[key].surface_set_material(surface,tree_material)
-			model.free()
-			var far_key:=key+":far"
-			var far_path: String="res://assets/sapling-trees/%s_%02d/far.glb" % [kind,variant+1]
-			var far_model: Node=load(far_path).instantiate();var far_item:=first_mesh(far_model)
-			if far_item!=null:
-				meshes[far_key]=far_item.mesh.duplicate()
-				for surface in far_item.mesh.get_surface_count():
-					var source_material: Material=far_item.mesh.surface_get_material(surface)
-					var far_material: Material=source_material.duplicate() if source_material!=null else null
-					if far_material is BaseMaterial3D:
-						far_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-						far_material.vertex_color_use_as_albedo=true;far_material.cull_mode=BaseMaterial3D.CULL_DISABLED
-					if far_material!=null:meshes[far_key].surface_set_material(surface,far_material)
-			far_model.free()
+			meshes[key]=PaintedTrees.mesh_for(kind,variant,"mid")
+			meshes[key+":far"]=PaintedTrees.mesh_for(kind,variant,"far")
 	for kind in ["cactus","rock","shrub"]:
 		var model: Node=load("res://assets/world/atlas_"+kind+".glb").instantiate()
 		var item:=first_mesh(model)
@@ -91,18 +60,11 @@ func first_mesh(node: Node) -> MeshInstance3D:
 		if found!=null:return found
 	return null
 
-func _exit_tree() -> void:
-	for path in near_requests.values():
-		var status:=ResourceLoader.load_threaded_get_status(path)
-		if status in [ResourceLoader.THREAD_LOAD_IN_PROGRESS,ResourceLoader.THREAD_LOAD_LOADED]:ResourceLoader.load_threaded_get(path)
-	near_requests.clear();near_queue.clear();near_queued.clear()
-
 func _process(delta: float) -> void:
 	if host==null or host.game.is_empty():return
 	if building_chunk:chunk_step.emit()
 	visible=not host.detail_mode
 	if not visible:return
-	poll_near_models()
 	var current_seed:=int(host.game.seed)
 	if seed_value!=current_seed:
 		reset_chunks();seed_value=current_seed
@@ -139,17 +101,17 @@ func ensure_towns() -> void:
 	if not towns_dirty:return
 	towns_dirty=false;town_buckets.clear()
 	for city in host.game.get("cities",[]):
-		if Production.upgrade_level(host.game,int(city.team))!=0:continue
 		if int(city.team)!=0 and not Campaign.visible_now(host.game,0,city):continue
-		add_town_clearances(city.economy.buildings,Grid.center(int(city.c),int(city.r)))
+		var age := Period.campaign_age(host.game,int(city.team))
+		add_town_clearances(city.economy.buildings,Grid.center(int(city.c),int(city.r)),age)
 	for landmark in host.game.get("landmarks",[]):
-		if landmark.kind!="village" or Discoveries.village_age(host.game,landmark)!=0:continue
+		if landmark.kind!="village":continue
 		var key:=str(int(landmark.c))+":"+str(int(landmark.r))
 		if not host.reveal_all and not host.game.explored[0].has(key):continue
 		add_town_clearances(Discoveries.village_layout(landmark),Grid.center(int(landmark.c),int(landmark.r)))
 
-func add_town_clearances(buildings: Array,origin: Vector2) -> void:
-	for spot in Town.clearances(buildings,origin):
+func add_town_clearances(buildings: Array,origin: Vector2,age:=0) -> void:
+	for spot in Town.clearances(buildings,origin,age):
 		var min_c:=floori((float(spot.x)-float(spot.r)-Grid.ORIGIN_X)/50.0)
 		var max_c:=floori((float(spot.x)+float(spot.r)-Grid.ORIGIN_X)/50.0)
 		var min_r:=floori((float(spot.z)-float(spot.r)-Grid.ORIGIN_Z)/50.0)
@@ -245,35 +207,11 @@ func tree_lod(node: MultiMeshInstance3D,center: Vector3) -> void:
 	var previous: String=node.get_meta("tree_lod","far")
 	var level: String="near" if pixels>(37.0 if previous=="near" else 45.0) else "mid" if pixels>(10.0 if previous=="mid" else 12.0) else "far"
 	if level=="near" and not meshes.has(key+":near"):
-		if not near_queued.has(key) and not near_requests.has(key) and not near_failed.has(key):near_queued[key]=true;near_queue.append(key)
-		level="mid"
+		var parts:=key.split(":")
+		meshes[key+":near"]=PaintedTrees.mesh_for(parts[0],int(parts[1]),"near")
 	var wanted_mesh: Mesh=meshes[key+":far"] if level=="far" else meshes[key+":near"] if level=="near" else meshes[key]
 	if node.multimesh.mesh!=wanted_mesh:node.multimesh.mesh=wanted_mesh
 	node.set_meta("tree_lod",level)
-
-func poll_near_models() -> void:
-	while near_requests.size()<4 and not near_queue.is_empty():
-		var key: String=near_queue.pop_front();near_queued.erase(key)
-		var parts:=key.split(":");var kind: String=parts[0];var variant:=int(parts[1])+1
-		var path: String="res://assets/sapling-trees/%s_%02d/near.glb" % [kind,variant]
-		if ResourceLoader.load_threaded_request(path,"PackedScene",false)==OK:near_requests[key]=path
-		else:near_failed[key]=true
-	for key in near_requests.keys():
-		var path: String=near_requests[key];var state:=ResourceLoader.load_threaded_get_status(path)
-		if state==ResourceLoader.THREAD_LOAD_LOADED:
-			var scene: PackedScene=ResourceLoader.load_threaded_get(path);near_requests.erase(key)
-			if scene==null:near_failed[key]=true;continue
-			var model: Node=scene.instantiate();var item:=first_mesh(model)
-			if item==null:model.free();near_failed[key]=true;continue
-			var near_key: String=key+":near";meshes[near_key]=item.mesh.duplicate();var kind: String=key.split(":")[0]
-			for surface in item.mesh.get_surface_count():
-				var source: Material=item.mesh.surface_get_material(surface);var material: Material=source.duplicate() if source!=null else null
-				if material is BaseMaterial3D:
-					if material.albedo_texture!=null and tree_textures.has(kind):material.albedo_texture=tree_textures[kind]
-					material.vertex_color_use_as_albedo=true;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-				if material!=null:meshes[near_key].surface_set_material(surface,material)
-			model.free();lod_stamp=""
-		elif state in [ResourceLoader.THREAD_LOAD_FAILED,ResourceLoader.THREAD_LOAD_INVALID_RESOURCE]:near_requests.erase(key);near_failed[key]=true
 
 func update_tree_lods() -> void:
 	if host.camera==null:return

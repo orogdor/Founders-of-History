@@ -9,6 +9,7 @@ extends RefCounted
 ## Keha võrgud nimega body_<tsoon> (nt body_torso, body_thighs) peidetakse,
 ## kui mõni selga pandud riie katab seda tsooni.
 
+const PERIOD_ATTIRE=preload("res://data/period_attire.json")
 const Rig=preload("res://scripts/human_rig.gd")
 const Equipment=preload("res://scripts/human_equipment.gd")
 const Clips=preload("res://scripts/human_clips.gd")
@@ -128,10 +129,20 @@ static func outfit_items(body: String,era: int,job:="",seed:=0) -> Array:
 		var outfit: Dictionary=outfits[stable_hash("%d:outfit" % seed)%outfits.size()]
 		for id in outfit.get("items",[]):
 			if items.has(id):slots[str(items[id].slot)]=id
+	var revised: Array=PERIOD_ATTIRE.data.civil.get(str(era),{}).get(adult,[])
+	if PERIOD_ATTIRE.data.jobs.has(str(era)+":"+job):
+		revised=PERIOD_ATTIRE.data.get("work_base",{}).get(str(era),{}).get(adult,revised)
+	if not revised.is_empty():
+		slots.clear()
+		for id in revised[stable_hash("%d:outfit" % seed)%revised.size()]:
+			if items.has(id):slots[str(items[id].slot)]=id
 	var jobs: Dictionary=e.get("jobs",{})
 	if jobs.has(job):
 		for id in jobs[job].get("all",[])+jobs[job].get(adult,[]):
 			if items.has(id):slots[str(items[id].slot)]=id
+	var workwear: Array=PERIOD_ATTIRE.data.jobs.get(str(era)+":"+job,[])
+	for id in workwear:
+		if items.has(id):slots[str(items[id].slot)]=id
 	for slot in own.get("drop",[]):slots.erase(slot)
 	add_hair(slots,e,adult,body,seed)
 	return slots.values()
@@ -153,7 +164,7 @@ static func unit_items(kind: String,seed:=0) -> Array:
 	var cfg:=config();var items: Dictionary=cfg.get("items",{})
 	var unit: Dictionary=cfg.get("units",{}).get(kind,{})
 	var slots: Dictionary={}
-	for id in unit.get("items",[]):
+	for id in PERIOD_ATTIRE.data.units.get(kind,unit.get("items",[])):
 		if items.has(id):slots[str(items[id].slot)]=id
 	var eras: Array=cfg.get("eras",[])
 	if not eras.is_empty():add_hair(slots,eras[clampi(int(unit.get("era",0)),0,eras.size()-1)],"man","man",seed)
@@ -187,7 +198,12 @@ static func dress(root: Node3D,era: int,job:="") -> void:
 	for id in ids:
 		var item: Dictionary=items[id]
 		if hide_hair and str(item.slot)=="hair":continue
-		var meshes:=attach_garment(skeleton,str(id),body,item,seed,team)
+		var palette: Array=PERIOD_ATTIRE.data.tints.get(str(era)+":"+str(id),[])
+		if not palette.is_empty():
+			item=item.duplicate()
+			item["tints"]=palette
+		var woven: bool=id in PERIOD_ATTIRE.data.get("woven",{}).get(str(era),[])
+		var meshes:=attach_garment(skeleton,str(id),body,item,seed,team,woven)
 		if meshes.is_empty():continue
 		garments.append_array(meshes)
 		for zone in item.get("hides",[]):hidden[zone]=true
@@ -197,7 +213,7 @@ static func dress(root: Node3D,era: int,job:="") -> void:
 			if is_instance_valid(mesh):mesh.visible=not hidden.has(zone)
 	root.set_meta("human_garments",garments);root.set_meta("human_outfit",ids)
 
-static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Dictionary,seed: int,team:=-1) -> Array:
+static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Dictionary,seed: int,team:=-1,woven:=false) -> Array:
 	var scene:=packed("res://assets/people/clothes/%s/%s.glb" % [id,body])
 	if scene==null or skeleton==null:return []
 	var instance: Node=scene.instantiate();var meshes: Array=[]
@@ -206,12 +222,12 @@ static func attach_garment(skeleton: Skeleton3D,id: String,body: String,item: Di
 	for mesh in meshes:
 		mesh.get_parent().remove_child(mesh);mesh.owner=null
 		skeleton.add_child(mesh);mesh.transform=Transform3D.IDENTITY;mesh.skeleton=NodePath("..")
-		tint(mesh,item,seed,id,team)
+		tint(mesh,item,seed,id,team,woven)
 	instance.free()
 	if meshes.is_empty():push_warning("HumanFactory: '%s' failis pole nahastatud võrku" % id)
 	return meshes
 
-static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team:=-1) -> void:
+static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team:=-1,woven:=false) -> void:
 	if mesh.mesh==null:return
 	var tints: Array=item.get("tints",[])
 	var color:=Color(str(tints[stable_hash("%d:%s:tint" % [seed,id])%tints.size()])) if not tints.is_empty() else Color.WHITE
@@ -222,11 +238,17 @@ static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team
 		if not material is BaseMaterial3D:continue
 		# Riiete tipuvärvides on varjud (voldid, kaenlaalused, äärte mustus).
 		var shaded: bool=(mesh.mesh.surface_get_format(s) & Mesh.ARRAY_FORMAT_COLOR)!=0
-		if tints.is_empty() and not shaded:continue
-		var key:="%d:%s:%s" % [material.get_instance_id(),color.to_html(false),shaded]
+		if tints.is_empty() and not shaded and not woven:continue
+		var key:="%d:%s:%s:%s" % [material.get_instance_id(),color.to_html(false),shaded,woven]
 		if not tinted.has(key):
 			var copy: BaseMaterial3D=material.duplicate();copy.albedo_color=copy.albedo_color*color
-			copy.vertex_color_use_as_albedo=shaded;tinted[key]=copy
+			copy.vertex_color_use_as_albedo=shaded
+			if woven and copy.albedo_texture==null:
+				copy.albedo_texture=preload("res://assets/bronze_home/linen.webp")
+				copy.uv1_scale=Vector3(1.5,1.5,1.0)
+				copy.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+				copy.roughness=0.98
+			tinted[key]=copy
 		mesh.set_surface_override_material(s,tinted[key])
 
 ## Ajastu tööriista nimi ametile (kiviajal senised tööriistad).

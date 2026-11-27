@@ -155,11 +155,19 @@ static func shelter_shape(run: Array) -> bool:
  return minf(left,minf(back,right))>=35 and minf(left,right)/maxf(left,right)>0.68 and absf(x.dot(y)/(left*back))<0.20 and absf(z.dot(y)/(right*back))<0.20 and x.dot(z)/(left*right)<-0.92
 
 static func opening_width(opening: Dictionary,edge: Dictionary) -> float:
- var widths:Dictionary={"hide":40.0,"wattle":40.0,"plank":42.0,"double":64.0,"arched":46.0,"mycenaean":44.0,"greek":42.0,"hole":24.0,"shutter":30.0,"slit":12.0,"lattice":34.0,"archwin":34.0}
+ var widths:Dictionary={"timberLintel":76.0,"hide":40.0,"wattle":40.0,"plank":42.0,"double":64.0,"arched":46.0,"mycenaean":44.0,"greek":42.0,"hole":24.0,"shutter":30.0,"slit":12.0,"lattice":34.0,"archwin":34.0,"factoryWindow":72.0,"glazed":78.0,"sash":46.0,"loadingDoor":102.0,"pictureWindow":146.0}
  var fallback:=42.0 if opening.get("type","")=="door" else 30.0
  return minf(float(widths.get(opening.get("style",""),fallback)),edge.a.distance_to(edge.b)*0.72)
 
-static func split_wall(edge: Dictionary,design: Dictionary) -> Array:
+static func window_span(era: int,style: String) -> Vector2:
+ var span: Vector2=[Vector2(0.73,1.33),Vector2(0.86,1.30),Vector2(0.96,1.45)][clampi(era,0,2)]
+ match style:
+  "slit": return span+Vector2(-0.12,0.14)
+  "hole": return span+Vector2(0.08,-0.08)
+  "pictureWindow": return Vector2(0.36,1.57)
+ return span
+
+static func split_wall(edge: Dictionary,design: Dictionary,inner_finish:="weave") -> Array:
  var a:Vector2=edge.a;var b:Vector2=edge.b;var direction:=b-a;var length:=direction.length()
  if length<0.000001:return []
  var cuts:=[];var finishes:=[];var stops:Array=[0.0,1.0]
@@ -183,7 +191,7 @@ static func split_wall(edge: Dictionary,design: Dictionary) -> Array:
  for i in range(1,stops.size()):
   var start:float=stops[i-1];var end:float=stops[i]
   if end-start<0.0001:continue
-  var middle:float=(start+end)/2;var item:Dictionary={"a":a.lerp(b,start),"b":a.lerp(b,end),"group":edge.group,"finish":design.get("wallStyle","") if edge.group=="outer" else "weave"}
+  var middle:float=(start+end)/2;var item:Dictionary={"a":a.lerp(b,start),"b":a.lerp(b,end),"group":edge.group,"finish":design.get("wallStyle","") if edge.group=="outer" else inner_finish}
   for cut in cuts:
    if cut.from<=middle and cut.to>=middle:item.type=cut.opening.type;item.opening=cut.opening;item.curved=cut.curved;break
   for finish in finishes:

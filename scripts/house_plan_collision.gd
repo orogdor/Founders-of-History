@@ -1,5 +1,6 @@
 extends RefCounted
 const Plan=preload("res://scripts/house_plan_geometry.gd")
+const Facade=preload("res://scripts/house_facade_details.gd")
 const Fence=preload("res://scripts/house_fence.gd")
 const Catalog=preload("res://data/house_editor_catalog.json")
 
@@ -36,6 +37,14 @@ static func walls(design: Dictionary,skip_high:=false,skip_towers:=false) -> Arr
    if span.get("type","")=="door":continue
    var a:Vector2=(span.a-origin)/Plan.PX_PER_M;var b:Vector2=(span.b-origin)/Plan.PX_PER_M
    out.append([a.x,a.y,b.x,b.y,0.23 if span.group=="outer" else 0.17])
+ if design.get("periodOrnament","")=="norse" and design.get("roofForm","")=="norse":
+  for edge in geometry.walls:
+   if edge.group!="outer" or edge.a.distance_to(edge.b)<4.6*Plan.PX_PER_M:continue
+   var normal:=Facade.exterior(edge,geometry.floors)
+   for ratio in [0.13,0.87]:
+    var a: Vector2=(edge.a.lerp(edge.b,ratio)-origin)/Plan.PX_PER_M
+    var b:=a+normal*0.56
+    out.append([a.x,a.y,b.x,b.y,0.13])
  # Source work shelters have four physical posts; ordinary furniture remains
  # non-blocking in the original walking view.
  for item in design.get("items",[]):

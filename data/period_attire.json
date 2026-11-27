@@ -1,0 +1,674 @@
+{
+  "civil": {
+    "1": {
+      "man": [
+        [
+          "bronze_wool_wrap",
+          "bronze_wool_cape",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_kilt",
+          "bronze_wool_tunic",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_kilt",
+          "bronze_wool_tunic",
+          "bronze_felt_cap",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_wrap",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ]
+      ],
+      "woman": [
+        [
+          "bronze_wool_dress",
+          "bronze_belt_disc",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_blouse",
+          "bronze_long_skirt",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_blouse",
+          "bronze_long_skirt",
+          "bronze_wool_shawl",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_dress",
+          "bronze_hairnet",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ]
+      ]
+    },
+    "2": {
+      "man": [
+        [
+          "iron_linen_shirt",
+          "iron_wool_tunic",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_wool_tunic",
+          "iron_cloak_brooch",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_linen_shirt",
+          "iron_wool_trousers",
+          "iron_wool_cap",
+          "bronze_belt",
+          "iron_pastlad"
+        ],
+        [
+          "iron_linen_shirt",
+          "iron_wool_tunic",
+          "iron_wool_trousers",
+          "iron_cloak_brooch",
+          "bronze_leather_shoes"
+        ]
+      ],
+      "woman": [
+        [
+          "iron_peplos",
+          "iron_soba",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_linen_shift",
+          "iron_wool_skirt",
+          "iron_soba",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_peplos",
+          "iron_spiral_headband",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_linen_shift",
+          "iron_skirt_striped",
+          "iron_apron",
+          "bronze_leather_shoes"
+        ]
+      ]
+    },
+    "3": {
+      "man": [
+        [
+          "mhc_viking_tunic",
+          "mhc_viking_pants",
+          "mhc_viking_boots",
+          "med_belt_pouch"
+        ],
+        [
+          "med_linen_shirt",
+          "med_wool_cote",
+          "med_wool_hose",
+          "med_hood",
+          "med_turnshoes"
+        ]
+      ],
+      "woman": [
+        [
+          "med_linen_chemise",
+          "med_wool_kirtle",
+          "med_apron",
+          "med_headcloth",
+          "med_turnshoes"
+        ],
+        [
+          "med_linen_chemise",
+          "med_wool_kirtle",
+          "med_wool_mantle",
+          "med_boots"
+        ]
+      ]
+    },
+    "4": {
+      "man": [
+        [
+          "ren_shirt",
+          "ind_waistcoat",
+          "ren_coat",
+          "ren_trousers",
+          "ren_boots"
+        ],
+        [
+          "ren_shirt",
+          "ind_waistcoat",
+          "ind_trousers_braces",
+          "ren_boots",
+          "ind_flat_cap"
+        ]
+      ],
+      "woman": [
+        [
+          "ind_blouse",
+          "ind_long_skirt",
+          "ind_wool_shawl",
+          "ren_shoes"
+        ],
+        [
+          "ren_bodice",
+          "ind_long_skirt",
+          "ren_shawl",
+          "ren_shoes"
+        ]
+      ]
+    }
+  },
+  "jobs": {
+    "4:fisher": [
+      "ren_shirt",
+      "ren_jerkin",
+      "ren_trousers",
+      "ren_boots",
+      "ind_headscarf"
+    ],
+    "4:harbor": [
+      "ren_shirt",
+      "ren_jerkin",
+      "ren_trousers",
+      "ren_boots",
+      "ind_headscarf"
+    ],
+    "6:builder": [
+      "mod_work_jacket",
+      "mod_cap"
+    ],
+    "6:factory": [
+      "mod_work_jacket"
+    ],
+    "6:lumber": [
+      "mod_work_jacket",
+      "mod_cap"
+    ],
+    "1:bronze_foundry": [
+      "work_leather_apron"
+    ],
+    "1:pottery_kiln": [
+      "work_leather_apron"
+    ],
+    "1:mason": [
+      "work_leather_apron"
+    ],
+    "1:cartwright": [
+      "work_leather_apron"
+    ],
+    "1:saw": [
+      "work_leather_apron"
+    ],
+    "1:coppermine": [
+      "bronze_felt_cap"
+    ],
+    "1:tinmine": [
+      "bronze_felt_cap"
+    ],
+    "1:quarry": [
+      "bronze_felt_cap"
+    ],
+    "1:lumber": [
+      "bronze_felt_cap"
+    ],
+    "1:forester": [
+      "bronze_felt_cap"
+    ],
+    "1:builder": [
+      "bronze_felt_cap"
+    ],
+    "1:farm": [
+      "work_straw_hat"
+    ],
+    "1:flax_farm": [
+      "work_straw_hat"
+    ],
+    "1:vegetable_garden": [
+      "work_straw_hat"
+    ],
+    "1:pasture": [
+      "work_straw_hat"
+    ],
+    "1:mill": [
+      "work_straw_hat"
+    ],
+    "1:weaver": [
+      "bronze_hairnet"
+    ],
+    "1:bakery": [
+      "bronze_hairnet"
+    ],
+    "2:smith": [
+      "work_leather_apron"
+    ],
+    "2:smelter": [
+      "work_leather_apron"
+    ],
+    "2:bronze_foundry": [
+      "work_leather_apron"
+    ],
+    "2:pottery_kiln": [
+      "work_leather_apron"
+    ],
+    "2:mason": [
+      "work_leather_apron"
+    ],
+    "2:jeweler": [
+      "work_leather_apron"
+    ],
+    "2:cartwright": [
+      "work_leather_apron"
+    ],
+    "2:builder": [
+      "work_leather_apron"
+    ],
+    "2:saw": [
+      "work_leather_apron"
+    ],
+    "2:mine": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:coal": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:coppermine": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:tinmine": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:quarry": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:gem_mine": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:lumber": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:forester": [
+      "iron_wool_cap",
+      "work_leather_apron"
+    ],
+    "2:farm": [
+      "work_straw_hat"
+    ],
+    "2:flax_farm": [
+      "work_straw_hat"
+    ],
+    "2:vegetable_garden": [
+      "work_straw_hat"
+    ],
+    "2:orchard": [
+      "work_straw_hat"
+    ],
+    "2:pasture": [
+      "work_straw_hat"
+    ],
+    "2:stable": [
+      "work_straw_hat"
+    ],
+    "2:weaver": [
+      "iron_apron"
+    ],
+    "2:bakery": [
+      "iron_apron"
+    ],
+    "2:mill": [
+      "iron_apron"
+    ],
+    "2:watermill": [
+      "iron_apron"
+    ],
+    "2:harbor": [
+      "iron_wool_cap"
+    ],
+    "2:fisher": [
+      "iron_wool_cap"
+    ]
+  },
+  "units": {
+    "infantry": [
+      "mil_team_tunic",
+      "mil_bronze_cuirass",
+      "bronze_kilt",
+      "bronze_leather_shoes",
+      "mil_bronze_helmet",
+      "iron_cloak_brooch"
+    ],
+    "cavalry": [
+      "mil_team_tunic",
+      "mil_mail_shirt",
+      "iron_wool_trousers",
+      "med_boots",
+      "mil_bronze_helmet"
+    ],
+    "musketeer": [
+      "ren_shirt",
+      "mil_team_coat",
+      "mil_white_trousers",
+      "mil_army_boots",
+      "mil_shako",
+      "mil_crossbelts"
+    ],
+    "arquebusier": [
+      "ren_shirt",
+      "mil_team_coat",
+      "ren_trousers",
+      "mil_army_boots",
+      "mil_kepi",
+      "mil_crossbelts"
+    ],
+    "cuirassier": [
+      "ren_shirt",
+      "mil_team_coat",
+      "mil_plate_cuirass",
+      "ren_trousers",
+      "mil_army_boots",
+      "mil_morion"
+    ],
+    "line_infantry": [
+      "ind_cotton_shirt",
+      "ind_greatcoat",
+      "ind_trousers_braces",
+      "mil_army_boots",
+      "mil_kepi",
+      "mil_crossbelts"
+    ],
+    "rifleman": [
+      "ind_cotton_shirt",
+      "ind_wool_jacket",
+      "ind_trousers_braces",
+      "mil_army_boots",
+      "mil_kepi",
+      "mil_crossbelts"
+    ],
+    "dragoon": [
+      "ind_cotton_shirt",
+      "ind_greatcoat",
+      "ind_trousers_braces",
+      "mil_army_boots",
+      "mil_kepi",
+      "mil_crossbelts"
+    ]
+  },
+  "tints": {
+    "1:bronze_wool_cape": [
+      "914c41",
+      "794640",
+      "8c754a",
+      "656f74"
+    ],
+    "1:bronze_wool_wrap": [
+      "d8bc96",
+      "d8cfb7",
+      "86645d",
+      "59757b"
+    ],
+    "1:bronze_long_skirt": [
+      "936257",
+      "8c7164",
+      "5d6d70",
+      "b39b70"
+    ],
+    "1:bronze_wool_dress": [
+      "aa6858",
+      "ad8c63",
+      "6c858a",
+      "c7af8e"
+    ],
+    "2:bronze_wool_wrap": [
+      "d9ccb3",
+      "c9b89d",
+      "bbab96"
+    ],
+    "2:iron_cloak_brooch": [
+      "873d30",
+      "626a68",
+      "968052",
+      "5f6b7c"
+    ],
+    "2:iron_wool_tunic": [
+      "ddd2b6",
+      "9d4835",
+      "b89053",
+      "756758",
+      "bdb598"
+    ],
+    "2:iron_peplos": [
+      "c7b48e",
+      "a45541",
+      "747f85",
+      "ad8f60"
+    ],
+    "3:mhc_viking_tunic": [
+      "79604b",
+      "716957",
+      "576c72",
+      "8b6651"
+    ],
+    "3:med_wool_cote": [
+      "907083",
+      "5f7378",
+      "8a6a4f",
+      "7a5c50"
+    ],
+    "3:med_wool_kirtle": [
+      "526b71",
+      "9a6b58",
+      "87735b",
+      "676e55"
+    ],
+    "4:ren_coat": [
+      "4d5e73",
+      "777e6d",
+      "716962",
+      "887864"
+    ],
+    "4:ren_jerkin": [
+      "6c5543",
+      "576966",
+      "807467"
+    ],
+    "4:ind_wool_shawl": [
+      "747e72",
+      "8c7968",
+      "986c67"
+    ],
+    "4:ind_waistcoat": [
+      "9a8269",
+      "747968",
+      "686171"
+    ],
+    "5:ind_wool_jacket": [
+      "72715c",
+      "6d7568",
+      "6c6660",
+      "7b7562"
+    ],
+    "5:ind_greatcoat": [
+      "6d715f",
+      "6c6d62",
+      "77705e"
+    ],
+    "5:ind_trousers_braces": [
+      "625f54",
+      "685f51",
+      "6d6b5f",
+      "525c5c"
+    ],
+    "6:mod_work_jacket": [
+      "bd8b5c",
+      "787e67",
+      "566b76",
+      "667678"
+    ],
+    "6:mod_cap": [
+      "596a72",
+      "7b6858",
+      "626967"
+    ],
+    "1:bronze_wool_tunic": [
+      "d7c8ad",
+      "c1aa82",
+      "927456",
+      "867d6f"
+    ],
+    "1:bronze_wool_blouse": [
+      "e1d2b7",
+      "c6ac87",
+      "b78b72",
+      "b9b7a1"
+    ],
+    "1:bronze_kilt": [
+      "aa8763",
+      "967561",
+      "828c86"
+    ],
+    "1:bronze_wool_shawl": [
+      "a97960",
+      "8d7b67",
+      "7d918f"
+    ],
+    "1:work_leather_apron": [
+      "96694d",
+      "7b614c",
+      "9e805e"
+    ],
+    "2:iron_soba": [
+      "974b42",
+      "667887",
+      "b5997a"
+    ],
+    "2:iron_wool_trousers": [
+      "867c65",
+      "766552",
+      "6c7171"
+    ],
+    "2:iron_wool_skirt": [
+      "8d774b",
+      "936055",
+      "85806d"
+    ],
+    "2:iron_wool_cap": [
+      "805b45",
+      "69624e",
+      "867c66"
+    ],
+    "2:iron_apron": [
+      "d9c6a0",
+      "b7aa85",
+      "c8b395"
+    ],
+    "2:work_leather_apron": [
+      "7b5540",
+      "8a644b",
+      "6c4c37"
+    ]
+  },
+  "work_base": {
+    "1": {
+      "man": [
+        [
+          "bronze_kilt",
+          "bronze_wool_tunic",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_wrap",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ]
+      ],
+      "woman": [
+        [
+          "bronze_wool_blouse",
+          "bronze_long_skirt",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "bronze_wool_dress",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ]
+      ]
+    },
+    "2": {
+      "man": [
+        [
+          "iron_wool_tunic",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_linen_shirt",
+          "iron_wool_trousers",
+          "bronze_belt",
+          "iron_pastlad"
+        ]
+      ],
+      "woman": [
+        [
+          "iron_linen_shift",
+          "iron_wool_skirt",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ],
+        [
+          "iron_peplos",
+          "bronze_belt",
+          "bronze_leather_shoes"
+        ]
+      ]
+    }
+  },
+  "woven": {
+    "1": [
+      "bronze_wool_wrap",
+      "bronze_wool_tunic",
+      "bronze_kilt",
+      "bronze_wool_cape",
+      "bronze_wool_blouse",
+      "bronze_long_skirt",
+      "bronze_wool_dress",
+      "bronze_wool_shawl",
+      "mil_team_tunic"
+    ],
+    "2": [
+      "iron_linen_shirt",
+      "iron_linen_shift",
+      "iron_wool_tunic",
+      "iron_wool_cap",
+      "iron_peplos",
+      "iron_wool_skirt",
+      "iron_wool_trousers",
+      "iron_apron",
+      "iron_soba",
+      "iron_cloak_brooch"
+    ]
+  }
+}

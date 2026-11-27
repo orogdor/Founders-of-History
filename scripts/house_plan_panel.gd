@@ -1,6 +1,7 @@
 extends Control
 const Canvas=preload("res://scripts/house_plan_canvas.gd")
 const Preview=preload("res://scripts/house_plan_preview.gd")
+const Period=preload("res://scripts/house_period_styles.gd")
 const Defaults=preload("res://data/house_default_designs.json")
 const Catalog=preload("res://data/house_editor_catalog.json")
 const Geometry=preload("res://scripts/house_plan_geometry.gd")
@@ -24,6 +25,21 @@ var tool_buttons: Dictionary={}
 var category_buttons: Dictionary={}
 var selected_category:="outer"
 var pier_available:=false
+const ERA_NAMES := ["Kiviaeg","Pronksiaeg","Rauaaeg","Keskaeg","Renessanss","Tööstusajastu","Moodne ajastu"]
+const ERA_NUMBERS := ["I","II","III","IV","V","VI","VII"]
+const ERA_ART := [
+ "res://assets/house_designer/era-stone.webp","res://assets/house_designer/era-bronze.webp","res://assets/house_designer/era-iron.webp",
+ "res://assets/ui/tech/medieval_crafts.webp","res://assets/ui/tech/navigation.webp","res://assets/ui/tech/industrialization.webp","res://assets/ui/tech/modernity.webp",
+]
+const HOUSE_DESCRIPTIONS := [
+ "Ümar maja tulekolde ja seinaäärse magamisasemega.",
+ "Krohvitud pereelamu madala panipaiga ja kivimüüriga õuega.",
+ "Rooma elamu aatriumi ja kivimosaiigiga.",
+ "Pikamaja lavatsite, kolde ja kangastelgedega.",
+ "Laudise ja verandaga 19. sajandi elamu.",
+ "Tellistest tööliselamu ahjude ja korstnatega.",
+ "Betooni, puitfassaadi ja panoraamakendega elamu.",
+]
 var era:=0
 var item_choices: OptionButton
 var style_choices: OptionButton
@@ -340,10 +356,12 @@ func setup_web_hud() -> void:
  set_web_orb_icon(web_selection_buttons[4],"res://assets/house_designer/icon-layers.webp")
  set_web_orb_icon(web_selection_buttons[5],"res://assets/house_designer/web-buildings-art.webp")
  era_bar=HBoxContainer.new();era_bar.add_theme_constant_override("separation",2);stage_ref.add_child(era_bar)
- for spec in [["Kiviaeg","stone"],["Pronksiaeg","bronze"],["Rauaaeg","iron"]]:
-  var button:=Button.new();var era_index:=era_buttons.size();button.custom_minimum_size=Vector2(130,40);button.toggle_mode=true;button.focus_mode=Control.FOCUS_NONE;button.tooltip_text=str(spec[0]);style_web_button(button);button.pressed.connect(choose_era.bind(era_index));era_bar.add_child(button);era_buttons.append(button)
-  var icon:=TextureRect.new();icon.texture=load("res://assets/house_designer/era-"+spec[1]+".webp");icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;icon.material=mask;icon.mouse_filter=Control.MOUSE_FILTER_IGNORE;button.add_child(icon);icon.position=Vector2(4,4);icon.size=Vector2(32,32);era_images.append(icon)
-  var label:=Label.new();label.text=spec[0];label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE;button.add_child(label);label.position=Vector2(37,0);label.size=Vector2(90,40);era_labels.append(label)
+ for era_name in ERA_NAMES:
+  var button:=Button.new();var era_index:=era_buttons.size();button.custom_minimum_size=Vector2(130,40);button.toggle_mode=true;button.focus_mode=Control.FOCUS_NONE;button.tooltip_text=era_name;style_web_button(button);button.pressed.connect(choose_era.bind(era_index));era_bar.add_child(button);era_buttons.append(button)
+  var icon:=TextureRect.new()
+  if ResourceLoader.exists(ERA_ART[era_index]):icon.texture=load(ERA_ART[era_index])
+  icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;icon.material=mask;icon.mouse_filter=Control.MOUSE_FILTER_IGNORE;button.add_child(icon);icon.position=Vector2(4,4);icon.size=Vector2(32,32);era_images.append(icon)
+  var label:=Label.new();label.text=era_name;label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE;button.add_child(label);label.position=Vector2(37,0);label.size=Vector2(90,40);era_labels.append(label)
  view_caption=Label.new();view_caption.text="PEALTVAADE";view_caption.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;view_caption.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;view_caption.add_theme_color_override("font_color",Color("f1d394"));view_caption.add_theme_font_size_override("font_size",11);var caption_style:=StyleBoxFlat.new();caption_style.bg_color=Color("102337");caption_style.border_color=Color("927449");caption_style.set_border_width_all(1);caption_style.set_corner_radius_all(4);view_caption.add_theme_stylebox_override("normal",caption_style);stage_ref.add_child(view_caption)
  view_tools=HBoxContainer.new();stage_ref.add_child(view_tools)
  for spec in [["↶","Pööra vasakule",func():preview.yaw-=PI/6;preview.update_camera()],["↷","Pööra paremale",func():preview.yaw+=PI/6;preview.update_camera()],["⌂","Taasta vaade",reset_view],["♟","Kõnni",toggle_walk],["▱","Katus sees / väljas",toggle_roof]]:
@@ -369,9 +387,21 @@ func layout_web_hud(narrow: bool) -> void:
  portrait_view.position=Vector2(right_width*0.29,right_height*0.25);portrait_view.size=Vector2(right_width*0.59,right_height*0.56)
  portrait_title.position=Vector2(right_width*0.33,right_height*0.70);portrait_title.size=Vector2(right_width*0.48,right_height*0.12)
  position_web_orbs(web_map_buttons,map_overlay.size);position_web_orbs(web_selection_buttons,selection_overlay.size)
- var compact:=width<560;var era_width:=129.0 if compact else 390.0;era_bar.position=Vector2((stage_ref.size.x-era_width)/2,8);era_bar.size=Vector2(era_width,40)
+ var compact:=width<1100
+ var button_width:=clampf(floorf((stage_ref.size.x-22.0)/ERA_NAMES.size()),32.0,42.0) if compact else 108.0
+ var era_width:=button_width*ERA_NAMES.size()+2.0*(ERA_NAMES.size()-1)
+ era_bar.position=Vector2((stage_ref.size.x-era_width)/2,8);era_bar.size=Vector2(era_width,40)
  for i in era_buttons.size():
-  era_buttons[i].custom_minimum_size=Vector2(42 if compact else 130,40);era_labels[i].visible=not compact
+  era_buttons[i].custom_minimum_size=Vector2(button_width,40)
+  var has_art: bool=era_images[i].texture!=null
+  era_labels[i].visible=not compact or not has_art
+  era_labels[i].text=ERA_NUMBERS[i] if compact else ERA_NAMES[i]
+  var label_start:=37 if i<3 else 34
+  era_labels[i].position=Vector2(label_start,0) if has_art and not compact else Vector2.ZERO
+  era_labels[i].size=Vector2(button_width-label_start-1,40) if has_art and not compact else Vector2(button_width,40)
+  if i>=3:era_labels[i].add_theme_font_size_override("font_size",11)
+  if i>=3 and compact:era_images[i].position.x=(button_width-32)/2
+  elif i>=3:era_images[i].position.x=3
   era_images[i].modulate=Color.WHITE if i==era else Color(0.72,0.72,0.72)
  update_card_dimensions(narrow)
  for button in [floor_controls[0],floor_controls[1],floor_add_button,floor_copy_button,floor_remove_button]:button.add_theme_font_size_override("font_size",11 if compact else 12);button.custom_minimum_size.y=28 if compact else 32
@@ -379,7 +409,7 @@ func layout_web_hud(narrow: bool) -> void:
  var floor_width:=floor_bar_ref.get_combined_minimum_size().x+12;floor_background.position=Vector2((stage_ref.size.x-floor_width)/2,floor_bar_ref.offset_top-4);floor_background.size=Vector2(floor_width,40)
  view_caption.position=Vector2(10 if compact else (stage_ref.size.x-130)/2,52 if compact else 58);view_caption.size=Vector2(130,24)
  roof_overlay.offset_left=-158 if compact else -214;roof_overlay.offset_right=-8 if compact else -14
- roof_overlay.offset_top=8 if compact else 70;roof_overlay.offset_bottom=roof_overlay.offset_top+105
+ roof_overlay.offset_top=155 if compact else 70;roof_overlay.offset_bottom=roof_overlay.offset_top+105
  view_tools.position=Vector2(maxf(0,stage_ref.size.x-223),maxf(0,stage_ref.size.y-50) if compact else 12)
  var hint_width:=minf(500,maxf(200,width-30));status.offset_left=-hint_width/2;status.offset_right=hint_width/2;status.offset_top=-50 if compact else -34
 
@@ -428,6 +458,12 @@ func select_category(id: String) -> void:
  update_option_visibility()
  rebuild_choice_cards()
 
+func opening_styles(tool: String) -> Array:
+ if tool=="window":return Catalog.data.WINDOW_STYLES
+ if Period.BronzePlans.uses_earthen_building(canvas.design):
+  return Catalog.data.DOOR_STYLES+[["timberLintel","Puitsillusega ukseava",1]]
+ return Catalog.data.DOOR_STYLES
+
 func rebuild_choice_cards() -> void:
  if tool_cards_row==null or canvas==null:return
  for card in choice_cards:card.queue_free()
@@ -438,10 +474,10 @@ func rebuild_choice_cards() -> void:
  var choices:=[]
  if painting:
   choices.append({"key":"paintWall","value":"","field":"brush","title":"Vaikematerjal"})
-  for finish in Catalog.data.ERA_WALLS[era]:choices.append({"key":"mat-"+str(finish),"value":str(finish),"field":"brush","title":str(WALL_LABELS.get(str(finish),finish))})
+  for finish in Period.wall_choices(era):choices.append({"key":"mat-"+str(finish),"value":str(finish),"field":"brush","title":str(WALL_LABELS.get(str(finish),Period.label_for(str(finish))))})
  elif selected_category in ["door","window"]:
-  var styles:Array=Catalog.data.DOOR_STYLES if selected_category=="door" else Catalog.data.WINDOW_STYLES
-  var labels={"hide":"Nahkuks","wattle":"Punutud uks","plank":"Lauduks","double":"Kahepoolne uks","arched":"Kaaruks","mycenaean":"Mükeene uks","greek":"Kreeka uks","hole":"Valgusava","shutter":"Luugiga aken","slit":"Laskeava","lattice":"Võreaken","archwin":"Kaaraken"}
+  var styles:=opening_styles(selected_category)
+  var labels={"hide":"Nahkuks","wattle":"Punutud uks","plank":"Lauduks","double":"Kahepoolne uks","arched":"Kaaruks","mycenaean":"Mükeene uks","greek":"Kreeka uks","hole":"Valgusava","shutter":"Luugiga aken","slit":"Laskeava","lattice":"Võreaken","archwin":"Kaaraken","factoryWindow":"Ruudustikaken","glazed":"Lai klaasaken","sash":"Tõstaken","loadingDoor":"Tõstetav kaubauks"}
   for entry in styles:
    if int(entry[2])<=era:choices.append({"key":selected_category+"-"+str(entry[0]),"value":str(entry[0]),"title":str(labels.get(entry[0],entry[1]))})
  elif selected_category=="settings":
@@ -461,6 +497,10 @@ func rebuild_choice_cards() -> void:
  for choice in choices:
   var key:String=choice.key;var value:String=choice.value;var category:=selected_category;var field:=str(choice.get("field",""))
   var card:=make_tool_card(tool_cards_row,key,str(choice.title));card.pressed.disconnect(select_tool.bind(key))
+  if era in [1,2] and category=="items":
+   var period_cards:="bronze_cards" if era==1 else "iron_cards"
+   var period_card:="res://assets/house_designer/"+period_cards+"/"+key+".png"
+   if ResourceLoader.exists(period_card):card.get_meta("card_picture").texture=load(period_card)
   card.pressed.connect(func():
    if field=="brush":
     canvas.wall_brush=value
@@ -481,7 +521,10 @@ func rebuild_choice_cards() -> void:
    for other in choice_cards:other.set_pressed_no_signal(other==card))
   if category in ["settings","facade"] or field=="brush":
    if field!="brush":card.set_meta("plan_field",field);card.set_meta("plan_value",value)
-   if field in ["wallStyle","brush"]:
+   var family:=Period.texture_family(value)
+   if not family.is_empty() and field in ["wallStyle","brush","roofMat"]:
+    card.get_meta("card_picture").texture=load("res://assets/painted/variants/"+family+"_0.png")
+   elif field in ["wallStyle","brush"]:
     for extension in ["webp","jpeg"]:
      var texture_path:String="res://assets/house_designer/web_cards/swatch-"+value+"."+str(extension)
      if ResourceLoader.exists(texture_path):card.get_meta("card_picture").texture=load(texture_path);break
@@ -515,10 +558,10 @@ func project_label(id: String) -> String:
  return str(entry.get("name",Catalog.data.catalog.get(id,{}).get("name",id)))
 
 func choose_era(target: int) -> void:
- if target<0 or target>2:return
+ if target<0 or target>=ERA_NAMES.size():return
  var id:=str(last_of_era.get(target,""))
  if id.is_empty():
-  var preferred:="house@1" if target==1 else "house@2" if target==2 else "house"
+  var preferred:="house" if target==0 else "house@"+str(target)
   if Defaults.data.has(preferred):id=preferred
   else:
    for key in Defaults.data:
@@ -527,7 +570,7 @@ func choose_era(target: int) -> void:
  catalogue_filter="";show_catalogue(true)
 
 func select_preview_project(id: String) -> void:
- if not Defaults.data.has(id) or int(Catalog.data.catalog.get(id,{}).get("era",3))>2:return
+ if not Defaults.data.has(id) or int(Catalog.data.catalog.get(id,{}).get("era",-1))<0:return
  if preview.walking:preview.stop_walking();walk_button.text="Kõnni"
  if not canvas.design.is_empty():
   design_drafts[str(canvas.design.id)]={"design":canvas.design.duplicate(true),"history":canvas.history.duplicate(true),"future":canvas.future.duplicate(true),"floor":canvas.active_floor}
@@ -565,24 +608,29 @@ func build_catalogue() -> void:
  var all_kinds:Array=[""];all_kinds.append_array(kinds)
  for kind in all_kinds:
   var selected_kind:=str(kind);var chip:=make_button(catalogue_kind_row,"Kõik" if selected_kind.is_empty() else str(label_by_kind.get(selected_kind,selected_kind)),func():catalogue_filter=selected_kind;build_catalogue());chip.toggle_mode=true;chip.set_pressed_no_signal(catalogue_filter==selected_kind);chip.custom_minimum_size.y=28
- catalogue_title.text=["Kiviaeg","Pronksiaeg","Rauaaeg"][era]+" · vali hoone või ehitusala"
+ catalogue_title.text=ERA_NAMES[era]+" · "+("vali hoone või ehitusala" if era==0 else Period.ARTWORK[era])
  var back:=make_tool_card(tool_cards_row,"catalogue-back","← Tagasi");back.pressed.disconnect(select_tool.bind("catalogue-back"));back.pressed.connect(func():show_catalogue(false));choice_cards.append(back)
  for id in Defaults.data:
   var definition:Dictionary=Catalog.data.catalog.get(id,{})
   if int(definition.get("era",-1))!=era or (not catalogue_filter.is_empty() and str(definition.get("kind","Muud"))!=catalogue_filter):continue
   var project_id:=str(id);var card:=make_tool_card(tool_cards_row,project_id,project_label(project_id));card.pressed.disconnect(select_tool.bind(project_id));card.pressed.connect(func():select_preview_project(project_id))
-  var portrait_path:="res://assets/house_designer/portraits/"+project_id+".webp"
+  var portrait_path:=project_portrait(project_id)
   if ResourceLoader.exists(portrait_path):card.get_meta("card_picture").texture=load(portrait_path)
   card.set_pressed_no_signal(project_id==str(canvas.design.get("id","")));choice_cards.append(card);catalogue_buttons[project_id]=card
  card_scroll.scroll_horizontal=0;update_card_dimensions(size.x<900)
+
+func project_portrait(id: String) -> String:
+ var path:=Period.portrait_path(id)
+ if not path.is_empty():return path
+ return "res://assets/house_designer/portraits/"+id+".webp"
 
 func open_design(id: String,name: String,current: Dictionary={},from_catalogue:=false) -> bool:
  if not Defaults.data.has(id):return false
  if not from_catalogue:
   embedded_id=id;embedded_name=name;design_drafts.clear();last_of_era.clear()
  reset_button.visible=id==embedded_id and not current.is_empty() and current.get("id","")==id
- building_name=name;title_label.text=name;era=clampi(int(Catalog.data.catalog[id].get("era",0)),0,2);last_of_era[era]=id
- var saved:Dictionary=current if current.get("id","")==id else Defaults.data[id]
+ building_name=name;title_label.text=name;era=clampi(int(Catalog.data.catalog[id].get("era",0)),0,ERA_NAMES.size()-1);last_of_era[era]=id
+ var saved:Dictionary=current if current.get("id","")==id else Period.get_plan(id)
  category_buttons.settings.text="Põllu seaded" if saved.get("field") is Dictionary else "Katus"
  category_buttons.facade.visible=not saved.get("field") is Dictionary
  for child in options_panel.get_children():
@@ -594,12 +642,19 @@ func open_design(id: String,name: String,current: Dictionary={},from_catalogue:=
  mini_preview.show_design(saved);mini_plan.show_design(saved)
  if preview.visible:preview.show_design(saved)
  if is_instance_valid(portrait_title):portrait_title.text=name
- var portrait_path:="res://assets/house_designer/portraits/"+id+".webp"
+ var portrait_path:=project_portrait(id)
  if not ResourceLoader.exists(portrait_path):portrait_path="res://assets/house_designer/portraits/"+str(id).split("@")[0]+".webp"
  if ResourceLoader.exists(portrait_path):
   var portrait_texture:Texture2D=load(portrait_path);portrait_view.texture=portrait_texture;ledger_portrait.texture=portrait_texture
  ledger_name.text=name;ledger_kind.text="ELAMUD" if str(Catalog.data.catalog[id].get("kind",""))=="Homes" else "EHITIS"
- var descriptions={"house":"Ümar maja tulekolde ja seinaäärse magamisasemega.","hall":"Pikk elamu ühise ruumi ja tulekoldega.","fisher":"Rannahoone kala püüdmiseks ja kuivatamiseks."};ledger_description.text=str(descriptions.get(str(id).split("@")[0],"Kujunda hoone, õu ja sisustus."))
+ var base_type:=str(id).get_slice("@",0)
+ var descriptions={"hall":"Pikk elamu ühise ruumi ja tulekoldega.","fisher":"Rannahoone kala püüdmiseks ja kuivatamiseks."}
+ if base_type=="house":
+  ledger_description.text=HOUSE_DESCRIPTIONS[era] if current.is_empty() or era==0 else "Sinu salvestatud elamu."
+ elif era>0:
+  ledger_description.text=""
+ else:
+  ledger_description.text=str(descriptions.get(base_type,"Kujunda hoone, õu ja sisustus."))
  sync_floor_controls();refresh_ledger()
  for i in era_buttons.size():
   era_buttons[i].set_pressed_no_signal(i==era);era_buttons[i].disabled=false
@@ -612,17 +667,24 @@ func open_design(id: String,name: String,current: Dictionary={},from_catalogue:=
  for i in build_choices.item_count:
   if build_choices.get_item_metadata(i)==saved.get("build","wall"):build_choices.select(i);break
  wall_choices.clear()
- for style in Catalog.data.ERA_WALLS[era]:
+ for style in Period.wall_choices(era):
   add_wall_choice(wall_choices,str(style))
   if style==saved.get("wallStyle",""):wall_choices.select(wall_choices.item_count-1)
  roof_form_choices.clear()
- for entry in [["gable","Viilkatus",0],["hip","Kelpkatus",0],["pediment","Frontoon",1],["flat","Lamekatus",1],["terrace","Madal räästakatus",1]]:
+ if Period.BronzePlans.uses_earthen_building(saved):
+  roof_form_choices.add_item("Lauge talakatus")
+  roof_form_choices.set_item_metadata(0,"earthenShed")
+ for entry in [["gable","Viilkatus",0],["hip","Kelpkatus",0],["pediment","Frontoon",1],["flat","Lamekatus",1],["terrace","Madal räästakatus",1],["norse","Pikamaja katus",3],["sawtooth","Saagkatus",5],["roofTerrace","Parapetiga lamekatus",6],["barrelRoof","Plekkvõlv",5]]:
   if int(entry[2])>era:continue
   roof_form_choices.add_item(entry[1]);roof_form_choices.set_item_metadata(roof_form_choices.item_count-1,entry[0])
   if entry[0]==saved.get("roofForm",""):roof_form_choices.select(roof_form_choices.item_count-1)
- if saved.get("roofForm","") not in ["gable","hip","pediment","flat","terrace"]:
+ if saved.get("roofForm","") not in ["gable","hip","pediment","flat","terrace","norse","sawtooth","roofTerrace","barrelRoof","earthenShed"]:
   roof_form_choices.add_item(str(saved.get("roofForm","")));roof_form_choices.set_item_metadata(roof_form_choices.item_count-1,saved.get("roofForm",""));roof_form_choices.select(roof_form_choices.item_count-1)
  roof_choices.clear()
+ for style in Period.ROOFS[era]:
+  roof_choices.add_item(Period.label_for(style))
+  roof_choices.set_item_metadata(roof_choices.item_count-1,style)
+  if style==saved.get("roofMat",""):roof_choices.select(roof_choices.item_count-1)
  for entry in [["reed","Roog",0],["bark","Kasetoht",0],["sod","Mätas",0],["plank","Lauad",1],["shingle","Sindlid",2],["tile","Katusekivi",1],["earth","Savikatus",1]]:
   if int(entry[2])>era:continue
   roof_choices.add_item(entry[1]);roof_choices.set_item_metadata(roof_choices.item_count-1,entry[0])
@@ -663,7 +725,7 @@ func open_design(id: String,name: String,current: Dictionary={},from_catalogue:=
 func add_wall_choice(control: OptionButton,style: String) -> void:
  control.add_theme_constant_override("icon_max_width",24)
  control.get_popup().add_theme_constant_override("icon_max_width",24)
- var label: String=WALL_LABELS.get(style,style)
+ var label: String=WALL_LABELS.get(style,Period.label_for(style))
  var path: String="res://assets/house_designer/"+str(WALL_TEXTURES.get(style,""))+".webp"
  if WALL_TEXTURES.has(style) and ResourceLoader.exists(path):control.add_icon_item(load(path),label)
  else:control.add_item(label)
@@ -717,7 +779,7 @@ func update_measurements(design: Dictionary) -> void:
  if outer>0:lines.append("Välisseinad: %.1f m" % outer)
  if inner>0:lines.append("Siseseinad: %.1f m" % inner)
  if fence>0:lines.append("Aiad: %.1f m" % fence)
- lines.append("Uksed: %d · aknad: %d" % [doors,windows]);lines.append("Esemed: %d" % design.get("items",[]).size());lines.append("Suurim ruum: %.1f m" % [8.5,10.5,12.3][era])
+ lines.append("Uksed: %d · aknad: %d" % [doors,windows]);lines.append("Esemed: %d" % design.get("items",[]).size());lines.append("Suurim ruum: %.1f m" % float(Catalog.data.ERAS[era].limit))
  ledger_text.text="\n".join(lines)
  fit_ledger.call_deferred()
 
@@ -756,7 +818,15 @@ func design_checklist(design: Dictionary) -> Array:
    if Geometry.shelter_shape(run):structure=true;break
   rows.append(["Välisseinad suletud",structure]);rows.append(["Uks välisseinas",openings.any(func(o):return o.get("type","")=="door" and o.get("group","")=="outer")]);rows.append(["Katus olemas",structure])
   var definition:Dictionary=Catalog.data.catalog.get(str(design.get("id","")),{})
-  if definition.get("kind","")=="Homes":rows.append(["Tulekolle",has.call("fire")]);rows.append(["Magamiskoht",has.call("bed")])
+  if definition.get("kind","")=="Homes":
+   var house_age:=Period.age_of(str(design.get("id","")))
+   if house_age<=3:
+    rows.append(["Tulekolle",has.call("fire") or has.call("norseHearth")])
+   elif house_age<6:
+    rows.append(["Ahi või kolle",has.call("hearthStove") or has.call("fire")])
+   else:
+    rows.append(["Aken",openings.any(func(o):return o.get("type","")=="window")])
+   rows.append(["Magamiskoht",has.call("bed") or has.call("norseSleepingBench")])
   else:rows.append(["Töövahendid (2+)",items.size()>=2])
   var wide_count:=0;var supported:=true
   for room in rooms:
@@ -799,12 +869,13 @@ func select_tool(id: String) -> void:
  if id=="paintWall":
   canvas.wall_brush=str(canvas.current_plan().get("wallStyle",""))
   style_choices.add_item("Seina vaikematerjal");style_choices.set_item_metadata(0,"")
-  for finish in Catalog.data.ERA_WALLS[era]:
+  for finish in Period.wall_choices(era):
    add_wall_choice(style_choices,str(finish))
    if finish==canvas.wall_brush:style_choices.select(style_choices.item_count-1)
  if id in ["door","window"]:
-  var choices:Array=Catalog.data.WINDOW_STYLES if id=="window" else Catalog.data.DOOR_STYLES
-  canvas.style=("hole" if era<2 else "shutter") if id=="window" else ["hide","mycenaean","greek"][era]
+  var choices:=opening_styles(id)
+  canvas.style=(["hole","hole","shutter","shutter","sash","factoryWindow","glazed"][era]) if id=="window" else ["hide","mycenaean","greek","plank","double","double","double"][era]
+  if id=="door" and Period.BronzePlans.uses_earthen_building(canvas.design):canvas.style="timberLintel"
   for choice in choices:
    if int(choice[2])>era:continue
    style_choices.add_item(str(choice[1]));style_choices.set_item_metadata(style_choices.item_count-1,choice[0])
@@ -818,7 +889,7 @@ func select_tool(id: String) -> void:
 func reset_design() -> void:
  var id:String=canvas.design.get("id","")
  if Defaults.data.has(id):
-  var previous_floor:int=canvas.active_floor;canvas.active_floor=0;canvas.apply_design(Defaults.data[id].duplicate(true),previous_floor)
+  var previous_floor:int=canvas.active_floor;canvas.active_floor=0;canvas.apply_design(Period.get_plan(id).duplicate(true),previous_floor)
   var category:=default_category_for(canvas.design);select_category(category);select_tool({"outer":"rect","area":"plot","fence":"rail","items":"item"}[category])
 
 func default_category_for(design: Dictionary) -> String:
