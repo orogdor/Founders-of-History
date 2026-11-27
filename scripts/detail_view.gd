@@ -34,6 +34,7 @@ var resources: Array = []
 var world_data: Dictionary = {}
 var person: Node3D
 const TREE_REFERENCE_HEIGHTS=PaintedTrees.HEIGHTS
+static var village_tree_meshes: Dictionary={}
 var tree_instances: Dictionary={}
 var tree_lod_levels: Dictionary={}
 var tree_lod_dirty:=true
@@ -153,7 +154,7 @@ func add_village_life(host: Node,id: String,team: int,nearby:=false) -> void:
 		city_lights.setup(host,int(id.trim_prefix("city:")),heights,visual_heights)
 
 
-func first_mesh(node: Node) -> MeshInstance3D:
+static func first_mesh(node: Node) -> MeshInstance3D:
 	if node is MeshInstance3D: return node
 	for child in node.get_children():
 		var found := first_mesh(child)
@@ -684,11 +685,28 @@ func register_tree(resource: Dictionary) -> void:
 	var companion_index:=int(tree_counts.get(companion_key,0));tree_counts[companion_key]=companion_index+1
 	tree_companions[resource.id]={"key":companion_key,"index":companion_index,"seed":companion_seed,"x":x,"z":z,"y":y,"scale":0.66+random*0.12}
 
+static func village_tree_mesh(species: String,variant: int,level: String) -> Mesh:
+	var path:="res://assets/sapling-trees/%s_%02d/%s.glb" % [species,variant+1,level]
+	if not village_tree_meshes.has(path):
+		var scene:=load(path) as PackedScene
+		var model:=scene.instantiate()
+		var mesh:=first_mesh(model).mesh.duplicate() as ArrayMesh
+		for index in mesh.get_surface_count():
+			var original:=mesh.surface_get_material(index) as StandardMaterial3D
+			if original!=null and original.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED:
+				var leaves:=original.duplicate() as StandardMaterial3D
+				leaves.albedo_color=Color("bdc9ad")
+				leaves.cull_mode=BaseMaterial3D.CULL_DISABLED
+				mesh.surface_set_material(index,leaves)
+		village_tree_meshes[path]=mesh
+		model.free()
+	return village_tree_meshes[path]
+
 func ensure_tree_group(key: String) -> void:
 	if tree_instances.has(key):return
 	var parts:=key.split(":")
 	var level: String=parts[2] if parts.size()>2 else "mid"
-	var mesh:=PaintedTrees.mesh_for(parts[0],int(parts[1]),level)
+	var mesh:=village_tree_mesh(parts[0],int(parts[1]),level)
 	var multi:=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D;multi.mesh=mesh
 	var node:=MultiMeshInstance3D.new();node.multimesh=multi;node.visible=parts.size()>2;add_child(node);tree_instances[key]=node
 

@@ -231,8 +231,10 @@ func rebuild(design: Dictionary,variation:=0) -> void:
     var room_lift:float=HomeStructure.room_height(room,height)-0.88 if earthen_construction or not iron_family.is_empty() else lift
     if age>=2 and room.type=="rect" and design.get("roofForm","gable") in ["gable","hip"] and roof_material not in ["reed","thatch"]:
      add_later_roof(room,design,room_lift,age)
-    else:add_roof(room,design,room_lift)
-   for index in range(roof_start,get_child_count()):get_child(index).set_meta("house_roof",true)
+    else:add_roof(room,design,room_lift,geometry.walls,era)
+   for index in range(roof_start,get_child_count()):
+    var part:=get_child(index)
+    if part.get_meta("period_static","")!="eave_wall":part.set_meta("house_roof",true)
  var towers:=Fence.tower_positions(design)
  for item in design.get("items",[]):
   var type:=str(item.type);var tower: Variant=null
@@ -856,7 +858,7 @@ func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float) -
 
 # The roof surface and reed courses follow the source designer's sampling;
 # vents and finer era-specific roof details remain to be ported.
-func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
+func add_roof(room: Dictionary,design: Dictionary,lift: float,walls: Array,era: int) -> void:
  var roof_form:=str(design.get("roofForm","gable"))
  if roof_form=="terrace":add_terrace_roof(room,design,lift);return
  if roof_form in ["flat","pediment"]:
@@ -901,8 +903,63 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
    var p:Vector2=center.lerp(rim,fullness)
    var y:float=eave+(seat_height-eave)*pow(t/seat,0.85) if t<=seat else seat_height+(peak-seat_height)*pow((t-seat)/(1-seat),0.90)
    return local(p,y+sin(s*PI*6)*0.011*(1-t)+lift-0.018)
+  if design.get("build","wall")=="wall":
+   add_round_eave_wall(outline,sample,seat,design,walls,0.88+lift,era)
   roof_grid(sample,maxi(outline.size()*3,72),38)
   roof_courses(sample,maxi(outline.size()*3,72),clampi(roundi(radius*3.2),6,11),true)
+
+# Infill follows the same sampled seat as the reed roof, including its raised
+# entrance. Split at the actual plan openings so edited doors and windows stay clear.
+func add_round_eave_wall(outline: PackedVector2Array,sample: Callable,seat: float,design: Dictionary,walls: Array,base: float,era: int) -> void:
+ var surfaces: Dictionary={}
+ for wall in walls:
+  if not wall.get("curved",false):continue
+  var side:=-1
+  for i in outline.size():
+   var a:=outline[i];var b:=outline[(i+1)%outline.size()]
+   if Plan.closest(wall.a,a,b).distance_to(wall.a)<0.02 and Plan.closest(wall.b,a,b).distance_to(wall.b)<0.02:
+    side=i;break
+  if side<0:continue
+  var start:=outline[side];var edge:=outline[(side+1)%outline.size()]-start
+  for span in Plan.split_wall(wall,design):
+   var bands: Array=[Vector2(base,INF)]
+   var style:=str(span.get("opening",{}).get("style",""))
+   if span.get("type","")=="door":
+    var lintel:float=[1.53,1.50,1.62][era]
+    lintel+=0.10 if style=="arched" else 0.08 if style in ["double","loadingDoor"] else 0.0
+    bands=[Vector2(maxf(base,lintel),INF)]
+   elif span.get("type","")=="window":
+    var win:=Plan.window_span(era,style)
+    bands=[Vector2(base,win.x),Vector2(maxf(base,win.y),INF)]
+   var divisions:=maxi(1,ceili(span.a.distance_to(span.b)/7.0))
+   for j in divisions:
+    var tops: Array[Vector3]=[]
+    for step in [j,j+1]:
+     var at:Vector2=span.a.lerp(span.b,float(step)/divisions)
+     var t:=clampf((at-start).dot(edge)/edge.length_squared(),0,1)
+     var top:Vector3=sample.call((side+t)/outline.size(),seat)
+     top.y+=0.015
+     tops.append(top)
+    for band:Vector2 in bands:
+     var first:Vector3=tops[0];var last:Vector3=tops[1]
+     first.y=clampf(first.y,band.x,maxf(band.x,band.y))
+     last.y=clampf(last.y,band.x,maxf(band.x,band.y))
+     if maxf(first.y,last.y)<=band.x:continue
+     var finish:=str(span.finish)
+     if not surfaces.has(finish):
+      var batch:=SurfaceTool.new()
+      batch.begin(Mesh.PRIMITIVE_TRIANGLES);batch.set_material(material_for(finish))
+      surfaces[finish]=batch
+     var surface:SurfaceTool=surfaces[finish]
+     var lower_a:=Vector3(first.x,band.x,first.z);var lower_b:=Vector3(last.x,band.x,last.z)
+     var axis:=Vector3(edge.x,0,edge.y).normalized()
+     for vertex:Vector3 in [lower_a,lower_b,first,lower_b,last,first]:
+      surface.set_uv(Vector2(vertex.dot(axis),vertex.y));surface.add_vertex(vertex)
+ for surface:SurfaceTool in surfaces.values():
+  surface.generate_normals()
+  var panel:=MeshInstance3D.new()
+  panel.name="RoundEaveWall";panel.set_meta("period_static","eave_wall")
+  panel.mesh=surface.commit();add_child(panel)
 
 # Later roofs have a true hip or gable, a closed gable end, and raised
 # fascia and ridge trim. Earlier reed roofs retain the curved course mesh.
