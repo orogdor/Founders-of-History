@@ -26,6 +26,13 @@ func _initialize() -> void:
  assert(model.find_child("OverlappingReedCourses",true,false)==null,"Bark roof must not receive reed courses")
  assert(model.find_child("ReedEaveFringe",true,false)==null,"Bark roof must not receive reed strands")
  assert(model.find_child("RoofDeck",true,false).mesh.surface_get_material(0) is StandardMaterial3D,"Bark roof must keep its own material")
+ var small: Dictionary=Defaults.data.house.duplicate(true)
+ small.rooms[0].r=44
+ small.openings[0].point.y=small.rooms[0].a.y+44
+ small.items=[]
+ small.roofHeight=60
+ model.rebuild(small)
+ assert(model.hut_peak>Plan.door_height(0,"hide")+0.28,"A small round plan must keep its ridge above the doorway canopy")
  var hall:Dictionary=Defaults.data.hall.duplicate(true);hall.roofMat="reed";model.rebuild(hall)
  assert(model.find_child("OverlappingReedCourses",true,false) is MeshInstance3D,"Rectangular reed roof must have courses")
  assert(model.find_child("HouseWallLog",true,false) is MeshInstance3D,"Timber hall must show horizontal logs")

@@ -893,7 +893,7 @@ func prepare_round_hut(room: Dictionary,design: Dictionary,lift: float) -> void:
  hut_center=Plan.point(room.a);hut_radius=float(room.r)/Plan.PX_PER_M
  var rise:=clampf(float(design.get("roofHeight",75))/100.0,0.24,1.70)
  hut_eave=maxf(0.40,lift-0.57)
- hut_peak=hut_eave+maxf(1.55,(1.95+hut_radius)*rise)
+ hut_peak=maxf(2.40,hut_eave+maxf(1.55,(1.95+hut_radius)*rise))
  hut_openings.clear()
  for opening in design.get("openings",[]):
   if opening.get("group","")!="outer":continue
