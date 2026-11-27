@@ -2472,9 +2472,9 @@ func _process(delta: float) -> void:
 			AIRoadGates.tick(game,city,ensure_city_runtime,upgrade_rule)
 			if rival and not city.get("reservePendingV168",false):
 				AIStoneDefenses.update_builders(game,city)
-				tick_ai_field(city,city)
+				tick_ai_field(city)
 				for district in city.get("districts",{}).values():
-					if DistrictContexts.has_activity(district):tick_ai_field(district,city)
+					if DistrictContexts.has_activity(district):tick_ai_field(district,{},city)
 				var defense_rule=func(type):return CityRules.urban_rule(game,city,city_cell_data(city),type,is_coast(int(city.c),int(city.r)),city_has_river(city),DistrictContexts.all_buildings(city))
 				var defense_context=func(parent,tile):return district_context_at(parent,tile,true)
 				var outer_rule=func(ctx,type):return CityRules.urban_rule(game,ctx,city_cell_data(ctx),type,is_coast(int(ctx.c),int(ctx.r)),city_has_river(ctx),DistrictContexts.all_buildings(city),{"outerRingV184":true})
@@ -4733,7 +4733,7 @@ func place_ai_building(city: Dictionary,runtime: Dictionary,type: String,parent:
 	return false
 
 # One 48-by-32 field per finished farm, following the source search cadence.
-func tick_ai_field(city: Dictionary,parent: Dictionary={}) -> void:
+func tick_ai_field(city: Dictionary,runtime: Dictionary={},parent: Dictionary={}) -> void:
 	if parent.is_empty():parent=city
 	if float(game.time)<float(city.get("nextFieldSearchV127",0)):return
 	var farms:=0;var fields:=0;var pending:=0
@@ -4747,7 +4747,7 @@ func tick_ai_field(city: Dictionary,parent: Dictionary={}) -> void:
 	var team:=int(city.team)
 	if not Economy.can_afford(city.economy.realms[team].resources,Economy.DATA.data.buildings.field.cost):return
 	city.nextFieldSearchV127=float(game.time)+60
-	var runtime:=ensure_city_runtime(city)
+	if runtime.is_empty():runtime=ensure_city_runtime(city)
 	var field: Variant=ai_field_site(city,runtime,null,parent)
 	if field==null:return
 	var heights: Array=runtime.heights
