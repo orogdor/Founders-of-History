@@ -63,10 +63,32 @@ static func rebuild(parent: Node3D,owned: Dictionary,urban: Dictionary,explored:
 		var name:="%d:%d:%d" % [team,1 if rural else 0,int(city.id)]
 		if not groups.has(name):groups[name]={}
 		groups[name][key]=true
+	# Fog and population revisions often leave the visible territory unchanged.
+	# Reuse each city's fill and each team's outline while their tiles match.
+	var previous: Dictionary={}
+	for layer in parent.get_children():previous[layer.get_meta("territory_key")]=layer
 	for name in groups:
+		var layer:=changed_layer(parent,previous,name,groups[name])
+		if layer==null:continue
 		var parts:=str(name).split(":");var team:=int(parts[0]);var rural:=int(parts[1])==1
-		fill(parent,groups[name],heights,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team]),0.07 if rural else 0.11,mesh_samples)
-	for team in teams:border(parent,teams[team],heights,Color(TEAM_COLORS[team]),mesh_samples)
+		fill(layer,groups[name],heights,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team]),0.07 if rural else 0.11,mesh_samples)
+	for team in teams:
+		var layer:=changed_layer(parent,previous,"border:"+str(team),teams[team])
+		if layer!=null:border(layer,teams[team],heights,Color(TEAM_COLORS[team]),mesh_samples)
+	for layer in previous.values():
+		parent.remove_child(layer);layer.queue_free()
+
+static func changed_layer(parent: Node3D,previous: Dictionary,key: String,cells: Dictionary) -> Node3D:
+	var layer: Node3D=previous.get(key)
+	previous.erase(key)
+	if layer!=null:
+		if layer.get_meta("cells")==cells:return null
+		for mesh in layer.get_children():
+			layer.remove_child(mesh);mesh.queue_free()
+	else:
+		layer=Node3D.new();layer.set_meta("territory_key",key);parent.add_child(layer)
+	layer.set_meta("cells",cells)
+	return layer
 
 static func contour_edge(points: Array,a: Vector2,b: Vector2,va: float,vb: float) -> void:
 	if (va>0.0)==(vb>0.0):return
@@ -79,23 +101,37 @@ static func line_quad(surface: SurfaceTool,heights: PackedFloat32Array,a: Vector
 
 static func border(parent: Node3D,cells: Dictionary,heights: PackedFloat32Array,color: Color,mesh_samples: Variant=null) -> void:
 	if cells.is_empty():return
-	var chunks:={}
+	# The smoothed field is uniform wherever all four neighboring tile
+	# centers agree. March only the intervals which can contain a contour.
+	var squares: Dictionary={}
 	for key in cells:
-		var coord:=str(key).split(":");var c:=int(coord[0]);var r:=int(coord[1])
-		for dz in [-1,0,1]:
-			for dx in [-1,0,1]:
-				var x:=floori(float(c+dx)/8.0);var z:=floori(float(r+dz)/8.0)
-				if x>=0 and z>=0 and x*8<Grid.COLS and z*8<Grid.ROWS:chunks[str(x)+":"+str(z)]=Vector2i(x,z)
+		var coords:=str(key).split(":")
+		var center:=Vector2i(int(coords[0]),int(coords[1]))
+		for offset in [Vector2i.ZERO,Vector2i.LEFT,Vector2i.UP,Vector2i(-1,-1)]:
+			squares[center+offset]=true
 	var outer:=SurfaceTool.new();outer.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var inner:=SurfaceTool.new();inner.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var segments:=0;var step:=0.1
-	for chunk in chunks.values():
-		for iz in 80:
-			var z: float=chunk.y*8+iz*step
-			for ix in 80:
-				var x: float=chunk.x*8+ix*step
-				var a:=field(cells,x,z)-0.5;var b:=field(cells,x+step,z)-0.5
-				var c:=field(cells,x+step,z+step)-0.5;var d:=field(cells,x,z+step)-0.5
+	var values:=PackedFloat64Array();values.resize(121)
+	for square: Vector2i in squares:
+		var nw:=float(cells.has("%d:%d" % [square.x,square.y]))
+		var ne:=float(cells.has("%d:%d" % [square.x+1,square.y]))
+		var sw:=float(cells.has("%d:%d" % [square.x,square.y+1]))
+		var se:=float(cells.has("%d:%d" % [square.x+1,square.y+1]))
+		if nw==ne and nw==sw and nw==se:continue
+		for iz in 11:
+			var blend:=smooth(iz*step)
+			for ix in 11:
+				var t:=smooth(ix*step)
+				values[iz*11+ix]=lerpf(lerpf(nw,ne,t),lerpf(sw,se,t),blend)-0.5
+		for iz in 10:
+			var z:=square.y+0.5+iz*step
+			if z<0:continue
+			for ix in 10:
+				var x:=square.x+0.5+ix*step
+				if x<0:continue
+				var index:=iz*11+ix
+				var a:=values[index];var b:=values[index+1];var c:=values[index+12];var d:=values[index+11]
 				if (a>0)==(b>0) and (b>0)==(c>0) and (c>0)==(d>0):continue
 				var points: Array=[]
 				contour_edge(points,Vector2(x,z),Vector2(x+step,z),a,b)

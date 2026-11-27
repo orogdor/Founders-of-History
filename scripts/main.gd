@@ -382,6 +382,7 @@ func build_world() -> void:
 	clear_detail_landscape_cache()
 	detail_mesh_cache.clear()
 	detail_ocean_cache.clear()
+	clear_territory_layers()
 	world_height_samples=WorldTerrain.samples(grid)
 	var colors:=PackedColorArray();colors.resize(grid.size())
 	for i in colors.size():colors[i]=terrain_color(i)
@@ -557,6 +558,12 @@ func refresh_city_territory() -> void:
 	for city in game.cities:Campaign.reveal(game,int(city.team),int(city.c),int(city.r),maxi(2,int(city.radius)))
 	if int(game.get("visionRevision",0))!=previous_revision:refresh_fog()
 
+func clear_territory_layers() -> void:
+	territory_visual_stamp=""
+	if territory_root==null:return
+	for layer in territory_root.get_children():
+		territory_root.remove_child(layer);layer.queue_free()
+
 func update_territory_visual() -> void:
 	if territory_root==null:return
 	territory_root.visible=city_created and not detail_mode
@@ -564,7 +571,6 @@ func update_territory_visual() -> void:
 	var stamp: String=territory_stamp+":"+str(game.get("visionRevision",0))+":"+str(reveal_all)
 	if stamp==territory_visual_stamp:return
 	territory_visual_stamp=stamp
-	for child in territory_root.get_children():child.queue_free()
 	WorldTerritory.rebuild(territory_root,territory_allocation.get("territory",{}),territory_allocation.get("urban",{}),game.explored[0],reveal_all,world_height_samples,world_mesh_samples)
 
 func update_world_roads() -> void:
@@ -2340,6 +2346,7 @@ func _process(delta: float) -> void:
 								visible_view.set_meta("live_hall_stamp",hall_stamp)
 								visible_view.place_hall(hall.x,hall.z,upgrade,float(hall.get("buildingRotationV228",0)),hall.get("houseDesignV354",{}))
 							break
+			if city.erase("ruralPlanDue") and rival and not city.get("reservePendingV168",false):plan_ai_rural(city)
 			if build_event.has("completed") and active:
 				if detail_mode:detail_root.sync_buildings(city,DetailView.Period.campaign_age(game,int(city.team)))
 				update_status("Hoone valmis.")
@@ -2359,7 +2366,7 @@ func _process(delta: float) -> void:
 				AIMilitary.plan_attack(game,team,merchant_land_path)
 				if "shipbuilding" in game.research[team].known:AINavy.plan(game,team,grid,ensure_sea_distances(),army_can_traverse,merchant_land_path,territory_allocation.get("territory",{}),prepare_ai_settlement_cell,ai_sea_site_ok)
 			for town in game.cities:
-				if int(town.team)>0 and not town.get("reservePendingV168",false):plan_ai_rural(town)
+				if int(town.team)>0 and not town.get("reservePendingV168",false):town.ruralPlanDue=true
 		var previous_age:=DetailView.Period.campaign_age(game,0)
 		for research in game.research:
 			if research.active!=null and float(research.get("discoveryInsight",0))>0:
@@ -3085,6 +3092,7 @@ func refresh_world_rivers() -> void:
 func refresh_after_bridge() -> void:
 	bridge_refresh_pending=false
 	if generation_thread!=null or game.is_empty():return
+	clear_territory_layers()
 	world_height_samples=WorldTerrain.samples(grid)
 	world_river_graph=WorldRivers.prepare(grid,int(game.seed))
 	refresh_world_rivers()
@@ -4111,7 +4119,7 @@ func place_ai_building(city: Dictionary,runtime: Dictionary,type: String,parent:
 		if coast_type:proposed.landEntry=coast_data.landEntry
 		if not nav.preserves_access(proposed,city.economy.buildings,city.world.get("workers",{}),city.economy.get("cargo",[])):continue
 		var entry: Variant=nav.nearest(LocalNav.door(proposed),9)
-		if entry==null or nav.route(depot,entry,false)==null:continue
+		if entry==null or not nav.reachable(depot,entry):continue
 		if type=="farm" and ai_field_site(city,runtime,proposed,parent)==null:continue
 		if type in ["lumber","hunter"]:
 			var kind: String="tree" if type=="lumber" else "game";var accessible:=false
@@ -4119,7 +4127,7 @@ func place_ai_building(city: Dictionary,runtime: Dictionary,type: String,parent:
 				if resource.kind!=kind or resource.get("removed",false) or float(resource.get("amount",0))<=0:continue
 				if Vector2(resource.x,resource.z).distance_to(target)>=55:continue
 				var goal: Variant=nav.nearest({"x":float(resource.x)+1.8,"z":resource.z},4)
-				if goal!=null and nav.route(entry,goal,false)!=null:accessible=true;break
+				if goal!=null and nav.reachable(entry,goal):accessible=true;break
 			if not accessible:continue
 		if preview_only:return true
 		var result:=Economy.place_building(build_economy,team,type,target,placement_passable,clear,true)
