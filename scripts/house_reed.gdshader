@@ -53,15 +53,15 @@ void fragment() {
   float lip = 1.0 - smoothstep(0.025, 0.15, overlap);
   float cut = 1.0 - smoothstep(-0.13, -0.003, UV.y);
   float straw_tone = mix(smoothstep(0.045, 0.55, grain), weather, 0.40);
-  vec3 clean = mix(vec3(.13,.097,.060),vec3(.44,.36,.243),straw_tone);
-  vec3 aged = mix(vec3(.142,.134,.116),vec3(.43,.406,.363),straw_tone);
+  vec3 clean = mix(vec3(.147,.108,.061),vec3(.56,.449,.283),straw_tone);
+  vec3 aged = mix(vec3(.151,.137,.103),vec3(.51,.445,.335),straw_tone);
   float aged_amount=clamp(smoothstep(.18,.76,weather)*.46+roof_run*.18+roof_age*.29,0.0,1.0);
   vec3 straw=mix(clean,aged,aged_amount);
   float soot=1.0-smoothstep(.77,1.19,roof_run+(weather-.5)*.18);
   vec3 stems=mix(vec3(.128,.094,.063),vec3(.52,.449,.33),smoothstep(.12,.63,grain));
   float fray=smoothstep(-.116,-.033,UV.y+(weather-.50)*.044);
   stems*=.75+.25*fray+strand*.049;
-  ALBEDO=mix(straw*(.88+.12*soot)*(1.0-lip*.13+strand*.062),stems,cut*.75);
+  ALBEDO=mix(straw*(.88+.12*soot)*(1.0-lip*.16+strand*.077),stems,cut*.75);
   ROUGHNESS = clamp(0.96 - grain * 0.11, 0.85, 0.98);
   SPECULAR = 0.14;
   if (!settlement_detail) {

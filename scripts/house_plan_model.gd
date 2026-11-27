@@ -28,7 +28,7 @@ var early_round_hut:=false
 var hut_center:=Vector2.ZERO
 var hut_radius:=0.0
 var hut_peak:=0.0
-var hut_lift:=0.0
+var hut_eave:=0.0
 var hut_openings: Array[Dictionary]=[]
 var daub_material: ShaderMaterial
 var hut_reed_surface: ShaderMaterial
@@ -425,9 +425,9 @@ func add_hut_entrance(a: Vector3,b: Vector3,top: float) -> void:
  var front:=outward.normalized()
  var half_width:=a.distance_to(b)*0.5
  for side:float in [-1.0,1.0]:
-  var jamb:=center+axis*side*(half_width+0.032)-front*0.035
-  add_pole(jamb+axis*side*0.033-Vector3.UP*0.025,jamb+Vector3.UP*(top+0.045),0.088,"wood")
- var lintel:=center-front*0.09+Vector3.UP*(top+0.059)
+  var jamb:=center+axis*side*(half_width+0.032)-front*0.10
+  add_pole(jamb+axis*side*0.033-Vector3.UP*0.025,jamb+Vector3.UP*(top-0.015),0.088,"wood")
+ var lintel:=center-front*0.16+Vector3.UP*(top+0.018)
  add_pole(lintel-axis*(half_width+0.068),lintel+axis*(half_width+0.079)+Vector3.UP*0.012,0.074,"stave")
  fence_box(a-axis*0.035+front*0.115,b+axis*0.035+front*0.115,-0.052,0.082,0.49,"hutStone")
 
@@ -702,6 +702,7 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var style:=str(span.finish);var width:=0.19 if span.group=="outer" else 0.115
  var round_exterior:bool=early_round_hut and span.group=="outer" and span.has("curve_center")
  var daub:bool=round_exterior and style=="weave"
+ var shade_daub:=daub and (not simplified or settlement_detail)
  var depth:=width*0.37 if style in ["wood","stave","bamboo","weave"] and not daub else width
  var cap_a:=high;var cap_b:=high
  if round_exterior:
@@ -712,6 +713,8 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
  var mesh:=BoxMesh.new();mesh.size=Vector3(delta.length(),high-low,depth)
  var masonry:=StoneSurface.is_masonry(style) and (not simplified or settlement_detail)
  var wall_material:Material=hut_daub_material() if daub else StoneSurface.material(style,true,not simplified and not Mobile.active) if masonry else material_for(style)
+ if round_exterior and simplified and not settlement_detail and StoneSurface.is_masonry(style):
+  wall_material=material_for("hutStone")
  var arrays:=mesh.get_mesh_arrays()
  var vertices:PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
  var normals:PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
@@ -744,12 +747,12 @@ func add_wall(span: Dictionary,low: float,high: float) -> void:
   if absf(normals[i].y)>0.5:uv[i]=Vector2(p.x+align,p.z)*uv_scale
   elif absf(normals[i].x)>0.5:uv[i]=Vector2(p.z,(low+high)/2-p.y)*uv_scale
   else:uv[i]=Vector2(p.x+align,(low+high)/2-p.y)*uv_scale
-  if daub:
+  if shade_daub:
    var edge_normal:=Vector3(-axis.y,0,axis.x)
    var facing:=normals[i].z*edge_normal.dot(((a+b)*0.5-local(hut_center)).normalized())
    shading.append(Color(1.0 if facing>0.2 else 0.57,0,0,1))
  arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_TEX_UV]=uv
- if daub:arrays[Mesh.ARRAY_COLOR]=shading
+ if shade_daub:arrays[Mesh.ARRAY_COLOR]=shading
  var source_mesh:=ArrayMesh.new();source_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
  var surface:=SurfaceTool.new();surface.create_from(source_mesh,0);surface.generate_tangents()
  var wall_mesh:=surface.commit()
@@ -888,9 +891,9 @@ func add_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
 
 func prepare_round_hut(room: Dictionary,design: Dictionary,lift: float) -> void:
  hut_center=Plan.point(room.a);hut_radius=float(room.r)/Plan.PX_PER_M
- hut_lift=lift
  var rise:=clampf(float(design.get("roofHeight",75))/100.0,0.24,1.70)
- hut_peak=maxf(2.40,lift+0.45+(1.30+hut_radius*0.53)*rise)
+ hut_eave=maxf(0.40,lift-0.57)
+ hut_peak=hut_eave+maxf(1.55,(1.95+hut_radius)*rise)
  hut_openings.clear()
  for opening in design.get("openings",[]):
   if opening.get("group","")!="outer":continue
@@ -901,42 +904,43 @@ func prepare_round_hut(room: Dictionary,design: Dictionary,lift: float) -> void:
   hut_openings.append({"point":point,"width":0.75 if door else 0.36,"clearance":Plan.door_height(0,str(opening.get("style","")))+0.28 if door else WINDOWS[0].y+0.18,"door":door})
 
 func hut_overhang(angle: float) -> float:
- return clampf(hut_radius*0.31,0.28,0.82)+0.046*sin(angle*5.0)+0.033*cos(angle*9.0)
+ return clampf(hut_radius*0.24,0.34,0.65)+0.028*sin(angle*5.0)+0.020*cos(angle*9.0)
 
 func hut_roof_height(rim: Vector2,angle: float,t: float) -> float:
- var skirt:=hut_lift-0.49+sin(angle*6.0)*0.035+sin(angle*17.0+1.2)*0.023
+ var skirt:=hut_eave+sin(angle*6.0)*0.027+sin(angle*17.0+1.2)*0.015
  var port:=skirt
  for opening in hut_openings:
   var distance:=rim.distance_to(opening.point)/Plan.PX_PER_M
   var width:=float(opening.width)
-  var clearing:=1.0-smoothstep(width-0.10,width+0.62,distance)
+  var clearing:=1.0-smoothstep(width-0.06,width+0.35,distance)
   var curve:=0.16*pow(clampf(distance/width,0.0,1.0),1.58) if opening.door else 0.0
   port=maxf(port,lerpf(skirt,float(opening.clearance)-curve,clearing))
- var slope:=pow(t,0.94)+sin(t*PI)*0.078
+ var slope:=t+sin(t*PI)*0.036
  var reed_laps:=sin(t*PI)*0.027*sin(t*TAU*4.0+sin(angle*4.0)*0.24)
  return lerpf(skirt,hut_peak,slope)+(port-skirt)*pow(1.0-t,3.15)+reed_laps
 
 func hut_wall_top(point: Vector2,depth: float) -> float:
  var angle:=(point-hut_center).angle()
  var overhang:=hut_overhang(angle)
- var roof_t:=clampf((overhang-depth*0.61)/maxf(hut_radius+overhang,0.20),0.0,1.0)
- return hut_roof_height(point,angle,roof_t)+0.065
+ var roof_t:=clampf((overhang-depth*0.58)/maxf(hut_radius+overhang,0.20),0.0,1.0)
+ # Keep the wall cap under the sampled thatch, including around the doorway.
+ return hut_roof_height(point,angle,roof_t)-(0.18 if simplified else 0.10)
 
 func add_round_thatch(outline: PackedVector2Array) -> void:
- var ridge:=hut_center+Vector2(-0.12,0.081)*Plan.PX_PER_M
+ var ridge:=hut_center+Vector2(-0.058,0.035)*Plan.PX_PER_M
  var sample:=func(s: float,t: float) -> Vector3:
   var around:=s*TAU
   var index:=s*outline.size();var k:=floori(index)
   var rim:Vector2=outline[k%outline.size()].lerp(outline[(k+1)%outline.size()],index-k)
   var edge:=rim+(rim-hut_center).normalized()*hut_overhang(around)*Plan.PX_PER_M
-  var shoulder:=1.0-t+sin(t*PI)*0.086
+  var shoulder:=1.0-t+sin(t*PI)*0.028
   return local(ridge.lerp(edge,shoulder),hut_roof_height(rim,around,t))
- var columns:=outline.size()*3 if not simplified else maxi(32,outline.size()*2 if settlement_detail else outline.size())
- roof_grid(sample,columns,29 if not simplified else 18 if settlement_detail else 11)
+ var columns:=outline.size()*3
+ roof_grid(sample,columns,32)
  if simplified and not settlement_detail:return
  var edge:=SurfaceTool.new()
  edge.begin(Mesh.PRIMITIVE_TRIANGLES);edge.set_material(roof_surface_material())
- var steps:=columns
+ var steps:=outline.size() if settlement_detail else columns
  for i in steps:
   var u:=float(i)/steps;var v:=float(i+1)/steps
   var top_a:Vector3=sample.call(u,0.0);var top_b:Vector3=sample.call(v,0.0)
@@ -959,8 +963,13 @@ func add_round_rafters(sample: Callable) -> void:
   var middle:Vector3=sample.call(angle,0.46)-Vector3.UP*0.080
   var last:Vector3=sample.call(angle,0.87)-Vector3.UP*0.085
   var width:=0.033+0.011*fence_noise(rib+3)
-  add_pole(first,middle,width,"stave")
-  add_pole(middle,last,width*0.91,"stave")
+  add_round_rafter(first,middle,width)
+  add_round_rafter(middle,last,width*0.91)
+
+func add_round_rafter(a: Vector3,b: Vector3,width: float) -> void:
+ for vent in roof_vents:
+  if vent.distance_to(Plan.closest(vent,Vector2(a.x,a.z),Vector2(b.x,b.z)))<0.26:return
+ add_pole(a,b,width,"stave")
 
 func add_terrace_roof(room: Dictionary,design: Dictionary,lift: float) -> void:
  var floor:=Plan.room_polygon(room)
@@ -1024,7 +1033,11 @@ func add_classical_roof(room: Dictionary,design: Dictionary,lift: float,form: St
   surface.generate_normals();var node:=MeshInstance3D.new();node.name="RoofDeckPediment";node.mesh=surface.commit();add_child(node)
 
 func roof_grid(sample: Callable,columns: int,rows: int) -> void:
- if settlement_detail:
+ # The eaves of the round hut must stay outside its wall, even on the world map.
+ if early_round_hut and simplified:
+  columns=columns/3 if settlement_detail else columns/4
+  rows=rows/4 if settlement_detail else rows/6
+ elif settlement_detail:
   columns=clampi(columns/3,9,30)
   rows=clampi(rows/4,6,14)
  elif simplified:

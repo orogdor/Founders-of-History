@@ -11,6 +11,8 @@ func _initialize() -> void:
  assert(eave.mesh.surface_get_material(0) is ShaderMaterial,"The round eave should share the thatch material")
  var crown: AABB=eave.mesh.get_aabb()
  assert(crown.position.y<0.90 and crown.end.y>1.98,"The eave must hang low beside a full-height doorway")
+ var roof: MeshInstance3D=model.find_child("RoofDeck",true,false)
+ assert(roof.get_aabb().end.y-crown.position.y>3.0,"The round house needs a tall roof above the low eave")
  assert(model.find_child("HutEntranceCanopy",true,false)==null,"The doorway hood should follow the continuous thatch")
  assert(model.find_child("OverlappingReedCourses",true,false)==null,"Round thatch should have one continuous surface")
  assert(model.find_child("ReedEaveFringe",true,false) is MeshInstance3D,"Reed roof must include cut eave strands")
@@ -34,6 +36,19 @@ func _initialize() -> void:
   assert(model.find_child("HouseWallStave",true,false) is MeshInstance3D,"Upright timber and bamboo walls must show vertical poles")
  hall.wallStyle="weave";model.rebuild(hall)
  assert(model.find_child("HouseWovenBranches",true,false) is MeshInstance3D,"Wattle walls must show woven branches")
+ var distant=Model.new();distant.simplified=true
+ for id in ["house","hunter"]:
+  var plan: Dictionary=Defaults.data[id]
+  distant.rebuild(plan)
+  var room: Dictionary=plan.rooms[0]
+  var center: Vector3=distant.local(Plan.point(room.a))
+  var wall_edge:=float(room.r)/Plan.PX_PER_M+0.185
+  for step in 32:
+   var rim_point:=Vector2(center.x,center.z)+Vector2.from_angle(TAU*step/32.0)*wall_edge
+   assert(covered(distant,rim_point)>0,"The simplified thatch must cover the round wall at every angle")
+  var wall: MeshInstance3D=distant.find_child("HouseWall",true,false)
+  assert(wall.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]==null,"World-map walls must use their material color without shader masks")
+ distant.free()
  print("HOUSE_ROOF_COURSES_OK");model.queue_free();quit()
 
 func covered(model:Node,point:Vector2) -> int:
