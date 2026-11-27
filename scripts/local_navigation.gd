@@ -2,6 +2,8 @@ class_name LocalNavigation
 extends RefCounted
 const Heap=preload("res://scripts/min_priority_queue.gd")
 const DIRS := [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1),Vector2i(1,1),Vector2i(1,-1),Vector2i(-1,1),Vector2i(-1,-1)]
+const DIAGONAL_LENGTH := 1.4142135623730951
+const FAST_ROAD_BOOST := 1.65
 var min_x: int
 var min_z: int
 var width: int
@@ -48,8 +50,9 @@ func nearest(p: Dictionary,max_radius := 9) -> Variant:
 		var best: Variant = null
 		var best_distance := INF
 		for dz in range(-radius,radius+1):
-			for dx in range(-radius,radius+1):
-				if maxi(abs(dx),abs(dz)) != radius or not is_open(p.x+dx,p.z+dz):continue
+			var stride := 1 if absi(dz)==radius else 2*radius
+			for dx in range(-radius,radius+1,stride):
+				if not is_open(p.x+dx,p.z+dz):continue
 				var candidate := point(index(p.x+dx,p.z+dz))
 				var d := sqrt(pow(float(candidate.x)-p.x,2)+pow(float(candidate.z)-p.z,2))
 				if d<best_distance:best=candidate;best_distance=d
@@ -66,8 +69,8 @@ func nearest_reachable(from: Dictionary,target: Dictionary,max_radius:=80) -> Va
 	for radius in range(max_radius+1):
 		var best: Variant=null;var best_distance:=INF
 		for dz in range(-radius,radius+1):
-			for dx in range(-radius,radius+1):
-				if maxi(absi(dx),absi(dz))!=radius:continue
+			var stride := 1 if absi(dz)==radius else 2*radius
+			for dx in range(-radius,radius+1,stride):
 				var n:=index(float(target.x)+dx,float(target.z)+dz)
 				if n<0 or mask[n]==0 or int(access_components[n])!=component:continue
 				var candidate:=point(n);var distance:=pow(float(candidate.x)-float(target.x),2)+pow(float(candidate.z)-float(target.z),2)
@@ -86,7 +89,7 @@ func road_strength(i: int) -> float:
 
 func road_boost(i: int) -> float:
 	var h := road_strength(i)
-	return 1.65 if h>=64 else (1.5 if h>=4 else 1.0)
+	return FAST_ROAD_BOOST if h>=64 else (1.5 if h>=4 else 1.0)
 
 func route(from: Dictionary,to: Dictionary,prefer_roads := true) -> Variant:
 	var a: Variant = nearest(from)
@@ -99,6 +102,10 @@ func route(from: Dictionary,to: Dictionary,prefer_roads := true) -> Variant:
 	var goal_x:=goal%width
 	var goal_z:=floori(float(goal)/width)
 	var use_roads:=prefer_roads and not heat.is_empty()
+	var road_costs:=PackedFloat64Array()
+	if use_roads:road_costs.resize(mask.size())
+	# The best possible road speed bounds the remaining octile distance.
+	var minimum_cost:=1.0/FAST_ROAD_BOOST if use_roads else 1.0
 	var costs := PackedFloat32Array();costs.resize(mask.size());costs.fill(INF)
 	var previous := PackedInt32Array();previous.resize(mask.size());previous.fill(-1)
 	var closed := PackedByteArray();closed.resize(mask.size());closed.fill(0)
@@ -118,12 +125,20 @@ func route(from: Dictionary,to: Dictionary,prefer_roads := true) -> Variant:
 			var xx: int = x+d.x;var zz: int = z+d.y
 			if xx<0 or xx>=width or zz<0 or zz>=height:continue
 			var j := zz*width+xx
-			if mask[j]==0 or closed[j]!=0 or (d.x!=0 and d.y!=0 and (mask[z*width+xx]==0 or mask[zz*width+x]==0)):continue
-			var score: float = costs[k]+sqrt(d.x*d.x+d.y*d.y)*(1.0/road_boost(j) if use_roads else 1.0)
+			var diagonal: bool=d.x!=0 and d.y!=0
+			if mask[j]==0 or closed[j]!=0 or (diagonal and (mask[z*width+xx]==0 or mask[zz*width+x]==0)):continue
+			var weight:=1.0
+			if use_roads:
+				weight=road_costs[j]
+				if weight==0.0:
+					weight=1.0/road_boost(j)
+					road_costs[j]=weight
+			var score: float = costs[k]+(DIAGONAL_LENGTH if diagonal else 1.0)*weight
 			if score<costs[j]:
 				costs[j]=score;previous[j]=k
-				var dx := xx-goal_x;var dz := zz-goal_z
-				heap.push(score+0.45*sqrt(dx*dx+dz*dz),j)
+				var dx:=absi(xx-goal_x);var dz:=absi(zz-goal_z)
+				var remaining:=maxi(dx,dz)+(DIAGONAL_LENGTH-1.0)*mini(dx,dz)
+				heap.push(score+minimum_cost*remaining,j)
 	return null
 
 
