@@ -11,6 +11,7 @@ const Catalog=preload("res://data/house_editor_catalog.json")
 const WINDOWS:=[Vector2(0.76,1.44),Vector2(0.87,1.53),Vector2(0.92,1.64),Vector2(0.92,1.74),Vector2(0.88,1.86),Vector2(0.83,2.04),Vector2(0.68,2.16)]
 const ReedShader=preload("res://scripts/house_reed.gdshader")
 const DaubShader=preload("res://scripts/house_daub.gdshader")
+const MAP_FINISHES={"reed":1,"thatch":1,"hutStone":2,"clay":3}
 const PALETTE={"clay":"c18b54","weave":"a18353","stone":"a4a292","hutStone":"8d8777","wood":"986741","bamboo":"9a805d","mudbrick":"c99b63","cutstone":"d3cab2","plank":"b5895a","brick":"b8573c","plaster":"efe7d3","halftimber":"ece2c9","hide":"b58d65","turf":"9a9462","stave":"c09872","minoanRed":"8e2a1d","minoanBlack":"1d1b1b"}
 const TEXTURES={"hide":"land-hide","clay":"atlas-clay","weave":"atlas-weave","stone":"proc-stone","hutStone":"proc-stone","wood":"atlas-wood","bamboo":"atlas-wood","mudbrick":"proc-mudbrick","cutstone":"proc-cutstone","plank":"proc-plank","brick":"proc-brick","plaster":"proc-plaster","halftimber":"proc-plaster","cyclopean":"proc-cyclopean","fresco":"proc-fresco","limestone":"proc-limestone","stave":"atlas-wood","turf":"land-earth","prestigePlaster":"proc-plaster","marble":"proc-marble","reticulatum":"proc-reticulatum","romanbrick":"proc-romanbrick","floor":"land-dirt","reed":"atlas-straw","thatch":"atlas-straw","sod":"proc-sod","bark":"proc-bark","shingle":"proc-shingle","tile":"proc-tile","earth":"proc-clayroof","roofplank":"proc-roofplank"}
 static var model_cache:Dictionary={}
@@ -51,6 +52,7 @@ func material_for(style: String) -> Material:
  var material:=StandardMaterial3D.new();material.albedo_color=Color(str(PALETTE.get(style,"ffffff")));material.roughness=1.0;material.cull_mode=BaseMaterial3D.CULL_DISABLED
  if simplified and not settlement_detail:
   material.albedo_color=Color(str(LOD_COLORS.get(style,PALETTE.get(style,"a69679"))))
+  if early_round_hut and MAP_FINISHES.has(style):material.set_meta("map_finish",MAP_FINISHES[style])
   materials[style]=material
   return material
  if style in ["reed","thatch"]:material.albedo_color=Color("756b5c")

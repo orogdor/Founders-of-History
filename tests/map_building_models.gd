@@ -48,6 +48,11 @@ func run() -> void:
 			assert(high.get_child(0).scene_file_path==original_path,"Expected the original Iron Age house mesh")
 		if age==0:
 			assert(high.get_child(0).get_script()==HouseModel,"The close Stone Age house uses the lower thatched roof")
+			assert(low.get_surface_count()==1 and low.surface_get_material(0)==Models.round_house_material(),"World-map round houses must keep their single batched surface")
+			var finishes: PackedVector2Array=low.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2]
+			assert(finishes.has(Vector2(1,0)) and finishes.has(Vector2(2,0)),"The world house needs both reed and stone texture coordinates")
+		else:
+			assert(low.surface_get_material(0)==Models.flat_material())
 		assert(low.surface_get_array_index_len(0)/3 < triangle_count(high)*0.25)
 		assert(Models.simplified_mesh("house",age)==low)
 		var middle:=Models.settlement_mesh("house",age)
@@ -71,6 +76,11 @@ func run() -> void:
 	assert(hunter.get_child(0).get_script()==HouseModel)
 	assert(Models.bounds(hunter).size.y<4.6,"A hunting hut should stay close to human scale")
 	hunter.free()
+	var hunting_hut:=Models.simplified_mesh("hunter",0)
+	assert(hunting_hut.surface_get_material(0)==Models.round_house_material())
+	var hut_finishes: PackedVector2Array=hunting_hut.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2]
+	assert(hut_finishes.has(Vector2(1,0)) and hut_finishes.has(Vector2(3,0)),"The hunting hut must render reed and clay without extra surfaces")
+	assert(Models.simplified_mesh("hall",0).surface_get_material(0)==Models.flat_material(),"Rectangular buildings keep their existing world material")
 	var stump:=NatureProps.stump()
 	assert(stump.get_surface_count()==2 and stump.get_aabb().size.y<0.6)
 	for kind in NatureProps.PALETTES:

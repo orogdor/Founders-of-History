@@ -6,6 +6,7 @@ const Placement=preload("res://scripts/building_placement.gd")
 const Fits=preload("res://data/building_fits.json")
 const Rules=preload("res://data/build_rules.json")
 const TownShader=preload("res://scripts/town_material.gdshader")
+const RoundHouseMapShader=preload("res://scripts/round_house_map.gdshader")
 const SurfaceDetail=preload("res://scripts/surface_detail.gd")
 const StoneSurface=preload("res://scripts/stone_surface.gd")
 const Mobile=preload("res://scripts/mobile_profile.gd")
@@ -20,6 +21,7 @@ static var has_vertex_colors:Dictionary={}
 static var town_material:ShaderMaterial
 static var settlement_town_material:ShaderMaterial
 static var low_material:StandardMaterial3D
+static var round_house_map_material:ShaderMaterial
 
 static func specification(type: String,age: int,design: Dictionary,tier: int,simplified:=false) -> Dictionary:
 	var building_age:=maxi(int(Rules.data.age.get(type,0)),age)
@@ -134,7 +136,9 @@ static func simplified_mesh(type: String,age: int,design: Dictionary={},tier:=1)
 		return low_meshes[key]
 	var raw:=source(spec,true)
 	if raw==null:return null
-	var arrays:=geometry_arrays()
+	var textured: bool=raw is HouseModel and raw.early_round_hut
+	var arrays:=geometry_arrays(textured)
+	if textured:arrays[Mesh.ARRAY_TEX_UV2]=PackedVector2Array()
 	if type in Placement.Walls and spec.plan.is_empty():
 		append_wall_shell(type,tier,bounds(raw),arrays)
 	else:
@@ -143,7 +147,7 @@ static func simplified_mesh(type: String,age: int,design: Dictionary={},tier:=1)
 	if arrays[Mesh.ARRAY_INDEX].is_empty():return null
 	var mesh:=ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	mesh.surface_set_material(0,flat_material())
+	mesh.surface_set_material(0,round_house_material() if textured else flat_material())
 	return cache_mesh(key,mesh)
 
 static func mesh_key(spec: Dictionary) -> String:
@@ -175,6 +179,15 @@ static func flat_material() -> StandardMaterial3D:
 		low_material.cull_mode=BaseMaterial3D.CULL_DISABLED
 		low_material.roughness=0.92
 	return low_material
+
+static func round_house_material() -> ShaderMaterial:
+	if round_house_map_material==null:
+		round_house_map_material=ShaderMaterial.new()
+		round_house_map_material.shader=RoundHouseMapShader
+		round_house_map_material.set_shader_parameter("reed_atlas",preload("res://assets/house_designer/atlas-straw.webp"))
+		round_house_map_material.set_shader_parameter("stone_atlas",StoneSurface.FIELDSTONE)
+		round_house_map_material.set_shader_parameter("clay_atlas",preload("res://assets/house_designer/atlas-clay.webp"))
+	return round_house_map_material
 
 static func settlement_mesh(type: String,age: int,design: Dictionary={},tier:=1) -> ArrayMesh:
 	var spec:=specification(type,age,design,tier,true)
@@ -302,6 +315,9 @@ static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Tran
 				selected[i]=bytes.decode_u16(i*stride) if stride==2 else bytes.decode_u32(i*stride)
 			indices=selected
 	var tint:Color=material.albedo_color if not keep_material and material is BaseMaterial3D else Color.WHITE
+	var map_finish:=Vector2.ZERO
+	if output[Mesh.ARRAY_TEX_UV2]!=null and material!=null:
+		map_finish.x=float(material.get_meta("map_finish",0))
 	var normal_basis:=pose.basis.inverse().transposed() if absf(pose.basis.determinant())>0.000001 else Basis.IDENTITY
 	var count:int=indices.size() if indices!=null and not indices.is_empty() else vertices.size()
 	var mapped:Dictionary={}
@@ -316,6 +332,8 @@ static func append_surface(mesh: Mesh,surface: int,material: Material,pose: Tran
 			output[Mesh.ARRAY_COLOR].append(color)
 			if output[Mesh.ARRAY_TEX_UV]!=null:
 				output[Mesh.ARRAY_TEX_UV].append(uv[vertex] if uv!=null and not uv.is_empty() else Vector2.ZERO)
+			if output[Mesh.ARRAY_TEX_UV2]!=null:
+				output[Mesh.ARRAY_TEX_UV2].append(map_finish)
 		output[Mesh.ARRAY_INDEX].append(mapped[vertex])
 
 
