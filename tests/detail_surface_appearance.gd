@@ -28,7 +28,7 @@ func run() -> void:
 	if not capture.is_empty() and DisplayServer.get_name()!="headless":
 		for frame in 260:
 			await process_frame
-			if frame>50 and not game.detail_loading_overlay.visible and game.detail_root.forest_fill==null:break
+			if frame>50 and not game.requested_detail and game.detail_root.forest_fill==null:break
 		await RenderingServer.frame_post_draw
 		assert(root.get_texture().get_image().save_png(capture)==OK)
 	game.graphics_shadows=false;game.update_daylight()

@@ -4,6 +4,7 @@ render_mode cull_disabled, diffuse_burley;
 #include "res://scripts/surface_relief.gdshaderinc"
 #include "res://scripts/detail_map_fog.gdshaderinc"
 #include "res://scripts/detail_surface_sampling.gdshaderinc"
+#include "res://scripts/terrain_climate.gdshaderinc"
 
 uniform bool overview = false;
 uniform bool surface_textures_ready = false;
@@ -70,12 +71,15 @@ void fragment() {
 	highp vec2 wide_dx = dFdx(wide_uv);
 	highp vec2 wide_dy = dFdy(wide_uv);
 	float range = length(VERTEX);
+	vec3 climate=ground_climate(overview?ground_pos/50.0:ground_pos/vec2(225.0,195.0),overview);
+	float dry_terrain=climate_dry(climate);
 	float detail = overview ? 1.0-smoothstep(32.0,78.0,range) : 1.0-smoothstep(82.0,375.0,range);
 	float sand = overview ? 1.0-smoothstep(0.8,4.2,elevation) : 1.0-smoothstep(0.12+shoreline,0.83+shoreline,elevation);
 	float rock = smoothstep(0.15,0.65,1.0-up) * (1.0-sand);
 	float snow = overview ? smoothstep(116.0,144.0,elevation)*up : 0.0;
 	vec3 col = land.rgb;
 	vec3 beach = vec3(0.49,0.37,0.23);
+	float macro_mix=ground_noise(ground_pos*.037+vec2(7.6,18.7));
 	if (!overview) {
 		vec2 skew = TERRAIN_ROTATION*ground_pos;
 		float patches = ground_noise(skew*0.057)*0.59 + ground_noise(ground_pos*0.246+6.4)*0.29
@@ -92,6 +96,7 @@ void fragment() {
 		vec2 patches_uv=ground_pos+terrain_bend(ground_pos*0.037,vec2(71.3,41.9))*12.0;
 		float patches = 2.0*ground_noise(patches_uv*vec2(0.072,0.128)+vec2(10.0,19.0))-1.0;
 		float soil = clamp(0.20+patches*0.29+rock*0.65,0.0,1.0);
+		soil=max(soil,dry_terrain);
 		if (!overview) { soil = mix(soil,1.0,sand); }
 		float forest = land.a*(1.0-soil);
 		vec3 coverage = vec3(1.0-soil-forest,soil,forest);
@@ -135,8 +140,10 @@ void fragment() {
 		}
 	}
 	col = mix(col,vec3(0.25,0.24,0.22),rock*0.52);
+	col=mix(col,desert_grains(climate,.25+.63*macro_mix,rock),dry_terrain*(1.0-rock*.52));
 	col = mix(col,overview ? vec3(0.58,0.51,0.37) : beach,sand*(overview ? 0.72 : 0.92));
-	ALBEDO = mix(col,vec3(0.84,0.86,0.90),snow);
+	float settled_snow=climate_snow(climate,1.0-up,macro_mix)*(1.0-sand);
+	ALBEDO=mix(col,snow_grains(.35+macro_mix*.55,.73),max(snow,settled_snow));
 	if (!overview && dot(undiscovered_edges,vec4(1.0)) > 0.0) {
 		float mist = detail_cloud_edge(tile_pos,ground_pos,undiscovered_edges);
 		if (mist > 0.0) {

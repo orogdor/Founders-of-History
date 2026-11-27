@@ -6,7 +6,7 @@ const SHADER := preload("res://scripts/road_surface.gdshader")
 const WIDTHS := [0.0, 0.78, 0.9, 1.05, 1.575]
 const APPEARANCES := [[1,1,1,1],[1,2,2,2],[2,3,3,3],[2,3,4,4],[2,3,4,5],[3,6,6,5],[3,6,7,7]]
 const ROAD_COLORS := ["", "716147", "7e6b50", "817767", "8b8170", "9a9182", "858682", "545a5a"]
-const TRAIL_COLORS := ["", "b09a73", "bea982", "9e9585", "8f9291"]
+const TRAIL_COLORS := ["", "857455", "958565", "938573", "85867d"]
 const ROAD_KINDS := ["", "soil", "soil", "gravel", "paving", "paving", "paving", "asphalt"]
 const TRAIL_KINDS := ["", "soil", "soil", "gravel", "gravel"]
 const CHANNELS := ["color", "normal", "height"]
@@ -75,6 +75,7 @@ static func material_for(style: int, view: View) -> ShaderMaterial:
 	material.set_shader_parameter("surface_roughness", 0.84 if kind == "asphalt" else 0.96)
 	material.set_shader_parameter("photo_brightness", 0.48 if kind == "asphalt" else 0.82)
 	material.set_shader_parameter("shoulder_variation", 0.32 if is_trail or kind == "soil" else 0.10)
+	material.set_shader_parameter("organic_tracks", 0.7 if is_trail else 1.0 if kind == "soil" else 0.35 if kind == "gravel" else 0.0)
 	if view == View.WORLD:
 		material.set_shader_parameter("tiles_per_unit", 14.0)
 		material.set_shader_parameter("texture_distance", Vector2(18.0, 60.0))

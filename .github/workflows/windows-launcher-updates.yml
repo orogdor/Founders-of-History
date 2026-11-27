@@ -37,6 +37,10 @@ jobs:
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/surface_upgrade.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/main_menu_navigation.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/startup_loading.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/house_roof_courses.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_light_placement.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_cache_resume.gd
+          timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/world_territory_stream.gd
           Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/windows_launcher_updates.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_walk_stream.gd
           timeout 90 Godot_v4.7.2-stable_linux.x86_64 --headless --path . --max-fps 90 --script res://tests/detail_camera_coverage.gd

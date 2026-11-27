@@ -10,7 +10,7 @@ var stamp: String=""
 var refresh_time:=0.0
 
 func _process(delta: float) -> void:
-	if host==null:return
+	if host==null or not host.detail_mode or not is_instance_valid(host.detail_root):return
 	refresh_time+=delta
 	if not stamp.is_empty() and refresh_time<1.0:return
 	refresh_time=0.0
@@ -33,6 +33,8 @@ func rebuild() -> void:
 	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
 	if neighbors==null:return
 	var edges: Array=neighbors.visible_roads()
+	var tile_center:=Grid.center(center.x,center.y)
+	var obstacles: Variant=null
 	for edge in edges:
 		if absi(center.x-edge.a.x)>2 and absi(center.x-edge.b.x)>2:continue
 		if absi(center.y-edge.a.y)>2 and absi(center.y-edge.b.y)>2:continue
@@ -40,8 +42,8 @@ func rebuild() -> void:
 		if owner==null:owner=host.territory_allocation.get("territory",{}).get(str(edge.b.x)+":"+str(edge.b.y))
 		var team:=int(owner.team) if owner is Dictionary else 0
 		var appearance := RoadSurface.appearance_for(int(host.game.ages[team]),level)
-		var tile_center:=Grid.center(center.x,center.y)
-		var obstacles:=tile_obstacles(center);var local_points:=local_road(edge.points,tile_center,obstacles,level)
+		if obstacles==null:obstacles=tile_obstacles(center)
+		var local_points:=local_road(edge.points,tile_center,obstacles,level)
 		for i in range(local_points.size()-1):
 			var a: Vector2=local_points[i];var b: Vector2=local_points[i+1]
 			var part:=Landscape.clip(Vector3(a.x,0,a.y),Vector3(b.x,0,b.y))

@@ -14,7 +14,6 @@ const CHUNK:=8
 const SCALE:=0.04
 const MAX_CHUNKS:=96
 const Mobile=preload("res://scripts/mobile_profile.gd")
-const TREE_KINDS:=["oak","lime","birch","pine","spruce","palm"]
 const TREE_HEIGHTS:={"oak":2.4244623,"lime":2.3191163,"birch":2.5285895,"pine":2.95,"spruce":2.95,"palm":2.6344731}
 const REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.0963,"palm":13.54984}
 const TINTS:=["ffffff","f3f7e6","e6efd6","fff4de","e2ead9","f7f1d4"]
@@ -37,48 +36,16 @@ var building_chunk:=false
 var building_key: String=""
 var build_serial:=0
 var lod_stamp: String=""
-var near_queue: Array=[]
-var near_queued: Dictionary={}
-var near_requests: Dictionary={}
-var near_failed: Dictionary={}
+var mesh_queue: Array[String]=[]
+var mesh_queued: Dictionary={}
+var mesh_requests: Dictionary={}
+var mesh_failed: Dictionary={}
 
 func _ready() -> void:
-	for kind in TREE_KINDS:
-		for variant in (1 if Mobile.active else 5):
-			var key: String=kind+":"+str(variant)
-			var path: String="res://assets/sapling-trees/%s_%02d/%s.glb" % [kind,variant+1,"far" if Mobile.active else "mid"]
-			var model: Node=load(path).instantiate()
-			var item:=first_mesh(model)
-			if item!=null:
-				meshes[key]=item.mesh.duplicate()
-				for surface in item.mesh.get_surface_count():
-					var source_material: Material=item.mesh.surface_get_material(surface)
-					var tree_material: Material=source_material.duplicate() if source_material!=null else null
-					if tree_material is BaseMaterial3D:
-						if tree_material.albedo_texture!=null:
-							if not tree_textures.has(kind):tree_textures[kind]=tree_material.albedo_texture
-							tree_material.albedo_texture=tree_textures[kind]
-						tree_material.vertex_color_use_as_albedo=true
-						tree_material.cull_mode=BaseMaterial3D.CULL_DISABLED
-						if Mobile.active:tree_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-					if tree_material!=null:meshes[key].surface_set_material(surface,tree_material)
-			model.free()
-			if Mobile.active:continue
-			var far_key:=key+":far"
-			var far_path: String="res://assets/sapling-trees/%s_%02d/far.glb" % [kind,variant+1]
-			var far_model: Node=load(far_path).instantiate();var far_item:=first_mesh(far_model)
-			if far_item!=null:
-				meshes[far_key]=far_item.mesh.duplicate()
-				for surface in far_item.mesh.get_surface_count():
-					var source_material: Material=far_item.mesh.surface_get_material(surface)
-					var far_material: Material=source_material.duplicate() if source_material!=null else null
-					if far_material is BaseMaterial3D:
-						far_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-						far_material.vertex_color_use_as_albedo=true;far_material.cull_mode=BaseMaterial3D.CULL_DISABLED
-					if far_material!=null:meshes[far_key].surface_set_material(surface,far_material)
-			far_model.free()
 	for kind in ["cactus","rock","shrub"]:
-		var model: Node=load("res://assets/world/atlas_"+kind+".glb").instantiate()
+		var path: String="res://assets/world/atlas_"+kind+".glb"
+		if not ResourceLoader.exists(path):continue
+		var model: Node=load(path).instantiate()
 		var item:=first_mesh(model)
 		if item!=null:
 			meshes[kind]=item.mesh.duplicate()
@@ -94,17 +61,17 @@ func first_mesh(node: Node) -> MeshInstance3D:
 	return null
 
 func _exit_tree() -> void:
-	for path in near_requests.values():
+	for path in mesh_requests.values():
 		var status:=ResourceLoader.load_threaded_get_status(path)
 		if status in [ResourceLoader.THREAD_LOAD_IN_PROGRESS,ResourceLoader.THREAD_LOAD_LOADED]:ResourceLoader.load_threaded_get(path)
-	near_requests.clear();near_queue.clear();near_queued.clear()
+	mesh_requests.clear();mesh_queue.clear();mesh_queued.clear()
 
 func _process(delta: float) -> void:
 	if host==null or host.game.is_empty():return
 	if building_chunk:chunk_step.emit()
 	visible=not host.detail_mode
 	if not visible:return
-	poll_near_models()
+	poll_world_models()
 	var current_seed:=int(host.game.seed)
 	if seed_value!=current_seed:
 		reset_chunks();seed_value=current_seed
@@ -243,41 +210,73 @@ func visibility_stamp(key: String) -> String:
 
 func tree_lod(node: MultiMeshInstance3D,center: Vector3) -> void:
 	var key: String=node.get_meta("tree_key","")
-	if not meshes.has(key+":far"):return
+	if not key.contains(":"):return
 	var height:=float(node.get_meta("tree_height",0.0));var distance:=maxf(0.001,host.camera.position.distance_to(center))
 	var pixels:=height*get_viewport().get_visible_rect().size.y/(2.0*tan(deg_to_rad(host.camera.fov/2.0))*distance)
 	var previous: String=node.get_meta("tree_lod","far")
 	var level: String="near" if pixels>(37.0 if previous=="near" else 45.0) else "mid" if pixels>(10.0 if previous=="mid" else 12.0) else "far"
-	if level=="near" and not meshes.has(key+":near"):
-		if not near_queued.has(key) and not near_requests.has(key) and not near_failed.has(key):near_queued[key]=true;near_queue.append(key)
-		level="mid"
-	var wanted_mesh: Mesh=meshes[key+":far"] if level=="far" else meshes[key+":near"] if level=="near" else meshes[key]
-	if node.multimesh.mesh!=wanted_mesh:node.multimesh.mesh=wanted_mesh
+	if Mobile.active:level="far"
+	var mesh_key:=key+":"+level
+	var wanted_mesh: Mesh=meshes.get(mesh_key)
+	if wanted_mesh==null:
+		queue_tree_mesh(mesh_key)
+		wanted_mesh=meshes.get(key+":mid",meshes.get(key+":far"))
+		if wanted_mesh==null:
+			queue_tree_mesh(key+":far")
+			wanted_mesh=meshes.get(key.get_slice(":",0)+":0:far")
+	if wanted_mesh!=null and node.multimesh.mesh!=wanted_mesh:node.multimesh.mesh=wanted_mesh
 	node.set_meta("tree_lod",level)
 
-func poll_near_models() -> void:
-	while near_requests.size()<4 and not near_queue.is_empty():
-		var key: String=near_queue.pop_front();near_queued.erase(key)
-		var parts:=key.split(":");var kind: String=parts[0];var variant:=int(parts[1])+1
-		var path: String="res://assets/sapling-trees/%s_%02d/near.glb" % [kind,variant]
-		if ResourceLoader.load_threaded_request(path,"PackedScene",false)==OK:near_requests[key]=path
-		else:near_failed[key]=true
-	for key in near_requests.keys():
-		var path: String=near_requests[key];var state:=ResourceLoader.load_threaded_get_status(path)
+func queue_tree_mesh(key: String) -> void:
+	if meshes.has(key) or mesh_queued.has(key) or mesh_requests.has(key) or mesh_failed.has(key):return
+	mesh_queued[key]=true
+	mesh_queue.append(key)
+
+func poll_world_models() -> void:
+	for key in mesh_requests.keys():
+		var path: String=mesh_requests[key]
+		var state:=ResourceLoader.load_threaded_get_status(path)
+		if state==ResourceLoader.THREAD_LOAD_IN_PROGRESS:continue
+		mesh_requests.erase(key)
 		if state==ResourceLoader.THREAD_LOAD_LOADED:
-			var scene: PackedScene=ResourceLoader.load_threaded_get(path);near_requests.erase(key)
-			if scene==null:near_failed[key]=true;continue
-			var model: Node=scene.instantiate();var item:=first_mesh(model)
-			if item==null:model.free();near_failed[key]=true;continue
-			var near_key: String=key+":near";meshes[near_key]=item.mesh.duplicate();var kind: String=key.split(":")[0]
-			for surface in item.mesh.get_surface_count():
-				var source: Material=item.mesh.surface_get_material(surface);var material: Material=source.duplicate() if source!=null else null
-				if material is BaseMaterial3D:
-					if material.albedo_texture!=null and tree_textures.has(kind):material.albedo_texture=tree_textures[kind]
-					material.vertex_color_use_as_albedo=true;material.cull_mode=BaseMaterial3D.CULL_DISABLED
-				if material!=null:meshes[near_key].surface_set_material(surface,material)
-			model.free();lod_stamp=""
-		elif state in [ResourceLoader.THREAD_LOAD_FAILED,ResourceLoader.THREAD_LOAD_INVALID_RESOURCE]:near_requests.erase(key);near_failed[key]=true
+			var scene:=ResourceLoader.load_threaded_get(path) as PackedScene
+			if scene!=null:store_tree_mesh(key,scene)
+			else:mesh_failed[key]=true
+		else:mesh_failed[key]=true
+		break
+	while mesh_requests.size()<3 and not mesh_queue.is_empty():
+		var key: String=mesh_queue.pop_front()
+		mesh_queued.erase(key)
+		var path: String="res://assets/sapling-trees/%s_%02d/%s.glb" % [key.get_slice(":",0),int(key.get_slice(":",1))+1,key.get_slice(":",2)]
+		if ResourceLoader.exists(path) and ResourceLoader.load_threaded_request(path,"PackedScene",false)==OK:mesh_requests[key]=path
+		else:mesh_failed[key]=true
+
+func store_tree_mesh(key: String,scene: PackedScene) -> void:
+	var model:=scene.instantiate()
+	var source_mesh:=first_mesh(model)
+	if source_mesh==null:
+		mesh_failed[key]=true
+		model.free()
+		return
+	var tree: Mesh=source_mesh.mesh.duplicate()
+	var kind:=key.get_slice(":",0)
+	var level:=key.get_slice(":",2)
+	for surface in tree.get_surface_count():
+		var source: Material=source_mesh.mesh.surface_get_material(surface)
+		if source==null:continue
+		var material: Material=source.duplicate()
+		if material is BaseMaterial3D:
+			if level=="far":material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+			elif material.albedo_texture!=null:
+				var texture_key:=kind+":"+str(surface)
+				if not tree_textures.has(texture_key):tree_textures[texture_key]=material.albedo_texture
+				material.albedo_texture=tree_textures[texture_key]
+			material.vertex_color_use_as_albedo=true
+			material.cull_mode=BaseMaterial3D.CULL_DISABLED
+		tree.surface_set_material(surface,material)
+	meshes[key]=tree
+	model.free()
+	lod_stamp=""
 
 func update_tree_lods() -> void:
 	if host.camera==null:return
@@ -295,9 +294,7 @@ func build_chunk(key: String,serial: int) -> void:
 	ensure_towns()
 	var initial_vision:=visibility_stamp(key);var processed:=0
 	var parts:=key.split(":");var chunk_c:=int(parts[0]);var chunk_r:=int(parts[1])
-	var sets: Dictionary={}
-	for mesh_id in meshes:
-		if not str(mesh_id).ends_with(":far") and not str(mesh_id).ends_with(":near"):sets[mesh_id]=[]
+	var sets: Dictionary={"shrub":[],"rock":[]}
 	var spacing:=8.0 if Mobile.active else 5.0
 	for r in range(chunk_r*CHUNK,mini((chunk_r+1)*CHUNK,Grid.ROWS)):
 		for c in range(chunk_c*CHUNK,mini((chunk_c+1)*CHUNK,Grid.COLS)):
@@ -343,7 +340,8 @@ func build_chunk(key: String,serial: int) -> void:
 					var variant_noise:=sin(p.x*12.9898+p.y*78.233)*43758.5453
 					var variant:=0 if Mobile.active else mini(4,floori((variant_noise-floorf(variant_noise))*5.0))
 					var mesh_key:=tree_kind if tree_kind=="cactus" else tree_kind+":"+str(variant)
-					if not meshes.has(mesh_key):continue
+					if tree_kind=="cactus" and not meshes.has(mesh_key):continue
+					if not sets.has(mesh_key):sets[mesh_key]=[]
 					var size: float=(3.8+k*4.2)*0.45*(1.2 if forest else 1.0)/(1.25 if tree_kind=="cactus" else 1.7 if tree_kind in ["pine","spruce"] else 1.6 if tree_kind=="birch" else 1.45)*SCALE
 					var position:=Vector3((p.x-Grid.WORLD_CENTER_X)*SCALE,Terrain.mesh_elevation(host.world_mesh_samples,p.x,p.y),(p.y-Grid.WORLD_CENTER_Z)*SCALE)
 					var model_scale: float=size if tree_kind=="cactus" else size*float(TREE_HEIGHTS[tree_kind])/float(REFERENCE_HEIGHTS[tree_kind])
@@ -364,7 +362,7 @@ func build_chunk(key: String,serial: int) -> void:
 					if tree_kind.is_empty():continue
 					var variant_noise:=sin(p.x*12.9898+p.y*78.233)*43758.5453
 					var variant:=mini(4,floori((variant_noise-floorf(variant_noise))*5.0));var mesh_key:=tree_kind+":"+str(variant)
-					if not meshes.has(mesh_key):continue
+					if not sets.has(mesh_key):sets[mesh_key]=[]
 					var size: float=(5.6 if tree_kind in ["pine","spruce"] else 5.2 if tree_kind=="birch" else 4.6)*(0.65+Scatter.random_value(gx,gz,seed_value,74)*0.5)*SCALE
 					var model_scale: float=size*float(TREE_HEIGHTS[tree_kind])/float(REFERENCE_HEIGHTS[tree_kind])
 					var position:=Vector3((p.x-Grid.WORLD_CENTER_X)*SCALE,Terrain.mesh_elevation(host.world_mesh_samples,p.x,p.y),(p.y-Grid.WORLD_CENTER_Z)*SCALE)
@@ -378,9 +376,11 @@ func build_chunk(key: String,serial: int) -> void:
 	for tree_kind in sets:
 		var instances: Array=sets[tree_kind]
 		if instances.is_empty():continue
+		var mesh: Mesh=meshes.get(tree_kind)
+		if not tree_kind.contains(":") and mesh==null:continue
 		var multi:=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D;multi.use_colors=true
-		multi.mesh=meshes[tree_kind];multi.instance_count=instances.size()
-		var max_height:=0.0;var unit_height:=multi.mesh.get_aabb().size.y
+		multi.mesh=mesh;multi.instance_count=instances.size()
+		var max_height:=0.0;var unit_height:=mesh.get_aabb().size.y if mesh!=null else float(REFERENCE_HEIGHTS[tree_kind.get_slice(":",0)])
 		for i in instances.size():
 			multi.set_instance_transform(i,instances[i].transform);multi.set_instance_color(i,instances[i].color)
 			max_height=maxf(max_height,instances[i].transform.basis.get_scale().y*unit_height)

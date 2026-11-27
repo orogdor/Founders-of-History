@@ -19,6 +19,21 @@ var team: int=-1
 var actors: Array=[]
 var cursor:=0
 
+static func resident_body(id: String,index: int) -> Array:
+	var key:="%s:%d" % [id,index]
+	return [Humans.pick_body(key,"",index==3),Humans.stable_hash(key)]
+
+static func resident_assets(id: String,era: int) -> Array[String]:
+	var files: Array[String]=["res://assets/people/equipment/load_basket.glb"]
+	for i in range(1,6):
+		var resident:=resident_body(id,i)
+		files.append_array(Humans.detail_actor_files(resident[0],era,"",resident[1]))
+	return files
+
+static func make_resident(id: String,index: int,era: int) -> Node3D:
+	var resident:=resident_body(id,index)
+	return Humans.create(resident[0],era,"",resident[1])
+
 func setup(owner: Node,id: String,tile: Vector2i,tile_heights: Array,owner_team: int,nearby:=false,visual:=PackedVector4Array()) -> void:
 	host=owner;site_id=id;site_tile=tile;heights=tile_heights;visual_heights=visual;team=owner_team
 	var era:=0
@@ -28,14 +43,16 @@ func setup(owner: Node,id: String,tile: Vector2i,tile_heights: Array,owner_team:
 		var figure: Node3D
 		if i==0:figure=GUARD.instantiate();MarkerModels.apply_colors(figure)
 		else:
-			var key:="%s:%d" % [id,i]
-			figure=Humans.create(Humans.pick_body(key,"",i==3),era,"",Humans.stable_hash(key))
+			if not nearby and host!=null and host.has_method("take_opening_resident"):figure=host.take_opening_resident(id,era,i)
+			if figure==null:figure=make_resident(id,i,era)
 		var size:=1.03 if i==0 else (0.69 if i==3 and not Humans.is_real(figure) else 0.94)
 		figure.scale=Vector3.ONE*(1.66*size);root.add_child(figure)
 		var basket:=Equipment.attach(figure,"hand_L","load_basket",Vector3(0,-0.04,0.04))
 		if basket!=null:basket.visible=false
 		var p: Vector2=HOMES[i%HOMES.size()];root.position=Vector3(p.x,Terrain.visual_rendered_height(heights,visual_heights,p.x,p.y),p.y)
 		var motion:=Motion.new();motion.phase=float(i)*0.17
+		var time:=float(host.game.get("time",0.0)) if host!=null and "game" in host else 0.0
+		motion.apply(figure,time,false)
 		actors.append({"index":i,"root":root,"figure":figure,"basket":basket,"motion":motion,"position":p,"path":[],"pathKey":"","activity":"home"})
 
 static func time_period(time: float) -> String:

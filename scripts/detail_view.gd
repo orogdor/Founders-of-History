@@ -13,6 +13,8 @@ const Motion = preload("res://scripts/human_motion.gd")
 const Humans = preload("res://scripts/human_factory.gd")
 const Forest = preload("res://scripts/forest_scatter.gd")
 const ForestFill = preload("res://scripts/detail_forest_fill.gd")
+const TreeFoliage = preload("res://scripts/forest_foliage.gdshader")
+const TreeBark = preload("res://scripts/forest_bark.gdshader")
 const VisualRiver=preload("res://scripts/visual_river.gd")
 const NatureProps=preload("res://scripts/detail_nature_props.gd")
 const HouseEras=preload("res://scripts/house_eras.gd")
@@ -32,6 +34,7 @@ var person: Node3D
 const TREE_REFERENCE_HEIGHTS:={"oak":16.76573,"lime":20.28008,"birch":18.25661,"pine":18.16921,"spruce":18.09630,"palm":13.54984}
 var tree_instances: Dictionary={}
 var tree_lod_levels: Dictionary={}
+var tree_lod_slots: Dictionary={}
 const TREE_LOD_NAMES: Array[String] = ["far","mid","near"]
 const HIDDEN_TREE := Transform3D(Basis(Vector3.ZERO,Vector3.ZERO,Vector3.ZERO),Vector3.ZERO)
 var tree_transforms: Dictionary={}
@@ -54,6 +57,7 @@ var tree_mountain:=false
 var tree_seed:=0
 var river_segments: Array=[]
 var ground_cover: Node3D
+var ground_cover_expand_at:=0
 var village_life: Node3D
 var city_lights: Node3D
 var tree_temperature:=0.5
@@ -61,6 +65,8 @@ var tree_moisture:=0.5
 var tree_textures: Dictionary={}
 static var shared_tree_meshes: Dictionary={}
 static var shared_tree_textures: Dictionary={}
+static var shared_bark_materials: Dictionary={}
+static var shared_leaf_materials: Dictionary={}
 static var tree_asset_frame: int=-1
 static var tree_poll_frame: int=-1
 static var tree_requests: Dictionary={}
@@ -103,7 +109,7 @@ var trainer_motion=Motion.new()
 var person_motion=Motion.new()
 var builder_motion=Motion.new()
 
-func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, seed: int, core_forest: bool, source_world: Dictionary, temperature:=0.5, moisture:=0.5,world_heights:=PackedFloat32Array(),river_graph: Dictionary={}) -> void:
+func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, seed: int, core_forest: bool, source_world: Dictionary, temperature:=0.5, moisture:=0.5,world_heights:=PackedFloat32Array(),river_graph: Dictionary={},show_settler:=true) -> void:
 	heights = Terrain.tile_heights(cells,c,r)
 	world_data = source_world
 	tree_biome=biome;tree_temperature=temperature;tree_moisture=moisture;tree_cell=Vector2i(c,r);tree_river=bool(cells[r*Terrain.Grid.COLS+c].get("river",false))
@@ -135,13 +141,15 @@ func build(cells: Array, c: int, r: int, terrain_color: Color, biome: String, se
 	add_child(water)
 	var host:=get_parent()
 	river_segments=host.detail_landscape_for(self,c,r,heights,visual_heights) if host!=null and host.has_method("detail_landscape_for") else Landscape.build(self,cells,c,r,heights,seed,world_heights,river_graph,true,visual_heights)
-	person = Humans.create("man",0,"settler",1)
-	person.scale = Vector3.ONE * 1.66
-	person.position = Vector3(0,maxf(0,display_height(0,0)),0)
+	person = Humans.create("man",0,"settler",1) if show_settler else Node3D.new()
 	add_child(person)
-	var bag_path:="res://assets/people/equipment/load_settler.glb"
-	if ResourceLoader.exists(bag_path):
-		var bag: Node3D=load(bag_path).instantiate();bag.position=Vector3(0,0.91,-0.3)/1.66;bag.scale=Vector3.ONE/1.66;person.add_child(bag)
+	person.visible=show_settler
+	if show_settler:
+		person.scale=Vector3.ONE*1.66
+		person.position=Vector3(0,maxf(0,display_height(0,0)),0)
+		var bag_scene:=Humans.packed("res://assets/people/equipment/load_settler.glb")
+		if bag_scene!=null:
+			var bag: Node3D=bag_scene.instantiate();bag.position=Vector3(0,0.91,-0.3)/1.66;bag.scale=Vector3.ONE/1.66;person.add_child(bag)
 	add_nature(biome)
 	if cells[r*Terrain.Grid.COLS+c].land:add_ground_cover(biome)
 
@@ -152,7 +160,6 @@ func add_ground_cover(biome: String,share:=1.0,walking:=false) -> void:
 	if Mobile.active:
 		if share<1.0 and not walking:return
 		share=minf(share,0.25)
-	if biome in ["mountain","snow_mountain"]:return
 	ground_cover=Node3D.new();ground_cover.set_script(GroundCover);add_child(ground_cover)
 	ground_cover.setup(tree_cell.x,tree_cell.y,biome,heights,river_segments,share,visual_heights)
 
@@ -249,24 +256,34 @@ func add_nature(biome: String) -> void:
 func ensure_fish(resource: Dictionary) -> void:
 	var id:=int(resource.id)
 	if not fish_models.has(id):
-		var path:="res://assets/world/kala_low.glb"
-		if not ResourceLoader.exists(path):return
-		var fish: Node3D=load(path).instantiate();fish.scale=Vector3.ONE*(0.35/0.990886)
+		var scene:=nature_scene("kala_low")
+		var pending_key:="fish:"+str(id)
+		if scene==null:
+			if int(nature_requests.get("kala_low",FAILED))==OK:
+				pending_nature[pending_key]={"kind":"fish","resource":resource}
+			return
+		pending_nature.erase(pending_key)
+		var fish: Node3D=scene.instantiate();fish.scale=Vector3.ONE*(0.35/0.990886)
 		fish.position=Vector3(float(resource.x),0.18,float(resource.z));add_child(fish);fish_models[id]=fish
 	fish_models[id].visible=not resource.get("removed",false) and float(resource.get("amount",0))>0
 
 func _process(delta: float) -> void:
+	if ground_cover_expand_at>0 and Time.get_ticks_msec()>=ground_cover_expand_at:
+		ground_cover_expand_at=0
+		if is_instance_valid(ground_cover):ground_cover.raise_density(0.25 if Mobile.active else 1.0)
 	GroundMaterial.poll()
 	poll_tree_assets()
 	process_forest_fill()
 	var created:=0
 	for key in pending_nature.keys():
 		var item: Dictionary=pending_nature[key]
-		if item.kind=="berry":ensure_berry(item.resource)
-		else:ensure_animal(item.resource)
+		match item.kind:
+			"berry":ensure_berry(item.resource)
+			"fish":ensure_fish(item.resource)
+			"game":ensure_animal(item.resource)
 		if not pending_nature.has(key):created+=1
 		if created>=4:break
-	if tree_pending:sync_tree_instances(tree_sync_time,tree_sync_buildings)
+	if tree_pending:sync_tree_instances(tree_sync_time,tree_sync_buildings,true)
 	var camera:=get_viewport().get_camera_3d()
 	if camera==null:return
 	tree_lod_timer+=delta
@@ -295,14 +312,15 @@ func set_nature_lod(root: Node3D,near: bool) -> void:
 	if low!=null:low.visible=not near
 
 static func request_nature_assets() -> void:
-	for name in NATURE_FILES:
-		if nature_requests.has(name):continue
-		var path: String="res://assets/world/"+name+".glb"
-		var error:=ResourceLoader.load_threaded_request(path,"PackedScene",false)
-		nature_requests[name]=error
+	for name in NATURE_FILES:request_nature_asset(name)
+
+static func request_nature_asset(name: String) -> void:
+	if nature_requests.has(name):return
+	var path:="res://assets/world/"+name+".glb"
+	nature_requests[name]=ResourceLoader.load_threaded_request(path,"PackedScene",false)
 
 static func poll_nature_assets() -> void:
-	for name in NATURE_FILES:nature_scene(name)
+	for name in nature_requests:nature_scene(name)
 
 static func poll_tree_assets() -> void:
 	var frame:=Engine.get_process_frames()
@@ -336,7 +354,7 @@ static func finish_asset_requests() -> void:
 
 static func nature_scene(name: String) -> PackedScene:
 	if nature_scenes.has(name):return nature_scenes[name]
-	if not nature_requests.has(name):request_nature_assets()
+	request_nature_asset(name)
 	var path: String="res://assets/world/"+name+".glb"
 	if int(nature_requests.get(name,FAILED))!=OK:return null
 	var status:=ResourceLoader.load_threaded_get_status(path)
@@ -755,20 +773,45 @@ func ensure_tree_group(key: String) -> void:
 			var original: Material=mesh.surface_get_material(surface)
 			if not original is BaseMaterial3D:continue
 			var material: BaseMaterial3D=original.duplicate()
+			var foliage:=material.resource_name.to_lower().contains("foliage")
 			if material.albedo_texture!=null and level!="far":
 				if not shared_tree_textures.has(kind):shared_tree_textures[kind]=material.albedo_texture
 				material.albedo_texture=shared_tree_textures[kind]
+			if foliage and not Mobile.active and material.albedo_texture!=null:
+				if not shared_leaf_materials.has(kind):
+					var leaf:=ShaderMaterial.new()
+					leaf.shader=TreeFoliage
+					leaf.set_shader_parameter("foliage_atlas",material.albedo_texture)
+					leaf.set_shader_parameter("alpha_cut",material.alpha_scissor_threshold)
+					var tint: Vector3={"birch":Vector3(0.74,0.85,0.64),"oak":Vector3(0.66,0.77,0.62),"pine":Vector3(0.59,0.74,0.68),"spruce":Vector3(0.57,0.72,0.59)}.get(kind,Vector3(0.72,0.81,0.64))
+					leaf.set_shader_parameter("canopy_tint",tint)
+					shared_leaf_materials[kind]=leaf
+				mesh.surface_set_material(surface,shared_leaf_materials[kind])
+				continue
+			if not foliage and level!="far" and not Mobile.active and material.albedo_texture!=null and not material.normal_enabled:
+				if not shared_bark_materials.has(kind):
+					var bark:=ShaderMaterial.new()
+					bark.shader=TreeBark
+					bark.set_shader_parameter("bark_atlas",material.albedo_texture)
+					bark.set_shader_parameter("birch",kind=="birch")
+					shared_bark_materials[kind]=bark
+				mesh.surface_set_material(surface,shared_bark_materials[kind])
+				continue
 			if level=="far":
 				material.shading_mode=BaseMaterial3D.SHADING_MODE_PER_PIXEL if Mobile.active else BaseMaterial3D.SHADING_MODE_UNSHADED
 				if Mobile.active:material.roughness=1.0;material.metallic_specular=0.0
-			elif material.resource_name.to_lower().contains("foliage"):material.albedo_color=Color(0.55,0.70,0.55)
+			elif foliage:material.albedo_color=Color(0.55,0.70,0.55)
+			else:
+				material.roughness=0.96
+				material.metallic_specular=0.14
 			material.cull_mode=BaseMaterial3D.CULL_DISABLED
 			mesh.surface_set_material(surface,material)
 		shared_tree_meshes[key]=mesh;model.free();tree_scenes.erase(key)
 	var mesh: Mesh=shared_tree_meshes[key]
 	var multi:=MultiMesh.new();multi.transform_format=MultiMesh.TRANSFORM_3D;multi.mesh=mesh
 	var node:=MultiMeshInstance3D.new();node.multimesh=multi;node.visible=Mobile.active or parts.size()>2
-	if Mobile.active and not mobile_tree_shadows:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if (Mobile.active and not mobile_tree_shadows) or (not Mobile.active and level=="far"):
+		node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node);tree_instances[key]=node
 
 func update_tree_lods(camera: Camera3D) -> void:
@@ -800,44 +843,73 @@ func process_tree_lod_group() -> void:
 		states.resize(count)
 		states.fill(255)
 	var desired:=PackedByteArray();desired.resize(count)
-	var needed: Array[bool]=[false,true,false]
+	var needed: Array[bool]=[false,false,false]
 	var pose:=global_transform
 	var pixel_factor:=tree_lod_view_height/(2.0*tan(deg_to_rad(tree_lod_fov*0.5)))
 	for i in count:
 		var transform: Transform3D=transforms[i]
 		var height:=reference_height*transform.basis.y.length()
+		if height<0.001:
+			desired[i]=255
+			continue
 		var center:=pose*(transform.origin+Vector3.UP*height*0.5)
 		var pixels:=height*pixel_factor/maxf(1.0,tree_lod_camera.distance_to(center))
 		var previous:=int(states[i])
-		var level:=2 if pixels>(37.0 if previous==2 else 45.0) else 1 if pixels>(10.0 if previous==1 else 12.0) else 0
-		desired[i]=level if height>=0.001 else 1
-		needed[desired[i]]=true
+		var level:=2 if pixels>(61.0 if previous==2 else 76.0) else 1 if pixels>(10.0 if previous==1 else 12.0) else 0
+		desired[i]=level
+		needed[level]=true
+	needed[1]=needed[0] or needed[1] or needed[2]
 	var meshes: Array[MultiMesh]=[null,null,null]
-	var resized: Array[bool]=[false,false,false]
+	var nodes: Array[MultiMeshInstance3D]=[null,null,null]
+	var changed:=not tree_lod_slots.has(key)
 	for level in TREE_LOD_NAMES.size():
 		var lod_key: String=key+":"+TREE_LOD_NAMES[level]
 		if needed[level]:ensure_tree_group(lod_key)
 		if not tree_instances.has(lod_key):
 			if needed[level]:tree_lod_dirty=true
 			continue
-		var mesh: MultiMesh=tree_instances[lod_key].multimesh
+		var node: MultiMeshInstance3D=tree_instances[lod_key]
+		var mesh:=node.multimesh
 		meshes[level]=mesh
-		if mesh.instance_count==count:continue
-		mesh.instance_count=count
-		var hidden:=PackedFloat32Array()
-		hidden.resize(count*12)
-		mesh.buffer=hidden
-		resized[level]=true
+		nodes[level]=node
+		changed=changed or mesh.instance_count!=count
 	for i in count:
-		var previous:=int(states[i])
-		var next:=int(desired[i])
-		if meshes[next]==null:next=1
-		if meshes[next]==null:continue
-		if previous!=next and previous<meshes.size() and meshes[previous]!=null and not resized[previous]:
-			meshes[previous].set_instance_transform(i,HIDDEN_TREE)
-		if previous!=next or resized[next]:meshes[next].set_instance_transform(i,transforms[i])
-		states[i]=next
-	tree_lod_levels[key]=states
+		var level:=int(desired[i])
+		if level<meshes.size() and meshes[level]==null:
+			level=1 if meshes[1]!=null else 255
+			desired[i]=level
+		changed=changed or states[i]!=level
+	if not changed:return
+	var slots:=PackedInt32Array()
+	slots.resize(count)
+	slots.fill(-1)
+	var uploads: Array[PackedFloat32Array]=[PackedFloat32Array(),PackedFloat32Array(),PackedFloat32Array()]
+	var visible_counts:=PackedInt32Array([0,0,0])
+	for level in meshes.size():
+		if meshes[level]!=null:uploads[level].resize(count*12)
+	for i in count:
+		var level:=int(desired[i])
+		if level>=meshes.size():continue
+		var slot:=visible_counts[level]
+		slots[i]=slot
+		visible_counts[level]+=1
+		var transform: Transform3D=transforms[i]
+		var offset:=slot*12
+		for row in 3:
+			uploads[level][offset+row*4]=transform.basis.x[row]
+			uploads[level][offset+row*4+1]=transform.basis.y[row]
+			uploads[level][offset+row*4+2]=transform.basis.z[row]
+			uploads[level][offset+row*4+3]=transform.origin[row]
+	for level in meshes.size():
+		var mesh:=meshes[level]
+		if mesh==null:continue
+		var visible_count:=visible_counts[level]
+		if mesh.instance_count!=count:mesh.instance_count=count
+		if visible_count>0:mesh.buffer=uploads[level]
+		mesh.visible_instance_count=visible_count
+		nodes[level].visible=visible_count>0
+	tree_lod_levels[key]=desired
+	tree_lod_slots[key]=slots
 
 func set_tree_transform(key: String,index: int,transform: Transform3D) -> void:
 	if Mobile.active:
@@ -850,89 +922,98 @@ func set_tree_transform(key: String,index: int,transform: Transform3D) -> void:
 	var states: PackedByteArray=tree_lod_levels.get(key,PackedByteArray())
 	if index>=states.size() or int(states[index])>=TREE_LOD_NAMES.size():return
 	var lod_key: String=key+":"+TREE_LOD_NAMES[states[index]]
-	if tree_instances.has(lod_key) and index<tree_instances[lod_key].multimesh.instance_count:
-		tree_instances[lod_key].multimesh.set_instance_transform(index,transform)
+	var slots: PackedInt32Array=tree_lod_slots[key]
+	var slot:=slots[index]
+	if tree_instances.has(lod_key) and slot>=0:
+		tree_instances[lod_key].multimesh.set_instance_transform(slot,transform)
 
 func hide_tree(id: Variant) -> void:
-	tree_lod_dirty=true
 	var key: String=tree_groups.get(id,"")
 	if tree_instances.has(key):set_tree_transform(key,int(tree_indices[id]),HIDDEN_TREE)
 	if tree_companions.has(id):
 		var companion: Dictionary=tree_companions[id]
 		if tree_instances.has(companion.key):set_tree_transform(companion.key,int(companion.index),HIDDEN_TREE)
 
-func sync_tree_instances(now: float,buildings: Array=[]) -> void:
+func sync_tree_instances(now: float,buildings: Array=[],new_groups_only:=false) -> void:
 	tree_sync_time=now;tree_sync_buildings=buildings;tree_pending=false
-	var resized:=false
+	var resized: Dictionary={}
 	for key in tree_counts:
 		ensure_tree_group(key)
 		if not tree_instances.has(key):tree_pending=true;continue
-		if tree_instances.has(key) and tree_instances[key].multimesh.instance_count!=int(tree_counts[key]):
+		if tree_instances[key].multimesh.instance_count!=int(tree_counts[key]):
 			tree_instances[key].multimesh.instance_count=int(tree_counts[key])
 			if not Mobile.active:
 				var transforms: Array=tree_transforms.get(key,[])
 				while transforms.size()<int(tree_counts[key]):transforms.append(HIDDEN_TREE)
 				tree_transforms[key]=transforms
 				tree_lod_dirty=true
-			resized=true
+			resized[key]=true
+	if new_groups_only and resized.is_empty():return
+	var footprints:=tree_clearance_footprints(buildings)
 	for resource in resources:
 		if resource.kind!="tree" or not tree_indices.has(resource.id):continue
 		var key: String=tree_groups[resource.id]
-		if not tree_instances.has(key):continue
-		var kind: String=key.split(":")[0]
-		var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
+		var companion: Dictionary=tree_companions.get(resource.id,{})
+		var companion_key: String=companion.get("key","")
+		var primary:=tree_instances.has(key) and (not new_groups_only or resized.has(key))
+		var secondary:=tree_instances.has(companion_key) and (not new_groups_only or resized.has(companion_key))
+		if not primary and not secondary:continue
 		var transform:=tree_transform(resource,heights,now,visual_heights)
-		if tree_mountain or display_height(resource.x,resource.z)<0.5 or Landscape.near_water(Vector2(resource.x,resource.z),river_segments,1.55):transform=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
-		var varied_size:=tree_proportions(hash([tree_cell,resource.id]))*(0.9*height/float(TREE_REFERENCE_HEIGHTS[kind]))
-		transform.basis=Basis(Vector3.UP,float(resource.id)*0.39)*transform.basis.scaled(varied_size)
-		set_tree_transform(key,int(tree_indices[resource.id]),transform)
-		if not tree_companions.has(resource.id):continue
-		var companion: Dictionary=tree_companions[resource.id];var companion_key: String=companion.key
-		if not tree_instances.has(companion_key):continue
-		var blocked: bool=tree_mountain or float(companion.y)<0.5 or resource.get("removed",false) or Landscape.near_water(Vector2(companion.x,companion.z),river_segments,1.55)
+		var growth:=transform.basis.get_scale().x
+		if primary:
+			if tree_mountain or transform.origin.y<0.5 or Landscape.near_water(Vector2(resource.x,resource.z),river_segments,1.55):transform=HIDDEN_TREE
+			var kind:=key.get_slice(":",0)
+			var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
+			var varied_size:=tree_proportions(hash([tree_cell,resource.id]))*(0.9*height/float(TREE_REFERENCE_HEIGHTS[kind]))
+			transform.basis=Basis(Vector3.UP,float(resource.id)*0.39)*transform.basis.scaled(varied_size)
+			set_tree_transform(key,int(tree_indices[resource.id]),transform)
+		if not secondary:continue
+		var position:=Vector2(companion.x,companion.z)
+		var blocked: bool=tree_mountain or float(companion.y)<0.5 or resource.get("removed",false) or Landscape.near_water(position,river_segments,1.55) or in_tree_clearance(position,footprints,5.0)
+		var companion_transform:=HIDDEN_TREE
 		if not blocked:
-			for building in buildings:
-				if building.get("virtual",false) or float(building.get("hp",0))<=0:continue
-				var clearance: Variant={"rx":float(building.get("width",16))/2.0,"rz":float(building.get("depth",16))/2.0} if building.type=="field" else LocalNavigation.clearance(building)
-				if clearance!=null and absf(float(companion.x)-float(building.x))<float(clearance.rx)+5.0 and absf(float(companion.z)-float(building.z))<float(clearance.rz)+5.0:blocked=true;break
-		var companion_transform:=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
-		if not blocked:
-			var companion_kind: String=companion_key.split(":")[0]
+			var companion_kind:=companion_key.get_slice(":",0)
 			var companion_height:=9.0 if companion_kind in ["pine","spruce"] else 10.0 if companion_kind=="palm" else 7.0
-			var growth: float=tree_transform(resource,heights,now,visual_heights).basis.get_scale().x
 			var size: float=float(companion.scale)*growth*companion_height/float(TREE_REFERENCE_HEIGHTS[companion_kind])
 			var proportions:=tree_proportions(hash([tree_cell,resource.id,19]))
 			companion_transform=Transform3D(Basis(Vector3.UP,float(companion.seed)*0.39).scaled(proportions*size),Vector3(companion.x,companion.y,companion.z))
 		set_tree_transform(companion_key,int(companion.index),companion_transform)
-	if not fill_trees.is_empty():sync_forest_fill(buildings,resized)
+	if not fill_trees.is_empty():sync_forest_fill(footprints,resized)
 
 static func tree_proportions(seed: int) -> Vector3:
 	var roll:=float(posmod(seed,1024))/1023.0
-	var height:=lerpf(0.55,1.4,smoothstep(0.0,1.0,roll))
-	var width:=lerpf(0.58,1.18,pow(roll,0.62))
+	var spread:=float(posmod(floori(float(seed)/1024.0),256))/255.0
+	var height:=lerpf(0.49,1.51,smoothstep(0.0,1.0,roll))
+	var width:=lerpf(0.58,1.20,pow(roll*0.70+0.30*spread,0.72))
 	return Vector3(width,height,width)
 
-func sync_forest_fill(buildings: Array,force:=false) -> void:
-	var footprints: Array=[];var stamp:=str(world_data.get("revision",0))
+func tree_clearance_footprints(buildings: Array) -> Array[Vector4]:
+	var footprints: Array[Vector4]=[]
 	for building in buildings:
 		if building.get("virtual",false) or float(building.get("hp",0))<=0:continue
 		var clearance: Variant={"rx":float(building.get("width",16))/2.0,"rz":float(building.get("depth",16))/2.0} if building.type=="field" else LocalNavigation.clearance(building)
 		if clearance==null:continue
-		var box: Array=[float(building.x),float(building.z),float(clearance.rx)+1.5,float(clearance.rz)+1.5]
-		footprints.append(box);stamp+=":"+str(box)
-	if stamp==fill_stamp and not force:return
+		footprints.append(Vector4(building.x,building.z,clearance.rx,clearance.rz))
+	return footprints
+
+func in_tree_clearance(position: Vector2,footprints: Array[Vector4],margin: float) -> bool:
+	for box in footprints:
+		if absf(position.x-box.x)<box.z+margin and absf(position.y-box.y)<box.w+margin:return true
+	return false
+
+func sync_forest_fill(footprints: Array[Vector4],resized: Dictionary) -> void:
+	var stamp:=str(world_data.get("revision",0))+":"+str(footprints)
+	var unchanged:=stamp==fill_stamp
+	if unchanged and resized.is_empty():return
 	fill_stamp=stamp
 	for entry in fill_trees:
 		var key: String=entry.key
-		if not tree_instances.has(key):continue
+		if not tree_instances.has(key) or (unchanged and not resized.has(key)):continue
 		var owner: Dictionary=entry.owner
-		var blocked: bool=owner.get("removed",false) or float(owner.get("amount",0))<=0
+		var blocked: bool=owner.get("removed",false) or float(owner.get("amount",0))<=0 or in_tree_clearance(Vector2(entry.x,entry.z),footprints,1.5)
+		var transform:=HIDDEN_TREE
 		if not blocked:
-			for box in footprints:
-				if absf(float(entry.x)-box[0])<box[2] and absf(float(entry.z)-box[1])<box[3]:blocked=true;break
-		var transform:=Transform3D(Basis().scaled(Vector3.ZERO),Vector3.ZERO)
-		if not blocked:
-			var kind: String=key.split(":")[0]
+			var kind:=key.get_slice(":",0)
 			var height:=9.0 if kind in ["pine","spruce"] else 10.0 if kind=="palm" else 7.0
 			var scale:=0.9*height*float(entry.scale)/float(TREE_REFERENCE_HEIGHTS[kind])
 			transform=Transform3D(Basis(Vector3.UP,float(entry.id)*0.39).scaled(tree_proportions(int(entry.id))*scale),Vector3(entry.x,display_height(entry.x,entry.z),entry.z))

@@ -15,12 +15,27 @@ uniform float surface_roughness = 0.94;
 uniform float photo_brightness = 1.0;
 uniform float shoulder_variation = 0.15;
 uniform float atlas_fill = 0.0;
+uniform float organic_tracks = 0.0;
 instance uniform vec2 road_uv_offset = vec2(0.0);
 
 varying vec2 road_uv;
 
 void vertex() {
 	road_uv = (UV + road_uv_offset) * tiles_per_unit;
+}
+
+float track_hash(vec2 cell) {
+	vec3 p=fract(cell.xyx*0.1031);
+	p+=dot(p,p.yzx+33.33);
+	return fract((p.x+p.y)*p.z);
+}
+
+float track_noise(vec2 p) {
+	vec2 cell=floor(p), blend=fract(p);
+	blend=blend*blend*(3.0-2.0*blend);
+	float bottom=mix(track_hash(cell),track_hash(cell+vec2(1,0)),blend.x);
+	float top=mix(track_hash(cell+vec2(0,1)),track_hash(cell+vec2(1,1)),blend.x);
+	return mix(bottom,top,blend.y);
 }
 
 void fragment() {
@@ -31,6 +46,8 @@ void fragment() {
 	float edge = length(UV2);
 	float height = 0.5;
 	vec3 color = road_tint.rgb;
+	float rim=0.97;
+	float wear=0.0;
 	NORMAL_MAP = vec3(0.5, 0.5, 1.0);
 	NORMAL_MAP_DEPTH = 0.0;
 	if (detail > 0.0) {
@@ -38,16 +55,30 @@ void fragment() {
 		float depth = relief_depth * (1.0 - smoothstep(relief_distance.x, relief_distance.y, distance_to_camera));
 		vec2 shifted = road_uv - relief_direction(VIEW, TANGENT, BINORMAL, NORMAL) * (1.0 - height) * depth;
 		vec3 photo = textureGrad(road_color, shifted, dx, dy).rgb;
+		if (organic_tracks>0.0 && atlas_fill==0.0) {
+			const mat2 ROT=mat2(vec2(.68,.733),vec2(-.733,.68));
+			vec2 coarse=ROT*(shifted*.49)+vec2(3.35,1.82);
+			float patch=track_noise(coarse*.51)+.35*track_noise(coarse*1.52+vec2(19.4,8.1));
+			vec3 scattered=textureGrad(road_color,coarse,ROT*(dx*.49),ROT*(dy*.49)).rgb;
+			photo=mix(photo,scattered,smoothstep(.36,.87,patch)*.64);
+			float lanes=1.0-smoothstep(.08,.21,abs(edge-.36-(patch-.62)*.21));
+			wear=organic_tracks*detail;
+			float mud=smoothstep(.51,.83,patch);
+			photo*=mix(1.0,.71+.14*lanes+.18*mud,wear);
+			vec3 moss=photo*vec3(.70,.86,.64);
+			photo=mix(photo,moss,mud*(1.0-lanes)*wear*.76);
+			rim-=wear*clamp((patch-.33)*.14,0.0,.088);
+		}
 		color = mix(color, photo * photo_brightness, detail * 0.68);
 		color *= mix(1.0, 0.87 + 0.24 * height, detail);
 		NORMAL_MAP = textureGrad(road_normal, shifted, dx, dy).rgb;
 		NORMAL_MAP_DEPTH = detail * 0.65;
 	}
 	// Use the height texture to break up the shoulder without a transparent overlay.
-	if (edge > 0.97 - shoulder_variation * (1.0 - height) * detail) {
+	if (edge > rim - shoulder_variation * (1.0 - height) * detail) {
 		discard;
 	}
-	ALBEDO = color * (1.0 - 0.12 * smoothstep(0.65, 1.0, edge));
+	ALBEDO = color * (1.0 - (.12+.13*wear) * smoothstep(.61, .96, edge));
 	EMISSION = color * atlas_fill * (1.0 - 0.35 * detail);
 	ROUGHNESS = surface_roughness;
 }

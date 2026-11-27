@@ -35,9 +35,15 @@ static func river_points(cell: Dictionary,target: Dictionary,tile: Dictionary,se
 	return points
 
 static func build(parent: Node3D,cells: Array,c: int,r: int,heights: Array,seed: int,world_heights:=PackedFloat32Array(),graph: Dictionary={},render:=true,visual:=PackedVector4Array()) -> Array:
+	var data:=prepare(cells,c,r,heights,seed,world_heights,graph,render,visual)
+	if render:install(parent,data,heights,visual)
+	return data.segments
+
+static func prepare(cells: Array,c: int,r: int,heights: Array,seed: int,world_heights: PackedFloat32Array,graph: Dictionary,render: bool,visual: PackedVector4Array) -> Dictionary:
 	var tile: Dictionary=cells[r*Grid.COLS+c]
 	var tile_center:=Grid.center(c,r)
 	var segments: Array=[]
+	var crossings: Array=[]
 	for dr in range(-2,3):
 		for dc in range(-2,3):
 			var sc:=c+dc;var sr:=r+dr
@@ -73,11 +79,27 @@ static func build(parent: Node3D,cells: Array,c: int,r: int,heights: Array,seed:
 			if render and (source.get("bridge",false) or source.get("ford",false)):
 				var p: Vector3=points[0]
 				if absf(p.x)<HALF.x and absf(p.z)<HALF.y:
-					add_crossing(parent,points,heights,bool(source.get("bridge",false)),visual,Vector2i(sc,sr))
+					crossings.append({"points":points,"bridge":bool(source.get("bridge",false)),"tile":Vector2i(sc,sr)})
+	var water: Dictionary={}
 	if render and not segments.is_empty():
 		var visual_rivers:=VisualRiver.segments(cells,world_heights,c,r,graph) if visual.size()==17*17 else []
-		add_water(parent,segments,heights,visual,{"segments":visual_rivers,"world_heights":world_heights,"center":tile_center})
-	return segments
+		water=prepare_water(segments,heights,visual,{"segments":visual_rivers,"world_heights":world_heights,"center":tile_center})
+	return {"segments":segments,"crossings":crossings,"water":water,"phase_origin":Vector2(c*225.0,r*195.0)}
+
+static func install(parent: Node3D,data: Dictionary,heights: Array,visual: PackedVector4Array) -> void:
+	for crossing in data.crossings:
+		add_crossing(parent,crossing.points,heights,crossing.bridge,visual,crossing.tile)
+	var water: Dictionary=data.water
+	if water.has("banks"):
+		var bank_material:=ShaderMaterial.new()
+		bank_material.shader=preload("res://scripts/river_bank.gdshader")
+		bank_material.set_shader_parameter("bank_texture",preload("res://assets/house_designer/mine-rock.webp"))
+		bank_material.set_shader_parameter("phase_origin",data.phase_origin)
+		add_surface(parent,water.banks,bank_material)
+	if water.has("stream"):
+		var water_material:=ShaderMaterial.new();water_material.shader=load("res://scripts/detail_river.gdshader")
+		water_material.set_shader_parameter("phase_origin",data.phase_origin)
+		add_surface(parent,water.stream,water_material)
 
 static func near_water(position: Vector2,segments: Array,margin:=1.35,extra:=0.0) -> bool:
 	for segment in segments:
@@ -127,7 +149,7 @@ static func append_polygon(vertices: PackedVector3Array,poly: Array,heights: Arr
 				y=(level-0.7)*0.3+0.01
 			vertices.append(Vector3(p.x,y,p.y))
 
-static func add_water(parent: Node3D,segments: Array,heights: Array,visual:=PackedVector4Array(),water_context: Dictionary={}) -> void:
+static func prepare_water(segments: Array,heights: Array,visual: PackedVector4Array,water_context: Dictionary) -> Dictionary:
 	var water:=PackedVector3Array();var banks:=PackedVector3Array();var nodes: Array=[]
 	const NX:=32;const NZ:=28
 	for j in range(NZ+1):
@@ -140,22 +162,42 @@ static func add_water(parent: Node3D,segments: Array,heights: Array,visual:=Pack
 			for poly in [[nodes[k],nodes[k+NX+1],nodes[k+1]],[nodes[k+1],nodes[k+NX+1],nodes[k+NX+2]]]:
 				append_polygon(water,clip_field(poly,0),heights,0.19,visual,water_context)
 				append_polygon(banks,clip_field(clip_field(poly,1),0,true),heights,0.10,visual)
+	var data: Dictionary={}
 	if not banks.is_empty():
-		var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var colors:=PackedColorArray()
 		for vertex in banks:
 			var d:=water_field(Vector2(vertex.x,vertex.z),segments)
 			var fade:=clampf(d.x/maxf(0.001,d.x-d.y),0,1)
-			surface.set_color(Color(1,1,1,0.8*pow(1.0-fade,1.6)*d.z));surface.add_vertex(vertex)
-		var bank_material:=material(Color("6e6a4c"),1.0);bank_material.vertex_color_use_as_albedo=true
-		var bank:=MeshInstance3D.new();bank.mesh=surface.commit();bank.material_override=bank_material;parent.add_child(bank)
+			colors.append(Color(1,1,1,0.8*pow(1.0-fade,1.6)*d.z))
+		data.banks=surface_arrays(banks,colors)
 	if not water.is_empty():
-		var water_material:=ShaderMaterial.new();water_material.shader=load("res://scripts/detail_river.gdshader")
-		var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var colors:=PackedColorArray()
 		for vertex in water:
 			var d:=water_field(Vector2(vertex.x,vertex.z),segments)
 			var width:=maxf(0.001,(d.x-d.y)/0.4);var edge:=clampf(1.0+d.x/width,0.0,1.0)
-			surface.set_color(Color(edge,0,0,d.z));surface.set_normal(Vector3.UP);surface.add_vertex(vertex)
-		var stream:=MeshInstance3D.new();stream.mesh=surface.commit();stream.material_override=water_material;parent.add_child(stream)
+			colors.append(Color(edge,0,0,d.z))
+		data.stream=surface_arrays(water,colors)
+		var normals:=PackedVector3Array()
+		normals.resize(water.size())
+		normals.fill(Vector3.UP)
+		data.stream[Mesh.ARRAY_NORMAL]=normals
+	return data
+
+static func surface_arrays(vertices: PackedVector3Array,colors: PackedColorArray) -> Array:
+	var arrays: Array=[]
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]=vertices
+	arrays[Mesh.ARRAY_COLOR]=colors
+	return arrays
+
+static func add_surface(parent: Node3D,arrays: Array,surface_material: Material) -> void:
+	var mesh:=ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	var instance:=MeshInstance3D.new()
+	instance.mesh=mesh
+	instance.material_override=surface_material
+	instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(instance)
 
 static func add_crossing(parent: Node3D,points: Array,heights: Array,bridge: bool,visual:=PackedVector4Array(),tile:=Vector2i(-1,-1)) -> void:
 	var path: String="res://assets/world/crossings/bridge.glb" if bridge else "res://assets/world/crossings/ford.glb"
@@ -173,12 +215,6 @@ static func add_crossing(parent: Node3D,points: Array,heights: Array,bridge: boo
 	var zaxis:=Vector3(-normal.y*6.2*3,0,normal.x*6.2*2.6)
 	crossing.transform=Transform3D(Basis(xaxis,Vector3(0,0.3,0),zaxis),Vector3(first.x,(lh+rh)*0.5 if bridge else Terrain.visual_rendered_height(heights,visual,first.x,first.z)+0.12,first.z))
 	parent.add_child(crossing)
-
-static func material(color: Color,opacity: float) -> StandardMaterial3D:
-	var result:=StandardMaterial3D.new();result.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-	result.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;color.a=opacity;result.albedo_color=color
-	result.cull_mode=BaseMaterial3D.CULL_DISABLED;result.no_depth_test=false
-	return result
 
 static func add_geometry(parent: Node3D,vertices: PackedVector3Array,primitive: Mesh.PrimitiveType,mat: Material) -> void:
 	var surface:=SurfaceTool.new();surface.begin(primitive)

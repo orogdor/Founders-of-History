@@ -11,108 +11,163 @@ static func smooth(x: float) -> float:
 	var t:=clampf(x,0,1)
 	return t*t*(3.0-2.0*t)
 
-static func field(cells: Dictionary,x: float,z: float) -> float:
-	var u:=x-0.5;var v:=z-0.5;var c:=floori(u);var r:=floori(v)
-	var a:=smooth(u-c);var b:=smooth(v-r)
-	var q00:=1.0 if cells.has(str(c)+":"+str(r)) else 0.0
-	var q10:=1.0 if cells.has(str(c+1)+":"+str(r)) else 0.0
-	var q01:=1.0 if cells.has(str(c)+":"+str(r+1)) else 0.0
-	var q11:=1.0 if cells.has(str(c+1)+":"+str(r+1)) else 0.0
-	return lerpf(lerpf(q00,q10,a),lerpf(q01,q11,a),b)
+static func sample_corners(cells: Dictionary,at: Vector2i) -> Vector4:
+	return Vector4(float(cells.has(at)),float(cells.has(at+Vector2i.RIGHT)),
+		float(cells.has(at+Vector2i.DOWN)),float(cells.has(at+Vector2i.ONE)))
 
-static func point(heights: PackedFloat32Array,x: float,z: float,lift: float,mesh_samples: Variant=null) -> Vector3:
+static func interpolate(corners: Vector4,x: float,z: float) -> float:
+	return lerpf(lerpf(corners.x,corners.y,x),lerpf(corners.z,corners.w,x),z)
+
+static func field(cells: Dictionary,x: float,z: float) -> float:
+	var u:=x-0.5;var v:=z-0.5
+	var at:=Vector2i(floori(u),floori(v))
+	return interpolate(sample_corners(cells,at),smooth(u-at.x),smooth(v-at.y))
+
+static func point(heights: PackedFloat32Array,x: float,z: float,lift: float,mesh_samples: Variant) -> Vector3:
 	var world_x: float=Grid.ORIGIN_X+x*50.0
 	var world_z: float=Grid.ORIGIN_Z+z*50.0
 	var height:=Terrain.mesh_elevation(mesh_samples,world_x,world_z) if mesh_samples!=null else Terrain.elevation(heights,world_x,world_z)
 	return Vector3((x-Grid.COLS/2.0)*2.0,height+lift,(z-Grid.ROWS/2.0)*2.0)
 
-static func add_vertex(surface: SurfaceTool,heights: PackedFloat32Array,x: float,z: float,alpha: float,mesh_samples: Variant=null) -> void:
-	surface.set_color(Color(1,1,1,alpha));surface.add_vertex(point(heights,x,z,0.055,mesh_samples))
-
-static func fill(parent: Node3D,cells: Dictionary,heights: PackedFloat32Array,color: Color,opacity: float,mesh_samples: Variant=null) -> void:
-	if cells.is_empty():return
-	var bounds:=Rect2i(99999,99999,0,0);var max_c:=-1;var max_r:=-1
-	for key in cells:
-		var p:=str(key).split(":");var c:=int(p[0]);var r:=int(p[1])
-		bounds.position.x=mini(bounds.position.x,c);bounds.position.y=mini(bounds.position.y,r);max_c=maxi(max_c,c);max_r=maxi(max_r,r)
-	var step:=0.2;var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);var triangles:=0
-	for iz in range((max_r-bounds.position.y+3)*5):
-		var z:=float(bounds.position.y-1)+iz*step
-		for ix in range((max_c-bounds.position.x+3)*5):
-			var x:=float(bounds.position.x-1)+ix*step
-			var values:=[field(cells,x,z),field(cells,x+step,z),field(cells,x,z+step),field(cells,x+step,z+step)]
-			if values.max()<0.42:continue
-			for k in [0,2,1,1,2,3]:
-				add_vertex(surface,heights,x+(k%2)*step,z+floori(float(k)/2)*step,smooth((values[k]-0.40)/0.20),mesh_samples)
-			triangles+=2
-	if triangles==0:return
-	var mesh:=MeshInstance3D.new();mesh.mesh=surface.commit()
-	var mat:=StandardMaterial3D.new();mat.albedo_color=color;mat.albedo_color.a=opacity
-	mat.vertex_color_use_as_albedo=true;mat.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;mat.cull_mode=BaseMaterial3D.CULL_DISABLED
-	mesh.material_override=mat;parent.add_child(mesh)
-
-static func rebuild(parent: Node3D,owned: Dictionary,urban: Dictionary,explored: Dictionary,reveal_all: bool,heights: PackedFloat32Array,mesh_samples: Variant=null) -> void:
-	var groups:={}
-	var teams:={}
+static func snapshot(owned: Dictionary,urban: Dictionary,explored: Dictionary,reveal_all: bool) -> Dictionary:
+	var groups: Dictionary={}
+	var teams: Dictionary={}
 	for key in owned:
 		if not reveal_all and not explored.has(key):continue
-		var city: Dictionary=owned[key];var team:=clampi(int(city.team),0,TEAM_COLORS.size()-1)
+		var city: Dictionary=owned[key]
+		var team:=clampi(int(city.team),0,TEAM_COLORS.size()-1)
+		var components:=str(key).split(":")
+		var at:=Vector2i(int(components[0]),int(components[1]))
 		if not teams.has(team):teams[team]={}
-		teams[team][key]=true
+		teams[team][at]=true
 		var rural: bool=not urban.get(str(int(city.id)),{}).has(key)
-		var name:="%d:%d:%d" % [team,1 if rural else 0,int(city.id)]
+		var name:=Vector3i(team,int(rural),int(city.id))
 		if not groups.has(name):groups[name]={}
-		groups[name][key]=true
-	for name in groups:
-		var parts:=str(name).split(":");var team:=int(parts[0]);var rural:=int(parts[1])==1
-		fill(parent,groups[name],heights,Palette.color(team,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team])),0.07 if rural else 0.11,mesh_samples)
-	for team in teams:
-		border(parent,teams[team],heights,Palette.color(team,Color(TEAM_COLORS[team])),mesh_samples)
+		groups[name][at]=true
+	return {"groups":groups,"teams":teams}
 
-static func contour_edge(points: Array,a: Vector2,b: Vector2,va: float,vb: float) -> void:
+static func prepare(snapshot_data: Dictionary,heights: PackedFloat32Array,mesh_samples: Variant) -> Array[Dictionary]:
+	var result: Array[Dictionary]=[]
+	var groups: Dictionary=snapshot_data.groups
+	for name: Vector3i in groups:
+		var fill:=prepare_fill(groups[name],heights,mesh_samples)
+		if not fill.is_empty():result.append({"arrays":fill,"team":name.x,"rural":bool(name.y),"fill":true})
+	var teams: Dictionary=snapshot_data.teams
+	for team in teams:
+		var outlines:=prepare_border(teams[team],heights,mesh_samples)
+		if not outlines.is_empty():
+			result.append({"arrays":outlines[0],"team":team,"edge":true})
+			result.append({"arrays":outlines[1],"team":team})
+	return result
+
+static func attach(parent: Node3D,surfaces: Array[Dictionary]) -> void:
+	for src in surfaces:
+		var mesh:=ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,src.arrays)
+		var mat:=StandardMaterial3D.new()
+		mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.cull_mode=BaseMaterial3D.CULL_DISABLED
+		var team: int=src.team
+		var rural: bool=src.get("rural",false)
+		if src.get("edge",false):mat.albedo_color=Color("f2e3b6")
+		else:mat.albedo_color=Palette.color(team,Color(COUNTY_COLORS[team] if rural else TEAM_COLORS[team]))
+		if src.get("fill",false):
+			mat.albedo_color.a=0.07 if rural else 0.11
+			mat.vertex_color_use_as_albedo=true
+			mat.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+		var layer:=MeshInstance3D.new()
+		layer.mesh=mesh;layer.material_override=mat
+		parent.add_child(layer)
+
+static func prepare_fill(cells: Dictionary,heights: PackedFloat32Array,mesh_samples: Variant) -> Array:
+	var min_cell:=Vector2i(Grid.COLS,Grid.ROWS)
+	var max_cell:=Vector2i.ZERO
+	for at: Vector2i in cells:
+		min_cell=min_cell.min(at)
+		max_cell=max_cell.max(at)
+	var start:=Vector2(min_cell-Vector2i.ONE)
+	var size:=(max_cell-min_cell+Vector2i(3,3))*5+Vector2i.ONE
+	var vertices:=PackedVector3Array()
+	var colors:=PackedColorArray()
+	var indices:=PackedInt32Array()
+	var used:=PackedInt32Array()
+	used.resize(size.x*size.y);used.fill(-1)
+	var fields:=PackedFloat32Array()
+	fields.resize(size.x*size.y)
+	for z in size.y:
+		for x in size.x:
+			fields[z*size.x+x]=field(cells,start.x+x*0.2,start.y+z*0.2)
+	for z in size.y-1:
+		for x in size.x-1:
+			var a:=z*size.x+x
+			var b:=a+1
+			var c:=a+size.x
+			var d:=c+1
+			if maxf(maxf(fields[a],fields[b]),maxf(fields[c],fields[d]))<0.42:continue
+			for index in [a,c,b,b,c,d]:
+				if used[index]<0:
+					used[index]=vertices.size()
+					var at:=start+Vector2(index%size.x,floori(float(index)/size.x))*0.2
+					vertices.append(point(heights,at.x,at.y,0.055,mesh_samples))
+					colors.append(Color(1,1,1,smooth((fields[index]-0.40)/0.20)))
+				indices.append(used[index])
+	if indices.is_empty():return []
+	var arrays:=vertex_only(vertices)
+	arrays[Mesh.ARRAY_COLOR]=colors
+	arrays[Mesh.ARRAY_INDEX]=indices
+	return arrays
+
+static func prepare_border(cells: Dictionary,heights: PackedFloat32Array,mesh_samples: Variant) -> Array:
+	var patches: Dictionary={}
+	for at: Vector2i in cells:
+		for offset in [Vector2i.ZERO,Vector2i.LEFT,Vector2i.UP,Vector2i(-1,-1)]:
+			patches[at+offset]=true
+	var outer:=PackedVector3Array()
+	var inner:=PackedVector3Array()
+	var values:=PackedFloat32Array()
+	values.resize(121)
+	for at: Vector2i in patches:
+		var corners:=sample_corners(cells,at)
+		var owners:=corners.x+corners.y+corners.z+corners.w
+		if owners<=0.0 or owners>=4.0:continue
+		var min_x:=5 if at.x<0 else 0
+		var max_x:=5 if at.x>=Grid.COLS-1 else 10
+		var min_z:=5 if at.y<0 else 0
+		var max_z:=5 if at.y>=Grid.ROWS-1 else 10
+		var origin:=Vector2(at)+Vector2(0.5,0.5)
+		for z in range(min_z,max_z+1):
+			for x in range(min_x,max_x+1):values[z*11+x]=interpolate(corners,smooth(x*0.1),smooth(z*0.1))-0.5
+		for z in range(min_z,max_z):
+			for x in range(min_x,max_x):
+				var i:=z*11+x
+				var a:=values[i];var b:=values[i+1]
+				var c:=values[i+12];var d:=values[i+11]
+				if (a>0)==(b>0) and (b>0)==(c>0) and (c>0)==(d>0):continue
+				var p:=origin+Vector2(x,z)*0.1
+				var points: Array[Vector2]=[]
+				contour_edge(points,p,p+Vector2(0.1,0),a,b)
+				contour_edge(points,p+Vector2(0.1,0),p+Vector2(0.1,0.1),b,c)
+				contour_edge(points,p+Vector2(0.1,0.1),p+Vector2(0,0.1),c,d)
+				contour_edge(points,p+Vector2(0,0.1),p,d,a)
+				for j in range(0,points.size()-1,2):
+					var start:=points[j];var end:=points[j+1]
+					var mid: Vector2=(start+end)*0.5
+					if Terrain.height_at(heights,Grid.ORIGIN_X+mid.x*50,Grid.ORIGIN_Z+mid.y*50)<0.6:continue
+					line_quad(outer,heights,start.lerp(end,0.2),start.lerp(end,0.8),0.046,0.13,mesh_samples)
+					line_quad(inner,heights,start.lerp(end,0.2),start.lerp(end,0.8),0.027,0.14,mesh_samples)
+	return [] if outer.is_empty() else [vertex_only(outer),vertex_only(inner)]
+
+static func vertex_only(vertices: PackedVector3Array) -> Array:
+	var arrays: Array=[]
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]=vertices
+	return arrays
+
+static func contour_edge(points: Array[Vector2],a: Vector2,b: Vector2,va: float,vb: float) -> void:
 	if (va>0.0)==(vb>0.0):return
 	points.append(a.lerp(b,va/(va-vb)))
 
-static func line_quad(surface: SurfaceTool,heights: PackedFloat32Array,a: Vector2,b: Vector2,half_width: float,lift: float,mesh_samples: Variant=null) -> void:
+static func line_quad(vertices: PackedVector3Array,heights: PackedFloat32Array,a: Vector2,b: Vector2,half_width: float,lift: float,mesh_samples: Variant) -> void:
 	var direction: Vector2=(b-a).normalized();var normal:=Vector2(-direction.y,direction.x)*half_width
 	for p in [a-normal,b-normal,a+normal,a+normal,b-normal,b+normal]:
-		surface.add_vertex(point(heights,p.x,p.y,lift,mesh_samples))
-
-static func border(parent: Node3D,cells: Dictionary,heights: PackedFloat32Array,color: Color,mesh_samples: Variant=null) -> void:
-	if cells.is_empty():return
-	var chunks:={}
-	for key in cells:
-		var coord:=str(key).split(":");var c:=int(coord[0]);var r:=int(coord[1])
-		for dz in [-1,0,1]:
-			for dx in [-1,0,1]:
-				var x:=floori(float(c+dx)/8.0);var z:=floori(float(r+dz)/8.0)
-				if x>=0 and z>=0 and x*8<Grid.COLS and z*8<Grid.ROWS:chunks[str(x)+":"+str(z)]=Vector2i(x,z)
-	var outer:=SurfaceTool.new();outer.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var inner:=SurfaceTool.new();inner.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var segments:=0;var step:=0.1
-	for chunk in chunks.values():
-		for iz in 80:
-			var z: float=chunk.y*8+iz*step
-			for ix in 80:
-				var x: float=chunk.x*8+ix*step
-				var a:=field(cells,x,z)-0.5;var b:=field(cells,x+step,z)-0.5
-				var c:=field(cells,x+step,z+step)-0.5;var d:=field(cells,x,z+step)-0.5
-				if (a>0)==(b>0) and (b>0)==(c>0) and (c>0)==(d>0):continue
-				var points: Array=[]
-				contour_edge(points,Vector2(x,z),Vector2(x+step,z),a,b)
-				contour_edge(points,Vector2(x+step,z),Vector2(x+step,z+step),b,c)
-				contour_edge(points,Vector2(x+step,z+step),Vector2(x,z+step),c,d)
-				contour_edge(points,Vector2(x,z+step),Vector2(x,z),d,a)
-				for i in range(0,points.size()-1,2):
-					var p: Vector2=points[i];var q: Vector2=points[i+1];var mid: Vector2=(p+q)*0.5
-					var wx: float=Grid.ORIGIN_X+mid.x*50;var wz: float=Grid.ORIGIN_Z+mid.y*50
-					if Terrain.height_at(heights,wx,wz)<0.6:continue
-					var start: Vector2=p.lerp(q,0.2);var end: Vector2=p.lerp(q,0.8)
-					line_quad(outer,heights,start,end,0.046,0.13,mesh_samples)
-					line_quad(inner,heights,start,end,0.027,0.14,mesh_samples);segments+=1
-	if segments==0:return
-	for row in [[outer,Color("f2e3b6")],[inner,color]]:
-		var node:=MeshInstance3D.new();node.mesh=row[0].commit()
-		var mat:=StandardMaterial3D.new();mat.albedo_color=row[1];mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.cull_mode=BaseMaterial3D.CULL_DISABLED;node.material_override=mat;parent.add_child(node)
+		vertices.append(point(heights,p.x,p.y,lift,mesh_samples))

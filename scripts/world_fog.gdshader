@@ -4,7 +4,11 @@ uniform sampler2D seen_linear : filter_linear, repeat_disable;
 uniform sampler2D seen_exact : filter_nearest, repeat_disable;
 uniform sampler2D symbols : filter_nearest, repeat_disable;
 varying vec2 map_pos;
-float fog_hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float fog_hash(vec2 p) {
+ vec3 mix_seed=fract(vec3(p.xyx)*.1031);
+ mix_seed+=dot(mix_seed,mix_seed.yzx+33.33);
+ return fract((mix_seed.x+mix_seed.y)*mix_seed.z);
+}
 float fog_noise(vec2 p) {
  vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
  return mix(mix(fog_hash(i),fog_hash(i+vec2(1.0,0.0)),f.x),mix(fog_hash(i+vec2(0.0,1.0)),fog_hash(i+vec2(1.0,1.0)),f.x),f.y);
@@ -37,17 +41,24 @@ float symbol_ink(vec2 p,float kind) {
 }
 void vertex() { map_pos=(MODEL_MATRIX*vec4(VERTEX,1.0)).xz; }
 void fragment() {
- vec2 cells=vec2(textureSize(seen_exact,0)),origin=vec2(-650.0,-550.0),extent=cells*50.0;
- vec2 w=origin+(map_pos+cells)*25.0;
- vec2 fw=w+vec2(fog_noise(w*.021)-.5,fog_noise(w*.021+17.0)-.5)*38.0+vec2(fog_noise(w*.08+3.0)-.5,fog_noise(w*.08+9.0)-.5)*10.0;
- vec2 base=(w-origin)/extent,su=(fw-origin)/extent;
- float exact=1.0-texture(seen_exact,(floor(base*cells)+.5)/cells).a;
- float seen=max(1.0-texture(seen_linear,su).a,exact);
- vec2 paper=fract(w/50.8)*128.0;
- float line=1.0-smoothstep(.7,1.8,abs(mod(paper.x-paper.y*30.0/128.0+20.0,18.0)-9.0));
- vec3 paper_color=vec3(.843,.757,.584)*(1.0-line*.10);
- float kind=texture(symbols,(floor(base*cells)+.5)/cells).r;
- if(kind>.1) paper_color=mix(paper_color,vec3(.30,.22,.11),symbol_ink(fract(base*cells),kind)*.58);
- ALBEDO=paper_color*(.94+.06*smoothstep(0.0,.30,seen));
- ALPHA=1.0-smoothstep(.30,.62,seen);
+ vec2 cells=vec2(textureSize(seen_exact,0));
+ vec2 tile=(map_pos+cells)*.5;
+ vec2 paper=tile*50.0;
+ vec2 center=(floor(tile)+.5)/cells;
+ float covered=step(.5,texture(seen_exact,center).a);
+ float nearby=texture(seen_linear,tile/cells).a;
+ float grain=fog_noise(paper*.057);
+ float stain=fog_noise(paper*.0037)+.35*fog_noise(paper*.013);
+ float edge=smoothstep(.24,.51,nearby+(grain-.5)*.08);
+ vec2 fiber_pos=vec2(paper.x-paper.y*.37,paper.x*.24+paper.y)*vec2(.65,.09);
+ float fibers=(fog_noise(fiber_pos)-.5)*(1.0-smoothstep(.34,1.25,length(fwidth(paper))));
+ vec3 paper_color=mix(vec3(.70,.59,.42),vec3(.89,.80,.63),clamp(stain*.61+.17,0.0,1.0));
+ paper_color*=.985+fibers*.085+grain*.035;
+ float kind=texture(symbols,center).r;
+ if(kind>.1) {
+  float ink=symbol_ink(fract(tile),kind)*(.33+.17*grain);
+  paper_color=mix(paper_color,vec3(.34,.26,.15),ink);
+ }
+ ALBEDO=paper_color*mix(1.0,.91,edge*(1.0-smoothstep(.57,.98,nearby)));
+ ALPHA=max(covered,edge);
 }

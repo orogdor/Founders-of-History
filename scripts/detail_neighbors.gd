@@ -10,6 +10,7 @@ const Campaign=preload("res://scripts/campaign_state.gd")
 const Production=preload("res://scripts/production_bonuses.gd")
 const DetailWorld=preload("res://scripts/detail_world.gd")
 const VisualRiver=preload("res://scripts/visual_river.gd")
+const Landscape=preload("res://scripts/detail_landscape.gd")
 const Roads=preload("res://scripts/detail_roads.gd")
 const WorldRoads=preload("res://scripts/world_roads.gd")
 const MAP_FOG=preload("res://scripts/detail_map_fog.gdshader")
@@ -75,6 +76,7 @@ func park() -> void:
 func resume(view: Node3D,center: Vector2i) -> void:
 	if center!=anchor:recenter(center)
 	move_to(view)
+	name="NeighborTiles"
 	edge_vision_revision=-1
 	map_vision_revision=-1
 	map_rect=Rect2i()
@@ -86,6 +88,24 @@ func prefetched_world(at: Vector2i) -> Dictionary:
 	var tile: Node=tiles.get(at)
 	var nature:=tile.get_node_or_null("Nature") if tile!=null else null
 	return nature.world_data if nature!=null else stages.get(at,{})
+
+func promote_wilderness(at: Vector2i,world: Dictionary) -> Node3D:
+	var tile: Node3D=tiles.get(at)
+	if tile==null:return null
+	var nature:=tile.get_node_or_null("Nature") as Node3D
+	if nature==null or not is_same(nature.world_data,world) or nature.building_root!=null:return null
+	var ground: MeshInstance3D=tile.get_meta("terrain_surface")
+	var water:=tile.get_node_or_null("TileWater")
+	var landscape:=tile.get_node_or_null("DetailLandscape")
+	nature.reparent(host_node,false)
+	nature.position=Vector3.ZERO
+	ground.reparent(nature,false);nature.terrain_surface=ground
+	if water!=null:water.reparent(nature,false)
+	if landscape!=null:landscape.reparent(nature,false)
+	nature.person=Node3D.new();nature.person.hide();nature.add_child(nature.person)
+	nature.ground_cover_expand_at=Time.get_ticks_msec()+220
+	nature.tree_lod_dirty=true
+	return nature
 
 func recenter(center: Vector2i) -> void:
 	var shift:=tile_offset(center)
@@ -266,13 +286,15 @@ func add_surface(at: Vector2i,heights: Array,visual: PackedVector4Array,mesh: Ar
 	tile.add_child(ground)
 	set_cloud_edges(ground,at)
 	var water:=MeshInstance3D.new()
+	water.name="TileWater"
 	var plane:=PlaneMesh.new();plane.size=TILE_SIZE;water.mesh=plane
 	water.material_override=host_node.detail_ocean_for(at.x,at.y,heights,visual)
 	tile.add_child(water)
 	return tile
 
 func add_landscape(at: Vector2i,tile: Node3D) -> void:
-	tile.set_meta("river_segments",host_node.detail_landscape_for(tile,at.x,at.y,tile.get_meta("heights"),tile.get_meta("visual_heights")))
+	tile.set_meta("river_segments",host_node.detail_landscape_for(tile,at.x,at.y,tile.get_meta("heights"),tile.get_meta("visual_heights"),tile.get_meta("prepared_landscape",{})))
+	tile.remove_meta("prepared_landscape")
 
 func closest(items: Dictionary) -> Vector2i:
 	var nearest:=INACTIVE_TILE
@@ -298,7 +320,8 @@ func _process(_delta: float) -> void:
 				if not tiles.has(at):
 					var visual: PackedVector4Array=host_node.detail_visual_for(at.x,at.y,result.visual)
 					var mesh: ArrayMesh=host_node.detail_mesh_for(at.x,at.y,result.heights,visual,result.mesh)
-					add_surface(at,result.heights,visual,mesh)
+					var tile:=add_surface(at,result.heights,visual,mesh)
+					tile.set_meta("prepared_landscape",result.landscape)
 				stages[at]=result.world
 				return
 	if not stages.is_empty():
@@ -362,6 +385,7 @@ static func prepare_chunk(cells: Array,graph: Dictionary,atlas: PackedFloat32Arr
 		result.heights=Terrain.tile_heights(cells,at.x,at.y)
 		result.visual=VisualRiver.color_heights(cells,atlas,at.x,at.y,seed,graph)
 		result.mesh=Terrain.mesh_arrays(result.heights,Vector2.ZERO,result.visual)
+		result.landscape=Landscape.prepare(cells,at.x,at.y,result.heights,seed,atlas,graph,true,result.visual)
 	if not cell.is_empty():result.world=DetailWorld.create(cells,cell,biome,seed)
 	return result
 

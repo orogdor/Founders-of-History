@@ -1,6 +1,7 @@
 const mat2 TERRAIN_ROTATION = mat2(vec2(0.846,0.533),vec2(-0.533,0.846));
 const mat2 TERRAIN_SECONDARY_ROTATION = mat2(vec2(0.601,-0.799),vec2(0.799,0.601));
-const float TERRAIN_SECONDARY_SCALE = 0.271;
+const float TERRAIN_PRIMARY_SCALE = 0.635;
+const float TERRAIN_SECONDARY_SCALE = 0.238;
 
 // Both projections bend continuously in world space, keeping their texture
 // alignment across streamed tile boundaries and camera origin changes.
@@ -11,12 +12,12 @@ vec2 terrain_bend(vec2 world, vec2 offset) {
 vec2 terrain_primary_uv(vec2 world) {
 	vec2 broad = terrain_bend(world*0.034, vec2(23.4,9.0));
 	vec2 fine = terrain_bend(world*0.103, vec2(68.5,11.4));
-	return TERRAIN_ROTATION*(world*0.51) + broad*3.15 + fine*1.05;
+	return TERRAIN_ROTATION*(world*TERRAIN_PRIMARY_SCALE) + broad*2.64 + fine*0.91;
 }
 
 vec2 terrain_secondary_uv(vec2 world) {
 	vec2 bend = terrain_bend(world*0.054, vec2(21.1,77.3));
-	return TERRAIN_SECONDARY_ROTATION*(world*TERRAIN_SECONDARY_SCALE) + bend*2.15;
+	return TERRAIN_SECONDARY_ROTATION*(world*TERRAIN_SECONDARY_SCALE) + bend*1.71;
 }
 
 float terrain_layer_mix(vec2 world) {

@@ -18,12 +18,14 @@ const WORK:={
 const IDLE:=["idle","idle","idle","idle_arms","idle","idle_arms","idle_no"]
 const BLEND:=0.3
 
-static func library(body: String) -> AnimationLibrary:
+static func library(body: String,prepared: PackedScene=null) -> AnimationLibrary:
 	if libraries.has(body):return libraries[body]
 	var lib: AnimationLibrary=null
 	var path:="res://assets/people/animations/%s.glb" % body
-	if ResourceLoader.exists(path):
-		var scene: Node=(load(path) as PackedScene).instantiate()
+	var source:=prepared
+	if source==null and ResourceLoader.exists(path):source=load(path) as PackedScene
+	if source!=null:
+		var scene:=source.instantiate()
 		var player: AnimationPlayer=scene.find_child("AnimationPlayer",true,false)
 		if player!=null and player.has_animation_library(""):
 			lib=player.get_animation_library("")

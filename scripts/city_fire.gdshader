@@ -1,14 +1,30 @@
 shader_type spatial;
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
-float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
-void fragment(){
- float x=UV.x-0.5;float y=1.0-UV.y;float t=TIME*2.6;
- float n=vn(vec2(x*3.0,y*2.2-t))*0.65+vn(vec2(x*7.0,y*5.0-t*1.7))*0.35;
- float w=pow(max(1.0-y,0.001),0.7)*0.44*(1.0+(n-0.5)*0.5);
- float d=abs(x+(n-0.5)*0.22*y)/w;
- float k=(1.0-smoothstep(0.55,1.0,d))*smoothstep(0.0,0.07,y)*(1.0-smoothstep(0.55,1.0,y+(n-0.5)*0.35));
- float core=(1.0-smoothstep(0.0,0.38,d))*(1.0-smoothstep(0.08,0.42,y));
- ALBEDO=mix(mix(vec3(0.85,0.18,0.03),vec3(1.0,0.55,0.10),smoothstep(0.1,0.6,k)),vec3(1.0,0.93,0.70),core)*k*1.35;
- ALPHA=k;
+
+#include "res://scripts/water_surface.gdshaderinc"
+
+varying float flame_seed;
+
+void vertex() {
+	vec2 origin=mod(MODEL_MATRIX[3].xz+vec2(112.5,97.5),vec2(225.0,195.0));
+	flame_seed=water_hash(origin)*8.0;
+}
+
+void fragment() {
+	float x=UV.x-.5;
+	float y=1.0-UV.y;
+	float t=TIME*3.4+flame_seed;
+	float draft=water_noise(vec2(flame_seed+t*.51,y*3.3-t*.92))-.5;
+	float tongue=water_noise(vec2(x*9.5+y*1.1,y*4.3-t*1.3));
+	float curl=(draft*.27+.045*sin(t+y*5.5))*y*y;
+	float lift=clamp(1.0-y*(1.12-.24*tongue),0.0,1.0);
+	float width=max(.001,pow(lift,.78)*(.275+.092*tongue));
+	float cross_section=abs(x+curl)/width;
+	float flame=(1.0-smoothstep(.28,1.0,cross_section))*smoothstep(.0,.075,y)*smoothstep(.015,.16,lift);
+	float hot=(1.0-smoothstep(.08,.68,cross_section))*(1.0-smoothstep(.37,.71,y));
+	vec3 color=mix(vec3(.91,.16,.028),vec3(1.0,.57,.146),flame);
+	color=mix(color,vec3(1.0,.92,.68),hot);
+	color=mix(color,vec3(.30,.37,.58),(1.0-smoothstep(.013,.085,y))*.55);
+	ALBEDO=color*(.94+.55*hot);
+	ALPHA=flame*.74;
 }

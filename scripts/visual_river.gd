@@ -161,7 +161,8 @@ static func color_heights(cells: Array,heights: PackedFloat32Array,c: int,r: int
 			var elevation:=height(heights,x,z,seed,river_segments,sea_base,near,shore,flare)
 			var color_height: float=(elevation-0.7)*0.3
 			var wobble: float=(Terrain.seeded_smooth(x/9.0+41.3,z/9.0+7.9,seed)-0.5)*0.45
-			var geometry_height:=color_height+maxf(0.0,elevation-10.0)*0.9*Visual.mountain_mask(cells,x,z,seed) if elevation>10.0 else color_height
+			var mountain:=Visual.mountain_mask(cells,x,z,seed) if elevation>10.0 else 0.0
+			var geometry_height:=color_height+maxf(0.0,elevation-10.0)*0.9*mountain
 			# Continuous atlas coordinates keep the relief identical at tile edges.
 			# Fade it out near water and river banks so crossings retain their shape.
 			var dry:=smoothstep(0.85,2.7,color_height)
@@ -173,6 +174,10 @@ static func color_heights(cells: Array,heights: PackedFloat32Array,c: int,r: int
 			var relief:=(broad-0.5)*8.2+(rolling-0.5)*2.65+(fine-0.5)*0.55
 			relief=maxf(relief,0.35-color_height)
 			geometry_height+=relief*dry*river_clearance
+			if mountain>0.0 and river_clearance>0.0:
+				var rock_bench:=Terrain.seeded_smooth(x/12.6+57.1,z/10.2+16.7,seed)-0.5
+				var ravine:=absf(2.0*Terrain.seeded_smooth(x/5.8+21.1,z/7.6+67.4,seed)-1.0)
+				geometry_height+=(rock_bench*6.5-pow(maxf(0.0,0.63-ravine),1.8)*6.0)*mountain*river_clearance
 			var sea_height:=color_height
 			if not river_segments.is_empty() or not mouths.is_empty():sea_height=(shore-0.7)*0.3
 			values[j*17+i]=Vector4(color_height,wobble,geometry_height,sea_height)

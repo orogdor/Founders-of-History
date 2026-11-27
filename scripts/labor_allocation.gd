@@ -87,7 +87,8 @@ static func allocate(state: Dictionary,city: Dictionary) -> void:
 	if battle is Dictionary and battle.get("civilianCityId")!=null and battle.get("civilianCityId")==city.get("id"):
 		for unit in battle.get("squads",[]):
 			if unit.get("civilian",false):budget=maxf(0,budget-1)
-	var food_critical:=Needs.food_total(stock)<float(realm.pop)*2.5
+	var food_stock:=Needs.food_total(stock)
+	var food_critical:=food_stock<float(realm.pop)*2.5
 	var water_critical:=float(stock.get("water",0))<float(realm.pop)*2
 	var team:=int(city.team);var is_ai:=team>0;var wait: Variant=state.research[team].get("ageWait") if is_ai else null
 	var shortages: Dictionary=wait.get("missing",{}).duplicate(true) if wait is Dictionary else {}
@@ -98,6 +99,7 @@ static func allocate(state: Dictionary,city: Dictionary) -> void:
 	var scarce_wood:=float(stock.get("wood",0))<(30 if float(shortages.get("plank",0))>0 else 12)
 	var entries: Array=[]
 	var pending:=false
+	var storage_counts:=Econ.storage_counts(economy.buildings)
 	for b in economy.buildings:
 		if (not b.get("ready",false) and not b.get("disabled",false) and b.get("workerLimit",1)!=0) or (b.get("wallUpgradeV184")!=null and float(b.get("hp",0))>0):pending=true
 		if b.type not in IMPLEMENTED or not b.get("ready",false):continue
@@ -107,8 +109,8 @@ static func allocate(state: Dictionary,city: Dictionary) -> void:
 		var need: float=d.get("workers",0)
 		var limit: float=b.get("workerLimit",need)
 		var output: String=d.get("out","")
-		var used: float=Needs.food_total(stock) if output in Econ.DATA.data.food_keys else float(stock.get(output,0))
-		var full:=not output.is_empty() and used>=Econ.storage_limit(economy.buildings,output)
+		var used: float=food_stock if output in Econ.DATA.data.food_keys else float(stock.get(output,0))
+		var full:=not output.is_empty() and used>=Econ.limit_from_counts(storage_counts,output)
 		var idle: bool=b.type in ["study","scriptorium","library","academy","school","university","monastery","chapel","observatory","public_school","high_school","polytechnic","laboratory"] and state.research[city.team].get("active")==null
 		var supplied: bool=Econ.can_afford(stock,d.get("input",{}))
 		var want:=0.0 if full or idle or not supplied else maxf(0,minf(need,limit))

@@ -7,10 +7,15 @@ uniform sampler2D reed_atlas : source_color, filter_linear_mipmap, repeat_disabl
 uniform vec4 reed_tint : source_color = vec4(0.46, 0.42, 0.36, 1.0);
 uniform bool settlement_detail = false;
 uniform bool hut_thatch = false;
+uniform sampler2D hut_height_map : filter_linear_mipmap, repeat_disable;
+uniform bool has_hut_height_map = false;
 varying vec3 surface_world;
+varying float roof_age;
 
 void vertex() {
  surface_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+ vec2 foundation=mod(MODEL_MATRIX[3].xz+vec2(112.5,97.5),vec2(225.0,195.0));
+ roof_age=fract(sin(dot(floor(foundation*2.0),vec2(9.35,17.19)))*14719.3);
 }
 
 vec2 reed_hash(vec2 p) {
@@ -30,19 +35,41 @@ vec3 reed_sample(vec2 cell, vec2 uv) {
 
 void fragment() {
  if (hut_thatch) {
-  vec3 bundle = reed_sample(vec2(3.0, 9.0), vec2(UV.x*1.44, UV.y*0.59));
-  float grain = dot(bundle, vec3(0.24, 0.68, 0.08));
-  float strand_x = UV.x * 277.0 + sin(UV.y*7.3 + UV.x*34.0)*0.08;
-  float line = sin(strand_x*6.283 + sin(UV.y*24.0)*0.28);
-  float fine = line * (1.0-smoothstep(0.16,0.60,fwidth(strand_x)));
-  float weather = 0.5+0.5*sin(surface_world.x*0.91+surface_world.y*2.4)*sin(surface_world.z*0.75+surface_world.y*0.33);
-  vec3 straw = mix(vec3(0.26,0.177,0.090),vec3(0.55,0.405,0.224),smoothstep(0.04,0.59,grain)*0.75+weather*0.25);
-  float cut_ends = smoothstep(-0.19,-0.015,UV.y);
-  ALBEDO = straw*(0.79+0.21*cut_ends)*(0.87+grain*0.14+fine*0.18);
-  ROUGHNESS = 0.95;
-  SPECULAR = 0.13;
-  float close_detail = 1.0-smoothstep(14.0,38.0,length(VERTEX));
-  NORMAL = material_relief_normal(VERTEX,NORMAL,close_detail*(grain*0.007+fine*0.0007));
+  float roof_run = clamp(UV.y / 2.3, 0.0, 1.0);
+  vec2 bundles = UV * vec2(2.8, 1.22);
+  bundles.x += sin(UV.x * 18.5 + UV.y * 5.7) * 0.023;
+  vec2 page = vec2(512.0) / vec2(2640.0, 528.0);
+  vec2 coordinates = (fract(bundles + vec2(0.11, 0.44)) * 512.0 + vec2(2.0 * 528.0 + 8.0, 8.0)) / vec2(2640.0, 528.0);
+  vec2 dx = dFdx(bundles) * page, dy = dFdy(bundles) * page;
+  vec3 reed = textureGrad(reed_atlas, coordinates, dx, dy).rgb;
+  float grain = dot(reed, vec3(0.23, 0.69, 0.08));
+  float weather = 0.48 + 0.25 * sin(surface_world.x * 0.68 + surface_world.y * 1.23)
+                      * sin(surface_world.z * 1.04 - surface_world.y * 0.92)
+                      + 0.12 * sin(surface_world.z * 2.4 + surface_world.x * 1.47);
+  float grain_detail = 1.0 - smoothstep(15.0, 54.0, length(VERTEX));
+  float strand = sin(UV.x * 493.0 + sin(UV.x * 87.0) * 0.85 + sin(UV.y * 6.3 + UV.x * 7.2) * 0.72);
+  strand *= grain_detail * (1.0 - smoothstep(0.14, 1.25, fwidth(UV.x) * 493.0));
+  float overlap = fract(roof_run * 5.0 + sin(UV.x * 11.2) * 0.057 + sin(UV.x * 27.6 + UV.y) * 0.028);
+  float lip = 1.0 - smoothstep(0.025, 0.15, overlap);
+  float cut = 1.0 - smoothstep(-0.13, -0.003, UV.y);
+  float straw_tone = mix(smoothstep(0.045, 0.55, grain), weather, 0.40);
+  vec3 clean = mix(vec3(.13,.097,.060),vec3(.44,.36,.243),straw_tone);
+  vec3 aged = mix(vec3(.142,.134,.116),vec3(.43,.406,.363),straw_tone);
+  float aged_amount=clamp(smoothstep(.18,.76,weather)*.46+roof_run*.18+roof_age*.29,0.0,1.0);
+  vec3 straw=mix(clean,aged,aged_amount);
+  float soot=1.0-smoothstep(.77,1.19,roof_run+(weather-.5)*.18);
+  vec3 stems=mix(vec3(.128,.094,.063),vec3(.52,.449,.33),smoothstep(.12,.63,grain));
+  float fray=smoothstep(-.116,-.033,UV.y+(weather-.50)*.044);
+  stems*=.75+.25*fray+strand*.049;
+  ALBEDO=mix(straw*(.88+.12*soot)*(1.0-lip*.13+strand*.062),stems,cut*.75);
+  ROUGHNESS = clamp(0.96 - grain * 0.11, 0.85, 0.98);
+  SPECULAR = 0.14;
+  if (!settlement_detail) {
+   float close_detail = 1.0 - smoothstep(12.0, 37.0, length(VERTEX));
+   float relief = has_hut_height_map && close_detail > 0.0
+                ? textureGrad(hut_height_map, coordinates, dx, dy).r : grain;
+   NORMAL = material_relief_normal(VERTEX, NORMAL, close_detail * (relief * 0.012 + strand * 0.0025 - lip * 0.007));
+  }
  } else if (settlement_detail) {
   vec3 straw = reed_sample(vec2(3.0, 9.0), UV);
   float tone = 0.94 + sin(surface_world.x * 1.08 + surface_world.z * 0.69) * 0.06;

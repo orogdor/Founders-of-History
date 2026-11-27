@@ -8,15 +8,15 @@ static func tempo_factor(state: Dictionary) -> float:
 	return float({"fast":0.7,"normal":1.0,"epic":1.5}.get(state.get("tempo","normal"),1.0))
 
 static func can_afford(resources: Dictionary, cost: Dictionary) -> bool:
-	var available := resources.duplicate()
 	for key in cost:
 		if key == "bread": continue
-		if float(available.get(key,0.0)) < float(cost[key]): return false
-		available[key] -= cost[key]
+		if float(resources.get(key,0.0)) < float(cost[key]): return false
 	if not cost.has("bread") or float(cost.bread) == 0.0: return true
 	var food := 0.0
 	for key in DATA.data.food_nutrition:
-		food += maxf(0.0,float(available.get(key,0.0))) * float(DATA.data.food_nutrition[key])
+		var available := float(resources.get(key,0.0))
+		if key != "bread": available -= float(cost.get(key,0.0))
+		food += maxf(0.0,available) * float(DATA.data.food_nutrition[key])
 	return food >= float(cost.bread)
 
 static func take_food(stock: Dictionary, meals: float, on_use := Callable()) -> float:
@@ -50,10 +50,17 @@ static func spend_resources(stock: Dictionary, cost: Dictionary, on_use := Calla
 	if cost.has("bread") and float(cost.bread) != 0: take_food(stock,float(cost.bread),on_use)
 
 static func storage_limit(buildings: Array, key: String) -> float:
+	return limit_from_counts(storage_counts(buildings),key)
+
+static func storage_counts(buildings: Array) -> Dictionary:
 	var counts := {}
 	for b in buildings:
-		if b.get("ready",false) and float(b.get("hp",0)) > 0 and not b.get("virtual",false):
-			counts[b.type] = counts.get(b.type,0)+1
+		var type: String = b.get("type","")
+		if type in ["hall","cellar","pottery_kiln","warehouse"] and b.get("ready",false) and float(b.get("hp",0)) > 0 and not b.get("virtual",false):
+			counts[type] = counts.get(type,0)+1
+	return counts
+
+static func limit_from_counts(counts: Dictionary, key: String) -> float:
 	var halls := maxi(1,int(counts.get("hall",0)))
 	if key == "gold": return INF
 	if key == "power": return 100.0

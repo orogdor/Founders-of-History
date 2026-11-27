@@ -21,8 +21,9 @@ func bind_world(world: Dictionary) -> void:
 	if not world.has("heatLast"):world.heatLast={}
 	heat=world.heat;heat_last=world.heatLast
 
-func _init(x: int,z: int,w: int,h: int,passable: Callable) -> void:
+func _init(x: int,z: int,w: int,h: int,passable := Callable()) -> void:
 	min_x=x;min_z=z;width=w;height=h
+	if not passable.is_valid():return
 	mask.resize(w*h)
 	for j in h:
 		for i in w:
@@ -94,6 +95,10 @@ func route(from: Dictionary,to: Dictionary,prefer_roads := true) -> Variant:
 	var start := index(a.x,a.z)
 	var goal := index(b.x,b.z)
 	if start==goal:return [b]
+	if access_components.size()==mask.size() and access_components[start]!=access_components[goal]:return null
+	var goal_x:=goal%width
+	var goal_z:=floori(float(goal)/width)
+	var use_roads:=prefer_roads and not heat.is_empty()
 	var costs := PackedFloat32Array();costs.resize(mask.size());costs.fill(INF)
 	var previous := PackedInt32Array();previous.resize(mask.size());previous.fill(-1)
 	var closed := PackedByteArray();closed.resize(mask.size());closed.fill(0)
@@ -114,10 +119,10 @@ func route(from: Dictionary,to: Dictionary,prefer_roads := true) -> Variant:
 			if xx<0 or xx>=width or zz<0 or zz>=height:continue
 			var j := zz*width+xx
 			if mask[j]==0 or closed[j]!=0 or (d.x!=0 and d.y!=0 and (mask[z*width+xx]==0 or mask[zz*width+x]==0)):continue
-			var score: float = costs[k]+sqrt(d.x*d.x+d.y*d.y)*(1.0/road_boost(j) if prefer_roads else 1.0)
+			var score: float = costs[k]+sqrt(d.x*d.x+d.y*d.y)*(1.0/road_boost(j) if use_roads else 1.0)
 			if score<costs[j]:
 				costs[j]=score;previous[j]=k
-				var dx := xx-(goal%width);var dz := zz-floori(float(goal)/width)
+				var dx := xx-goal_x;var dz := zz-goal_z
 				heap.push(score+0.45*sqrt(dx*dx+dz*dz),j)
 	return null
 
@@ -346,8 +351,9 @@ func move(agent: Dictionary,target: Dictionary,dt: float,speed := 3.0,citizen :=
 
 
 func clone_for_agent() -> LocalNavigation:
-	var copy=LocalNavigation.new(min_x,min_z,width,height,func(_x,_z):return true)
+	var copy=LocalNavigation.new(min_x,min_z,width,height)
 	copy.base=base.duplicate();copy.mask=mask.duplicate()
+	copy.access_components=access_components.duplicate()
 	copy.heat=heat;copy.heat_last=heat_last;copy.trail_time=trail_time
 	copy.trail_world=trail_world
 	return copy

@@ -10,6 +10,7 @@ const Grid=preload("res://scripts/campaign_grid.gd")
 const Terrain=preload("res://scripts/detail_terrain.gd")
 const HouseCollision=preload("res://scripts/house_collision.gd")
 const Production=preload("res://scripts/production_bonuses.gd")
+const Districts=preload("res://scripts/district_context.gd")
 const SKY_SHADER=preload("res://scripts/walking_sky.gdshader")
 const BuildLabel=preload("res://scripts/build_label.gd")
 var host: Node
@@ -34,6 +35,7 @@ var names_button: TextureButton
 var saved_camera: Dictionary={}
 var walking_environment: Environment
 var sky_material: ShaderMaterial
+var walking_sky: Sky
 var sky_hour: float=-1.0
 var touch_move_id:=-1
 var touch_look_id:=-1
@@ -151,17 +153,18 @@ func exit_walking(recenter:=true) -> void:
 func start_sky() -> void:
 	if sky_material==null:
 		sky_material=ShaderMaterial.new();sky_material.shader=SKY_SHADER
-	var sky:=Sky.new();sky.sky_material=sky_material;sky.radiance_size=Sky.RADIANCE_SIZE_32
-	sky.process_mode=Sky.PROCESS_MODE_INCREMENTAL
+		walking_sky=Sky.new();walking_sky.sky_material=sky_material;walking_sky.radiance_size=Sky.RADIANCE_SIZE_32
+		walking_sky.process_mode=Sky.PROCESS_MODE_INCREMENTAL
 	walking_environment=host.world_environment.environment.duplicate()
-	walking_environment.sky=sky
+	walking_environment.sky=walking_sky
 	walking_environment.background_mode=Environment.BG_SKY
 	walking_environment.ambient_light_sky_contribution=0.0
 	walking_environment.fog_enabled=true
 	walking_environment.fog_mode=Environment.FOG_MODE_DEPTH
-	walking_environment.fog_depth_begin=110.0
-	walking_environment.fog_depth_end=425.0
-	walking_environment.fog_density=1.0
+	walking_environment.fog_depth_begin=38.0
+	walking_environment.fog_depth_end=470.0
+	walking_environment.fog_depth_curve=1.55
+	walking_environment.fog_density=0.86
 	walking_environment.fog_sky_affect=0.0
 	host.camera.environment=walking_environment
 	sky_hour=-1.0
@@ -175,14 +178,18 @@ func update_sky() -> void:
 	if sky_hour>=0.0 and absf(hour-sky_hour)<0.02:return
 	sky_hour=hour
 	var altitude:=sin((hour-6.0)*PI/12.0)
-	var daylight:=smoothstep(-0.16,0.32,altitude)
-	var twilight:=1.0-smoothstep(0.04,0.38,absf(altitude))
-	var horizon:=Color("141f35").lerp(Color("a8c6d5"),daylight).lerp(Color("b77c61"),twilight*0.47)
+	var daylight:=smoothstep(-0.14,0.34,altitude)
+	var twilight:=1.0-smoothstep(0.025,0.41,absf(altitude))
+	var horizon:=Color("202f47").lerp(Color("bacdd6"),daylight).lerp(Color("c28a68"),twilight*0.37)
 	sky_material.set_shader_parameter("horizon",horizon)
 	sky_material.set_shader_parameter("daylight",daylight)
 	sky_material.set_shader_parameter("twilight",twilight)
 	sky_material.set_shader_parameter("sun_direction",host.sunlight.position.normalized())
-	walking_environment.fog_light_color=horizon
+	var seed:=int(host.game.get("seed",0))
+	var period:=float(host.elapsed)/1440.0
+	var wind:=Vector2(period*.24,period*.11)
+	sky_material.set_shader_parameter("weather_offset",Vector2(posmod(seed,829),posmod(seed,953))*.036+wind)
+	walking_environment.fog_light_color=Color("1d2b43").lerp(Color("a3b9c0"),daylight).lerp(Color("ad8c83"),twilight*0.36)
 
 func sync_model() -> void:
 	model.position=pos;model.rotation.y=yaw+PI;model.visible=placed and not active and host.detail_mode and tile==current_tile()
@@ -236,23 +243,22 @@ func handle_input(event: InputEvent) -> bool:
 func pier_height(x: float,z: float) -> Variant:
 	var dc:=floori((x+112.5)/225.0);var dr:=floori((z+97.5)/195.0);var at:=current_tile()+Vector2i(dc,dr);var best: Variant=null
 	for parent in host.game.get("cities",[]):
-		var contexts: Array=[parent];contexts.append_array(parent.get("districts",{}).values())
-		for city in contexts:
-			if int(city.c)!=at.x or int(city.r)!=at.y:continue
-			for building in city.economy.buildings:
-				if building.get("type","") not in ["fisher","harbor"] or not building.get("ready",false) or float(building.get("hp",0))<=0:continue
-				var bx:=float(building.x)+dc*225.0;var bz:=float(building.z)+dr*195.0
-				if absf(x-bx)>35 or absf(z-bz)>35:continue
-				var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
-				if surface==null:continue
-				var base:float=host.detail_rendered_height(bx,bz)
-				if building.has("baseY"):
-					if building.get("riverBankV276",false):
-						var heights: Array=host.detail_root.heights if dc==0 and dr==0 else host.detail_pick_heights.get(str(at.x)+":"+str(at.y),[])
-						if not heights.is_empty():base+=float(building.baseY)-Terrain.detail_height(heights,float(building.x),float(building.z))
-					else:base=float(building.baseY)
-				var height:=base+float(surface)
-				if best==null or height>float(best):best=height
+		var city: Variant=Districts.existing(parent,at)
+		if city==null:continue
+		for building in city.economy.buildings:
+			if building.get("type","") not in ["fisher","harbor"] or not building.get("ready",false) or float(building.get("hp",0))<=0:continue
+			var bx:=float(building.x)+dc*225.0;var bz:=float(building.z)+dr*195.0
+			if absf(x-bx)>35 or absf(z-bz)>35:continue
+			var surface: Variant=HouseCollision.pier_surface(host.detail_root,building,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+			if surface==null:continue
+			var base:float=host.detail_rendered_height(bx,bz)
+			if building.has("baseY"):
+				if building.get("riverBankV276",false):
+					var heights: Array=host.detail_root.heights if dc==0 and dr==0 else host.detail_pick_heights.get(str(at.x)+":"+str(at.y),[])
+					if not heights.is_empty():base+=float(building.baseY)-Terrain.detail_height(heights,float(building.x),float(building.z))
+				else:base=float(building.baseY)
+			var height:=base+float(surface)
+			if best==null or height>float(best):best=height
 	return best
 
 func ground_height(x: float,z: float) -> float:
@@ -275,11 +281,9 @@ func blocked(x: float,z: float) -> bool:
 	if not host.reveal_all and not host.game.explored[0].has(str(at.x)+":"+str(at.y)):return true
 	var neighbors: Node=host.detail_root.get_node_or_null("NeighborTiles")
 	if at!=center and (neighbors==null or not neighbors.can_enter(at)):return true
-	var contexts:=[]
 	for parent in host.game.get("cities",[]):
-		contexts.append(parent);contexts.append_array(parent.get("districts",{}).values())
-	for city in contexts:
-		if int(city.c)!=at.x or int(city.r)!=at.y:continue
+		var city: Variant=Districts.existing(parent,at)
+		if city==null:continue
 		for b in city.economy.buildings:
 			if b.get("virtual",false) or float(b.get("hp",0))<=0 or b.type in ["bridge","field","pasture","road"]:continue
 			var bounds: Variant=Navigation.clearance(b)
@@ -289,7 +293,7 @@ func blocked(x: float,z: float) -> bool:
 				var age:=Production.visual_age(host.game,int(city.team))
 				var reach:float=maxf(maxf(float(bounds.rx),float(bounds.rz))*0.82+2.0,HouseCollision.reach(host.detail_root,b,age))
 				if absf(x-(float(b.x)+dc*225.0))>=reach or absf(z-(float(b.z)+dr*195.0))>=reach:continue
-				var hit:Variant=HouseCollision.hits(host.detail_root,b,Production.visual_age(host.game,int(city.team)),x,z,Vector2(dc*225.0,dr*195.0))
+				var hit:Variant=HouseCollision.hits(host.detail_root,b,age,x,z,Vector2(dc*225.0,dr*195.0))
 				if hit==true:return true
 				if hit==null and b.type not in ["woodgate","gatehouse"] and absf(x-(float(b.x)+dc*225.0))<float(bounds.rx)*0.82 and absf(z-(float(b.z)+dr*195.0))<float(bounds.rz)*0.82:return true
 	return false
@@ -318,7 +322,7 @@ func step(dt: float,input: Vector2,run: bool) -> void:
 	if moving and not airborne:bob+=dt*(13.0 if run else 8.5)
 	tile=tile_at(pos.x,pos.z)
 	var offset:=tile-current_tile()
-	if maxi(absi(offset.x),absi(offset.y))>=3 and neighbors!=null and neighbors.worker==null:
+	if maxi(absi(offset.x),absi(offset.y))>=3 and neighbors!=null and neighbors.can_enter(tile):
 		host.transition_detail_tile(tile,offset,true)
 	apply_camera()
 

@@ -78,7 +78,7 @@ static func seeded_smooth(x: float,z: float,seed: int) -> float:
 	u=u*u*(3.0-2.0*u);v=v*v*(3.0-2.0*v)
 	return (Geography.noise(i,j,seed)*(1.0-u)+Geography.noise(i+1,j,seed)*u)*(1.0-v)+(Geography.noise(i,j+1,seed)*(1.0-u)+Geography.noise(i+1,j+1,seed)*u)*v
 
-static func sample_color(cells: Array,colors: PackedColorArray,x: float,z: float,height: float,seed:=0) -> Color:
+static func sample_color(cells: Array,linear_colors: PackedColorArray,x: float,z: float,height: float,seed:=0) -> Color:
 	if height<=0.7:return Color(WATER,0.0)
 	var wx:=x+(seeded_smooth(x/41.0+5.3,z/41.0+9.1,seed)-0.5)*46.0+(seeded_smooth(x/13.0+71.0,z/13.0+33.0,seed)-0.5)*12.0
 	var wz:=z+(seeded_smooth(x/41.0+41.7,z/41.0+3.9,seed)-0.5)*46.0+(seeded_smooth(x/13.0+19.0,z/13.0+87.0,seed)-0.5)*12.0
@@ -86,34 +86,46 @@ static func sample_color(cells: Array,colors: PackedColorArray,x: float,z: float
 	var c:=floori(fx);var r:=floori(fz);var u:=fx-c;var v:=fz-r
 	u=u*u*(3.0-2.0*u);v=v*v*(3.0-2.0*v)
 	var red:=0.0;var green:=0.0;var blue:=0.0;var forest:=0.0;var weight:=0.0
+	var columns:=Grid.COLS
+	var rows:=Grid.ROWS
 	for j in 2:
 		for i in 2:
-			var cc:=clampi(c+i,0,Grid.COLS-1);var rr:=clampi(r+j,0,Grid.ROWS-1)
-			var index:=rr*Grid.COLS+cc
+			var cc:=clampi(c+i,0,columns-1);var rr:=clampi(r+j,0,rows-1)
+			var index:=rr*columns+cc
 			if not cells[index].land:continue
 			var w: float=(u if i==1 else 1-u)*(v if j==1 else 1-v)
-			var linear:=colors[index].srgb_to_linear()
-			red+=linear.r*w;green+=linear.g*w;blue+=linear.b*w;forest+=colors[index].a*w;weight+=w
-	var fallback_c:=clampi(floori((x-Grid.ORIGIN_X)/50.0),0,Grid.COLS-1);var fallback_r:=clampi(floori((z-Grid.ORIGIN_Z)/50.0),0,Grid.ROWS-1)
-	var fallback_index:=fallback_r*Grid.COLS+fallback_c
-	var fallback_color: Color=colors[fallback_index] if cells[fallback_index].land else Color("92a365",0.0)
-	var ground:=Color(red/weight,green/weight,blue/weight) if weight>0.000001 else fallback_color.srgb_to_linear()
+			var linear:=linear_colors[index]
+			red+=linear.r*w;green+=linear.g*w;blue+=linear.b*w;forest+=linear.a*w;weight+=w
+	var ground: Color
+	var forest_tint: float
+	if weight>0.000001:
+		ground=Color(red/weight,green/weight,blue/weight)
+		forest_tint=forest/weight
+	else:
+		var fallback_c:=clampi(floori((x-Grid.ORIGIN_X)/50.0),0,columns-1)
+		var fallback_r:=clampi(floori((z-Grid.ORIGIN_Z)/50.0),0,rows-1)
+		var fallback_index:=fallback_r*columns+fallback_c
+		ground=linear_colors[fallback_index] if cells[fallback_index].land else Color("92a365",0.0).srgb_to_linear()
+		forest_tint=ground.a
 	if height<3.4:ground=ground.lerp(Color("dfcea0").srgb_to_linear(),clampf((3.4-height)/1.6,0,1)*0.85)
 	ground*=0.92+seeded_smooth(x/17.0+20.0,z/17.0+30.0,seed)*0.14
-	ground.a=forest/weight if weight>0.000001 else fallback_color.a
+	ground.a=forest_tint
 	return ground.linear_to_srgb()
 
 static func coast_mask(cells: Array) -> PackedByteArray:
 	var mask:=PackedByteArray();mask.resize(cells.size())
-	for r in Grid.ROWS:
-		for c in Grid.COLS:
-			var land: bool=cells[r*Grid.COLS+c].land
-			for dz in range(-2,3):
-				if mask[r*Grid.COLS+c]:break
-				for dx in range(-2,3):
-					var x:=c+dx;var z:=r+dz
-					if x>=0 and x<Grid.COLS and z>=0 and z<Grid.ROWS and bool(cells[z*Grid.COLS+x].land)!=land:
-						mask[r*Grid.COLS+c]=1;break
+	var columns:=Grid.COLS
+	var rows:=Grid.ROWS
+	for r in rows:
+		for c in columns:
+			var index:=r*columns+c
+			var land: bool=cells[index].land
+			for z in range(maxi(0,r-2),mini(rows,r+3)):
+				if mask[index]:break
+				var row:=z*columns
+				for x in range(maxi(0,c-2),mini(columns,c+3)):
+					if bool(cells[row+x].land)!=land:
+						mask[index]=1;break
 	return mask
 
 static func coast_height(heights: PackedFloat32Array,x: float,z: float,seed: int,mask: PackedByteArray) -> float:
@@ -145,6 +157,8 @@ static func prepare_mesh(cells: Array,heights: PackedFloat32Array,colors: Packed
 	var elevation_uv:=PackedVector2Array();elevation_uv.resize(count)
 	var sampled_heights:=PackedFloat32Array();sampled_heights.resize(count)
 	var normals:=PackedVector3Array();normals.resize(count)
+	var linear_colors:=PackedColorArray();linear_colors.resize(colors.size())
+	for i in colors.size():linear_colors[i]=colors[i].srgb_to_linear()
 	var step:=2.0/subdivisions
 	for r in depth:
 		var z: float=Grid.ORIGIN_Z+float(r)*50.0/subdivisions
@@ -155,7 +169,7 @@ static func prepare_mesh(cells: Array,heights: PackedFloat32Array,colors: Packed
 			sampled_heights[i]=h
 			elevation_uv[i]=Vector2(h,0)
 			vertices[i]=Vector3((float(c)/subdivisions-Grid.COLS/2.0)*2.0,maxf(0.0,(h-0.7)*0.04),(float(r)/subdivisions-Grid.ROWS/2.0)*2.0)
-			vertex_colors[i]=sample_color(cells,colors,x,z,h,seed)
+			vertex_colors[i]=sample_color(cells,linear_colors,x,z,h,seed)
 	for r in depth:
 		for c in width:
 			var left: float=vertices[r*width+maxi(c-1,0)].y
@@ -163,6 +177,9 @@ static func prepare_mesh(cells: Array,heights: PackedFloat32Array,colors: Packed
 			var up: float=vertices[maxi(r-1,0)*width+c].y
 			var down: float=vertices[mini(r+1,depth-1)*width+c].y
 			normals[r*width+c]=Vector3(left-right,step*2.0,up-down).normalized()
+	var arrays:=[];arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=elevation_uv
+	if adaptive:return refine_coasts(arrays,sampled_heights,cells,heights,linear_colors,seed,mask,subdivisions)
 	var index_count: int=(width-1)*(depth-1)*6
 	var indices:=PackedInt32Array();indices.resize(index_count)
 	var at:=0
@@ -170,9 +187,7 @@ static func prepare_mesh(cells: Array,heights: PackedFloat32Array,colors: Packed
 		for c in width-1:
 			var a:=r*width+c;var b:=a+1;var d:=a+width;var e:=d+1
 			for index in [a,d,b,b,d,e]:indices[at]=index;at+=1
-	var arrays:=[];arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_COLOR]=vertex_colors;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_TEX_UV]=elevation_uv;arrays[Mesh.ARRAY_INDEX]=indices
-	if adaptive:return refine_coasts(arrays,sampled_heights,cells,heights,colors,seed,mask,subdivisions)
+	arrays[Mesh.ARRAY_INDEX]=indices
 	return {"arrays":arrays,"heights":sampled_heights,"sampler":{"base":sampled_heights,"cells":{},"subdivisions":subdivisions}}
 
 # Refine only the coarse quads crossed by sea level. Neighbouring quads add

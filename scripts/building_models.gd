@@ -14,6 +14,7 @@ const LOW_CACHE_SIZE=128
 
 static var low_meshes:Dictionary={}
 static var low_order:Array[String]=[]
+static var imported_scenes:Dictionary={}
 static var vertex_materials:Dictionary={}
 static var has_vertex_colors:Dictionary={}
 static var town_material:ShaderMaterial
@@ -45,6 +46,23 @@ static func create(type: String,age: int,design: Dictionary={},tier:=1) -> Node3
 	wrapper.add_child(raw)
 	return wrapper
 
+static func prepare_asset(spec: Dictionary) -> void:
+	if spec.plan.is_empty():
+		imported_scene(spec.id)
+	else:
+		HouseModel.prepared_model(spec.plan)
+
+static func imported_scene(id: String) -> PackedScene:
+	if id.is_empty():return null
+	if imported_scenes.has(id):return imported_scenes[id]
+	var path:="res://assets/buildings/"+id+".glb"
+	if not ResourceLoader.exists(path):return null
+	var scene:=load(path) as PackedScene
+	if scene!=null:
+		imported_scenes[id]=scene
+		if imported_scenes.size()>12:imported_scenes.erase(imported_scenes.keys()[0])
+	return scene
+
 static func source(spec: Dictionary,simplified: bool,settlement_detail:=false) -> Node3D:
 	var raw:Node3D
 	if not spec.plan.is_empty():
@@ -56,9 +74,9 @@ static func source(spec: Dictionary,simplified: bool,settlement_detail:=false) -
 		else:
 			raw=HouseModel.from_design(spec.plan)
 	else:
-		var path:="res://assets/buildings/"+str(spec.id)+".glb"
-		if spec.id.is_empty() or not ResourceLoader.exists(path):return null
-		raw=load(path).instantiate()
+		var scene:=imported_scene(spec.id)
+		if scene==null:return null
+		raw=scene.instantiate()
 		if not simplified:apply_imported_materials(raw,spec.town_shader,true)
 	if not spec.fit.is_empty():
 		var scale: Array=spec.fit.scale

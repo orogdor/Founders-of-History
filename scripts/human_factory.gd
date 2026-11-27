@@ -12,6 +12,7 @@ extends RefCounted
 const Rig=preload("res://scripts/human_rig.gd")
 const Equipment=preload("res://scripts/human_equipment.gd")
 const Clips=preload("res://scripts/human_clips.gd")
+const Mobile=preload("res://scripts/mobile_profile.gd")
 const FALLBACK=preload("res://assets/people/human_far.glb")
 const DATA_PATH:="res://data/human_outfits.json"
 ## Mängu kutsujad skaleerivad inimese 1,66-ga (vana mudel on umbes 1 ühik pikk).
@@ -21,6 +22,11 @@ const CHILD_FALLBACK_SCALE:=0.69
 static var data: Dictionary={}
 static var scenes: Dictionary={}
 static var tinted: Dictionary={}
+static var cloth_normals: Dictionary={}
+static var detail_requested: Dictionary={}
+static var detail_ready: Dictionary={}
+static var detail_queue: Array[String]=[]
+static var detail_wanted: Dictionary={}
 
 static func config() -> Dictionary:
 	if data.is_empty():
@@ -30,8 +36,67 @@ static func config() -> Dictionary:
 
 static func packed(path: String) -> PackedScene:
 	if path.is_empty():return null
-	if not scenes.has(path):scenes[path]=load(path) if ResourceLoader.exists(path) else null
+	if not scenes.has(path):
+		var scene: PackedScene=detail_ready.get(path)
+		detail_ready.erase(path)
+		if detail_requested.has(path):
+			scene=ResourceLoader.load_threaded_get(path) as PackedScene
+			detail_requested.erase(path)
+		if scene==null and ResourceLoader.exists(path):scene=load(path) as PackedScene
+		scenes[path]=scene
 	return scenes[path]
+
+static func detail_actor_files(body: String,era: int,job: String,seed: int) -> Array[String]:
+	var cfg:=config()
+	var body_file:=str(cfg.get("bodies",{}).get(body,{}).get("scene",""))
+	var paths: Array[String]=[]
+	if body_file.is_empty() or not ResourceLoader.exists(body_file):return paths
+	paths.append(body_file)
+	if not Clips.libraries.has(body):paths.append("res://assets/people/animations/%s.glb" % body)
+	var items: Dictionary=cfg.get("items",{})
+	var ids:=outfit_items(body,era,job,seed)
+	var hide_hair:=ids.any(func(id):return bool(items[id].get("hides_hair",false)))
+	for id in ids:
+		if hide_hair and str(items[id].slot)=="hair":continue
+		paths.append("res://assets/people/clothes/%s/%s.glb" % [id,body])
+	return paths
+
+static func prepare_detail_assets(paths: Array[String]) -> void:
+	detail_wanted.clear()
+	detail_queue.clear()
+	for path in paths:
+		if detail_wanted.has(path):continue
+		detail_wanted[path]=true
+		if not scenes.has(path) and not detail_ready.has(path) and not detail_requested.has(path):
+			detail_queue.append(path)
+	for path in detail_ready.keys():
+		if not detail_wanted.has(path):detail_ready.erase(path)
+
+static func poll_detail_assets() -> void:
+	for path in detail_requested.keys():
+		var status:=ResourceLoader.load_threaded_get_status(path)
+		if status==ResourceLoader.THREAD_LOAD_IN_PROGRESS:continue
+		if status==ResourceLoader.THREAD_LOAD_LOADED:
+			var scene:=ResourceLoader.load_threaded_get(path) as PackedScene
+			if scene!=null and detail_wanted.has(path):
+				if path.begins_with("res://assets/people/animations/"):
+					Clips.library(path.get_file().get_basename(),scene)
+				else:detail_ready[path]=scene
+		detail_requested.erase(path)
+	while detail_requested.size()<2 and not detail_queue.is_empty():
+		var path: String=detail_queue.pop_front()
+		if not scenes.has(path) and ResourceLoader.exists(path) and ResourceLoader.load_threaded_request(path,"PackedScene",false)==OK:
+			detail_requested[path]=true
+
+static func finish_detail_assets() -> void:
+	for path in detail_requested.keys():
+		var status:=ResourceLoader.load_threaded_get_status(path)
+		if status in [ResourceLoader.THREAD_LOAD_IN_PROGRESS,ResourceLoader.THREAD_LOAD_LOADED]:
+			ResourceLoader.load_threaded_get(path)
+		detail_requested.erase(path)
+	detail_ready.clear()
+	detail_wanted.clear()
+	detail_queue.clear()
 
 static func stable_hash(text: String) -> int:
 	return absi(hash(text))
@@ -83,7 +148,6 @@ static func create(body: String,era:=0,job:="",seed:=0,team:=-1,unit:="") -> Nod
 const SKIN_SHADES:=[Color(1,1,1),Color(0.93,0.9,0.87),Color(1.04,1.01,0.98),Color(0.86,0.8,0.74),Color(0.98,0.95,0.96),Color(0.78,0.7,0.62)]
 static func tint_skin(model: Node,seed: int) -> void:
 	var shade: Color=SKIN_SHADES[stable_hash("%d:skin" % seed)%SKIN_SHADES.size()]
-	if shade==Color(1,1,1):return
 	for node in all_children(model):
 		if not node is MeshInstance3D or node.mesh==null:continue
 		var mesh: MeshInstance3D=node
@@ -92,7 +156,11 @@ static func tint_skin(model: Node,seed: int) -> void:
 			if not material is BaseMaterial3D or not str(material.resource_name).begins_with("skin"):continue
 			var key:="skin:%d:%s" % [material.get_instance_id(),shade.to_html(false)]
 			if not tinted.has(key):
-				var copy: BaseMaterial3D=material.duplicate();copy.albedo_color=copy.albedo_color*shade;tinted[key]=copy
+				var copy: BaseMaterial3D=material.duplicate()
+				copy.albedo_color=copy.albedo_color*shade
+				copy.roughness=clampf(copy.roughness,0.68,0.92)
+				copy.metallic_specular=0.22
+				tinted[key]=copy
 			mesh.set_surface_override_material(s,tinted[key])
 
 static func collect_zones(model: Node) -> Dictionary:
@@ -217,17 +285,55 @@ static func tint(mesh: MeshInstance3D,item: Dictionary,seed: int,id: String,team
 	var color:=Color(str(tints[stable_hash("%d:%s:tint" % [seed,id])%tints.size()])) if not tints.is_empty() else Color.WHITE
 	if bool(item.get("hair_color",false)):color=hair_color(seed);tints=[color]
 	elif bool(item.get("team",false)):color=team_color(team).darkened(0.18) if team>=0 else Color("8a7a62");tints=[color]   # kangas: tumedam kui UI värv
+	var finish:=str(item.get("mat",""))
+	var soft_surface:=finish in ["hide","leather","fur","wool","linen","twill","knit","felt","plaid","denim","herringbone","jersey","quilted"]
 	for s in mesh.mesh.get_surface_count():
 		var material:=mesh.get_active_material(s)
 		if not material is BaseMaterial3D:continue
 		# Riiete tipuvärvides on varjud (voldid, kaenlaalused, äärte mustus).
-		var shaded: bool=(mesh.mesh.surface_get_format(s) & Mesh.ARRAY_FORMAT_COLOR)!=0
-		if tints.is_empty() and not shaded:continue
-		var key:="%d:%s:%s" % [material.get_instance_id(),color.to_html(false),shaded]
+		var attributes: int=mesh.mesh.surface_get_format(s)
+		var shaded: bool=(attributes & Mesh.ARRAY_FORMAT_COLOR)!=0
+		if tints.is_empty() and not shaded and not soft_surface:continue
+		var key:="%d:%s:%s:%s:%s" % [material.get_instance_id(),color.to_html(false),shaded,finish,Mobile.active]
 		if not tinted.has(key):
 			var copy: BaseMaterial3D=material.duplicate();copy.albedo_color=copy.albedo_color*color
-			copy.vertex_color_use_as_albedo=shaded;tinted[key]=copy
+			copy.vertex_color_use_as_albedo=shaded
+			if soft_surface:
+				var leather:=finish in ["hide","leather"]
+				copy.roughness=clampf(copy.roughness+0.10,0.70 if leather else 0.84,0.98)
+				copy.metallic_specular=0.23 if leather else 0.17
+				var opaque:=copy.transparency==BaseMaterial3D.TRANSPARENCY_DISABLED
+				if opaque and copy.normal_texture==null and (attributes & Mesh.ARRAY_FORMAT_TANGENT)!=0 and not Mobile.active:
+					copy.normal_texture=cloth_grain("hide" if leather else "fur" if finish=="fur" else "woven")
+					copy.normal_enabled=true
+					copy.normal_scale=0.48 if leather else 0.58
+			tinted[key]=copy
 		mesh.set_surface_override_material(s,tinted[key])
+
+static func cloth_grain(finish: String) -> Texture2D:
+	if cloth_normals.has(finish):return cloth_normals[finish]
+	const SIZE:=96
+	var image:=Image.create(SIZE,SIZE,false,Image.FORMAT_RGB8)
+	for y in SIZE:
+		for x in SIZE:
+			var u:=float(x)*TAU/SIZE
+			var v:=float(y)*TAU/SIZE
+			var warp:=sin(u*5.0+v*3.0)*.36
+			var across:=sin(u*27.0+warp)
+			var along:=sin(v*31.0+warp)
+			match finish:
+				"hide":
+					across=sin(u*23.0+sin(v*17.0+u*6.0))*.56
+					along=sin(v*26.0+sin(u*15.0-v*5.0))*.55
+				"fur":
+					across=sin(u*44.0+sin(v*13.0)*.89)*1.15
+					along=sin(v*16.0+u*13.0)*.28
+			var normal:=Vector3(across*.26,along*.24,1.0).normalized()
+			image.set_pixel(x,y,Color(normal.x*.5+.5,normal.y*.5+.5,normal.z*.5+.5))
+	image.generate_mipmaps(true)
+	var texture:=ImageTexture.create_from_image(image)
+	cloth_normals[finish]=texture
+	return texture
 
 ## Ajastu tööriista nimi ametile (kiviajal senised tööriistad).
 static func tool_name(kind: String,era: int) -> String:

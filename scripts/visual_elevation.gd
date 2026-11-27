@@ -25,15 +25,28 @@ static func smooth_atlas(heights: PackedFloat32Array,x: float,z: float) -> float
 	if not is_finite(x) or not is_finite(z):return -15.0
 	var fx: float=(x-Grid.ORIGIN_X)/50.0-0.5;var fz: float=(z-Grid.ORIGIN_Z)/50.0-0.5
 	var c:=floori(fx);var r:=floori(fz);var wu:=spline(fx-c);var wv:=spline(fz-r);var h:=0.0
-	for j in 4:
-		var row:=0.0
-		for i in 4:row+=wu[i]*sample_at(heights,c-1+i,r-1+j)
-		h+=wv[j]*row
 	var original:=atlas(heights,x,z)
-	return lerpf(original,h,smooth((absf(original)-1.5)/4.0))
+	var blend:=smooth((absf(original)-1.5)/4.0)
+	if blend==0.0:return original
+	var columns:=Grid.COLS
+	var rows:=Grid.ROWS
+	if c>=1 and c+2<columns and r>=1 and r+2<rows:
+		for j in 4:
+			var at: int=(r-1+j)*columns+c-1
+			var row:=wu[0]*heights[at]+wu[1]*heights[at+1]+wu[2]*heights[at+2]+wu[3]*heights[at+3]
+			h+=wv[j]*row
+	else:
+		for j in 4:
+			var row:=0.0
+			for i in 4:row+=wu[i]*sample_at(heights,c-1+i,r-1+j)
+			h+=wv[j]*row
+	return lerpf(original,h,blend)
 
 static func base(heights: PackedFloat32Array,x: float,z: float,seed: int) -> float:
 	var h:=smooth_atlas(heights,x,z)
+	var sub:=maxf(0.0,0.72-h)
+	var ocean_floor:=2.5*smooth(sub/7.0)+sub*0.10 if sub>0 else 0.0
+	if h<=2.5:return h-ocean_floor
 	var wx:=x+(seeded_smooth(x/97+11.3,z/97+4.1,seed)-0.5)*70.0
 	var wz:=z+(seeded_smooth(x/97+31.7,z/97+52.9,seed)-0.5)*70.0
 	var lowland:=smooth((h-2.5)/5.0)*(1.0-smooth((h-22.0)/14.0))
@@ -45,7 +58,6 @@ static func base(heights: PackedFloat32Array,x: float,z: float,seed: int) -> flo
 		var r3:=pow(1.0-absf(2.0*seeded_smooth(wx/31+43,wz/31+27,seed)-1.0),2)
 		var scarp:=smooth((r2-0.55)/0.18)*(6.0+10.0*r1)
 		relief=steep*(18.0+50.0*r1+30.0*r2*(0.35+0.65*r1)+9.0*r3*(0.4+0.6*r2)+scarp)
-	var sub:=maxf(0.0,0.72-h);var ocean_floor:=2.5*smooth(sub/7.0)+sub*0.10 if sub>0 else 0.0
 	return h+roll+relief-ocean_floor
 
 static func mountain_at(cells: Array,c: int,r: int) -> float:

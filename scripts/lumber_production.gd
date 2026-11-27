@@ -42,6 +42,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 	var world: Dictionary=city.world
 	var economy: Dictionary=city.economy
 	var realm: Dictionary=economy.realms[city.team]
+	var storage_counts:=Econ.storage_counts(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings)
 	var terrain_modifiers:=Bonuses.terrain(cells,city)
 	if ForestryScript.natural_regrowth(state,world,dt,economy.buildings)>0:changed=true
 	# On reload, continue above all persisted cargo IDs so their paths stay separate.
@@ -64,9 +65,9 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		var pending_water:=0.0
 		for cargo in economy.cargo:
 			if cargo.team==city.team and cargo.key=="water":pending_water+=cargo.amount
-		var water_full:=float(realm.resources.get("water",0))+pending_water>=Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"water")
+		var water_full:=float(realm.resources.get("water",0))+pending_water>=Econ.limit_from_counts(storage_counts,"water")
 		var well_assigned:=float(well.get("assigned",0))
-		if well_assigned>0 and float(realm.resources.get("water",0))+pending_water<Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"water"):
+		if well_assigned>0 and float(realm.resources.get("water",0))+pending_water<Econ.limit_from_counts(storage_counts,"water"):
 			var hall_for_worker: Variant=null
 			for b in economy.buildings:
 				if b.type=="hall" and b.get("ready",false):hall_for_worker=b;break
@@ -96,7 +97,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		else:well.status="Ootab tööjõudu"
 	for fisher in economy.buildings:
 		if fisher.type!="fisher" or not fisher.get("ready",false) or fisher.get("disabled",false) or float(fisher.get("hp",0))<=0:continue
-		var full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"fish",float(Econ.DATA.data.buildings.fisher.rate),Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"fish"))
+		var full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"fish",float(Econ.DATA.data.buildings.fisher.rate),Econ.limit_from_counts(storage_counts,"fish"))
 		var fisher_assigned:=float(fisher.get("assigned",0))
 		if fisher_assigned>0 and not full:
 			var bonus: float=Bonuses.workplace(state,city,"fisher",terrain_modifiers,city_wide_buildings)
@@ -109,7 +110,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		else:fisher.status="Ootab tööjõudu"
 	for hunter in economy.buildings:
 		if hunter.type!="hunter" or not hunter.get("ready",false) or hunter.get("disabled",false) or float(hunter.get("hp",0))<=0:continue
-		var food_full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"meat",float(Econ.DATA.data.buildings.hunter.rate),Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"meat"))
+		var food_full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"meat",float(Econ.DATA.data.buildings.hunter.rate),Econ.limit_from_counts(storage_counts,"meat"))
 		var hunter_assigned:=float(hunter.get("assigned",0))
 		if hunter_assigned>0 and not food_full:
 			var bonus: float=Bonuses.workplace(state,city,"hunter",terrain_modifiers,city_wide_buildings)
@@ -123,7 +124,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		else:hunter.status="Ootab tööjõudu"
 	for farm in economy.buildings:
 		if farm.type!="farm" or not farm.get("ready",false) or farm.get("disabled",false) or float(farm.get("hp",0))<=0:continue
-		var full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"grain",float(Econ.DATA.data.buildings.farm.rate),Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"grain"))
+		var full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),"grain",float(Econ.DATA.data.buildings.farm.rate),Econ.limit_from_counts(storage_counts,"grain"))
 		if float(farm.get("assigned",0))>0 and not full:
 			var bonus: float=Bonuses.workplace(state,city,"farm",terrain_modifiers,city_wide_buildings)
 			var work_dt:=dt*float(farm.efficiency)*bonus
@@ -144,7 +145,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		var incoming:=0.0
 		for cargo in economy.cargo:
 			if cargo.team==city.team and cargo.key==key:incoming+=float(cargo.amount)
-		var cap:=Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,key)
+		var cap:=Econ.limit_from_counts(storage_counts,key)
 		var full:=not Econ.food_production_allowed(realm.resources,team_cargo(economy.cargo,city.team),key,float(definition.rate),cap,ingredients) if key in Econ.DATA.data.food_keys else float(realm.resources.get(key,0))+incoming>=cap
 		if full:building.status="Ladu täis";continue
 		if not Econ.can_afford(realm.resources,ingredients):building.status="Ootab toorainet";continue
@@ -204,9 +205,9 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		var pending_wood:=0.0
 		for cargo in economy.cargo:
 			if cargo.team==city.team and cargo.key=="wood":pending_wood+=cargo.amount
-		var wood_full:=float(stock.get("wood",0))+pending_wood>=Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"wood")
+		var wood_full:=float(stock.get("wood",0))+pending_wood>=Econ.limit_from_counts(storage_counts,"wood")
 		var assigned: float=lumber.get("assigned",0)
-		if assigned>0 and float(stock.get("wood",0))+pending_wood<Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,"wood"):
+		if assigned>0 and float(stock.get("wood",0))+pending_wood<Econ.limit_from_counts(storage_counts,"wood"):
 			var bonus: float=Bonuses.workplace(state,city,"lumber",terrain_modifiers,city_wide_buildings)
 			var worker_dt: float = dt*lumber.efficiency*bonus
 			var id:=str(economy.buildings.find(lumber))
@@ -225,7 +226,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		var incoming:=0.0
 		for cargo in economy.cargo:
 			if cargo.team==city.team and cargo.key==output:incoming+=float(cargo.amount)
-		var full:=float(realm.resources.get(output,0))+incoming>=Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,output)
+		var full:=float(realm.resources.get(output,0))+incoming>=Econ.limit_from_counts(storage_counts,output)
 		var ingredients: Dictionary=definition.get("input",{})
 		if float(mine.get("assigned",0))>0 and not full and Econ.can_afford(realm.resources,ingredients):
 			var hall_for_worker: Variant=null
@@ -260,7 +261,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		var id:=str(economy.buildings.find(forester));var nav:=actor_nav(worker_navs,id,base)
 		var work_dt:=dt*float(forester.efficiency)*Bonuses.workplace(state,city,"forester",terrain_modifiers,city_wide_buildings)
 		ForestryScript.plant(economy,world,forester,work_dt,nav)
-	if tick_basic(city,base,city.get("basicAssigned",{}),basic_dt if basic_dt>=0 else dt,state):changed=true
+	if tick_basic(city,base,city.get("basicAssigned",{}),basic_dt if basic_dt>=0 else dt,state,storage_counts):changed=true
 	if int(world.get("revision",0))!=seen_revision:synchronize(base,world,economy.buildings);changed=true
 	var hall: Variant=null
 	for b in economy.buildings:
@@ -284,7 +285,7 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 				continue
 			var key: String=cargo.key
 			var used: float=Needs.food_total(realm.resources) if key in Econ.DATA.data.food_keys else float(realm.resources.get(key,0))
-			var free:=maxf(0,Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,key)-used)
+			var free:=maxf(0,Econ.limit_from_counts(storage_counts,key)-used)
 			var unloaded:=minf(float(cargo.amount),free)
 			realm.resources[key]=float(realm.resources.get(key,0))+unloaded
 			cargo.amount-=unloaded
@@ -296,8 +297,10 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 			else:cargo.status="Ladu täis"
 	return changed
 
-func tick_basic(city: Dictionary,base: LocalNavigation,assigned: Dictionary,dt: float,state: Dictionary) -> bool:
+func tick_basic(city: Dictionary,base: LocalNavigation,assigned: Dictionary,dt: float,state: Dictionary,storage_counts: Dictionary={}) -> bool:
 	var economy: Dictionary=city.economy
+	if storage_counts.is_empty():
+		storage_counts=Econ.storage_counts(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings)
 	var world: Dictionary=city.world
 	var stock: Dictionary=economy.realms[city.team].resources
 	var hall: Variant=null
@@ -310,7 +313,7 @@ func tick_basic(city: Dictionary,base: LocalNavigation,assigned: Dictionary,dt: 
 		var count: float=assigned.get(key,0)
 		if count<=0:continue
 		var used: float=Needs.food_total(stock) if key=="berries" else float(stock.get(key,0))
-		var free:=maxf(0,Econ.storage_limit(city_wide_buildings if not city_wide_buildings.is_empty() else economy.buildings,key)-used)
+		var free:=maxf(0,Econ.limit_from_counts(storage_counts,key)-used)
 		if free<=0:continue
 		var d: Dictionary=definitions[key]
 		var basic: Dictionary={"type":d.type,"resourceKind":d.kind,"workerKey":"basic:"+key,"team":city.team,"x":hall.x,"z":hall.z}
@@ -333,4 +336,3 @@ static func record_delivery(realm: Dictionary,seconds: float,key: String,amount:
 	realm.deliveryHistory[minute][key]=float(realm.deliveryHistory[minute].get(key,0))+amount
 	for old in realm.deliveryHistory.keys():
 		if int(old)<floori(seconds/60)-5:realm.deliveryHistory.erase(old)
-
