@@ -1,0 +1,33 @@
+name: Publish Windows download
+on:
+  push:
+    branches: [publish-windows-update-38]
+    paths: ['.github/workflows/publish-windows-download.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ef0b189bd698eee0d68d3d9b7379890edbea8b65
+          fetch-depth: 1
+      - name: Download verified Windows build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 46018772505 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
+          find /tmp/game -maxdepth 3 -type f -printf '%P %s\n'
+          cd /tmp/game
+          zip -q -r /tmp/Founders-of-History-Windows.zip .
+          unzip -tq /tmp/Founders-of-History-Windows.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create windows-majad-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target ef0b189bd698eee0d68d3d9b7379890edbea8b65 --title "Founders of History Windows" --notes "Windowsi mänguversioon koos pronksi- ja rauaaja uute ehitistega." --latest=false
