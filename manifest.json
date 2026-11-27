@@ -1,16 +1,16 @@
 {
   "schema": 1,
   "runtime": "godot-4.7.2-android-v1",
-  "revision": 43,
-  "source": "5a7a0f61460993eecb3fd1c01a2950dc682bf163",
+  "revision": 44,
+  "source": "980d315c3bb262304eb98c03ed7a9fccfd2e6fb6",
   "base": {
     "url": "https://github.com/orogdor/Founders-of-History/releases/download/android-launcher-base-v1/android-base.pck",
     "sha256": "519bfaa99bb22d192e48660211acaddebc35b8c76f947a527bc83ded8c6c866b",
     "size": 772044368
   },
   "patch": {
-    "url": "https://github.com/orogdor/Founders-of-History/releases/download/android-launcher-update-43-1/android-patch.pck",
-    "sha256": "44b926b028715bc392ab559b52fc5e82193f1df351090a8e3cf52c1c5cf818e1",
-    "size": 631255324
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/android-launcher-update-44-1/android-patch.pck",
+    "sha256": "2d846372a729bc0f908b614ec881b5e70b8162938a828d01d32cb38bff2400bb",
+    "size": 631258500
   }
 }
