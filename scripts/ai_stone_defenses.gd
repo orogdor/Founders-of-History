@@ -386,29 +386,36 @@ static func tick(state: Dictionary,city: Dictionary,runtime: Dictionary,rule: Ca
   if not existing is Dictionary:existing=natural_plan.call() if natural_plan.is_valid() else null
   if not existing is Dictionary:existing=survey(city,int(state.seed)+int(city.id)*19,nav)
   city.stoneDefensePlanV166=existing
- for original_slot in existing.slots:
+ # Resume the survey on the next city tick. Detailed access checks can visit
+ # the entire navigation grid, so inspect at most two planned sites per turn.
+ var first_slot:=clampi(int(existing.get("surveyCursor",0)),0,existing.slots.size())
+ var end_slot:=mini(first_slot+2,existing.slots.size())
+ for slot_index in range(first_slot,end_slot):
+  var original_slot:Dictionary=existing.slots[slot_index]
   var dc:=floori((float(original_slot.x)+112.5)/225.0);var dr:=floori((float(original_slot.z)+97.5)/195.0)
   var ctx:Variant=city if dc==0 and dr==0 else (context_for.call(city,Vector2i(int(city.c)+dc,int(city.r)+dr)) if context_for.is_valid() else null)
   if not ctx is Dictionary:continue
   var slot:Dictionary=original_slot.duplicate(true);slot.x=float(slot.x)-dc*225.0;slot.z=float(slot.z)-dr*195.0
-  var local_runtime:Dictionary=runtime if dc==0 and dr==0 else (runtime_for.call(ctx) if runtime_for.is_valid() else {})
-  if not local_runtime.has("nav"):continue
-  nav=local_runtime.nav
   var placed:=false
   for b in ctx.economy.buildings:
    if b.type==slot.type and float(b.get("hp",0))>0 and Vector2(b.x,b.z).distance_to(Vector2(slot.x,slot.z))<(1.0 if slot.get("drawnWallV175",false) else 4.5):placed=true;break
+  if placed:continue
+  var cost:Dictionary=Econ.DATA.data.buildings[slot.type].cost
+  if not Econ.can_afford(stock,cost) or float(stock.get("wood",0))-float(cost.get("wood",0))<7 or float(stock.get("stone",0))-float(cost.get("stone",0))<3:continue
   var locked:String=str(context_rule.call(ctx,slot.type)) if context_rule.is_valid() else str(rule.call(slot.type))
   var terrain:Callable=Callable()
   if global_terrain.is_valid():terrain=func(x,z):return global_terrain.call(city,x+dc*225.0,z+dr*195.0)
-  if placed or not locked.is_empty() or blocked(slot,ctx.economy.buildings,nav,terrain):continue
+  if not locked.is_empty():continue
+  var local_runtime:Dictionary=runtime if dc==0 and dr==0 else (runtime_for.call(ctx) if runtime_for.is_valid() else {})
+  if not local_runtime.has("nav"):continue
+  nav=local_runtime.nav
+  if blocked(slot,ctx.economy.buildings,nav,terrain):continue
   var bounds:Dictionary=footprint(slot);var blocked_deposit:=false
   for resource in ctx.world.get("resources",[]):
    if resource.get("removed",false) or resource.kind in ["tree","berry","game","fish"]:continue
    if absf(float(resource.x)-float(slot.x))<float(bounds.rx)+4 and absf(float(resource.z)-float(slot.z))<float(bounds.rz)+4:blocked_deposit=true;break
   if blocked_deposit:continue
   if slot.type!="woodgate" and not nav.preserves_access(slot,ctx.economy.buildings,ctx.world.get("workers",{}),ctx.economy.get("cargo",[])):continue
-  var cost:Dictionary=Econ.DATA.data.buildings[slot.type].cost
-  if not Econ.can_afford(stock,cost) or float(stock.get("wood",0))-float(cost.get("wood",0))<7 or float(stock.get("stone",0))-float(cost.get("stone",0))<3:continue
   var at:=Vector2(float(slot.x),float(slot.z));var passable=func(x,z,_team):return terrain.call(x,z) if terrain.is_valid() else terrain_open(nav,x,z)
   var build_economy:=District.build_economy(city,ctx)
   if slot.get("wallTowerV179",false):
@@ -424,7 +431,13 @@ static func tick(state: Dictionary,city: Dictionary,runtime: Dictionary,rule: Ca
   if building.get("extendedPalisadeV166",false):building.navWidth=7.2;building.navDepth=1.1
   building.historicPalisadeV166=true;building.plannedDefense=true
   ctx.economy.buildings.append(building);Builder.clear_footprint(ctx.world,building);nav.rebuild(ctx.economy.buildings,ctx.world.resources)
+  existing.erase("surveyCursor")
   existing.constructed=int(existing.get("constructed",0))+1;city.aiStoneDefenseStatusV166={"reason":"built","kind":slot.type,"at":state.time};return
+ if end_slot<existing.slots.size():
+  existing.surveyCursor=end_slot
+  city.nextStoneDefenseCheckV166=state.time
+  return
+ existing.erase("surveyCursor")
  city.aiStoneDefenseStatusV166={"reason":"no-site","at":state.time}
 
 # Repair gaps in the first historic curtain with paid masonry. Keep at least

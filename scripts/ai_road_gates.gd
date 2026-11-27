@@ -20,6 +20,7 @@ static func road_crosses(wall: Dictionary,roads: Array) -> bool:
 static func traffic(state: Dictionary,city: Dictionary,runtime_for: Callable) -> Array:
  var result:=[];var contexts:=District.contexts(city)
  for ctx in contexts:
+  if ctx.world.get("heat",{}).is_empty():continue
   var nav:LocalNavigation=runtime_for.call(ctx).nav;nav.trail_time=float(state.time)
   for key in nav.heat:
    var idx:=int(key)
@@ -59,7 +60,6 @@ static func tick(state: Dictionary,city: Dictionary,runtime_for: Callable,rule: 
   for b in ctx.economy.buildings:
    if b.type in ["woodgate","gatehouse"] and float(b.get("hp",0))>0:gates.append(Vector2(float(b.x)+(int(ctx.c)-int(city.c))*225.0,float(b.z)+(int(ctx.r)-int(city.r))*195.0))
  for ctx in contexts:
-  var nav:LocalNavigation=runtime_for.call(ctx).nav
   for wall in ctx.economy.buildings:
    if wall.type not in ["palisade","stonewall","reinforced_wall"] or not wall.get("ready",false) or float(wall.get("hp",0))<=0:continue
    var shifted:Dictionary=wall.duplicate();shifted.x=float(wall.x)+(int(ctx.c)-int(city.c))*225.0;shifted.z=float(wall.z)+(int(ctx.r)-int(city.r))*195.0
@@ -77,6 +77,7 @@ static func tick(state: Dictionary,city: Dictionary,runtime_for: Callable,rule: 
    if not str(rule.call(ctx,type)).is_empty():continue
    var stock:Dictionary=city.economy.realms[int(city.team)].resources;var cost:Dictionary=Economy.DATA.data.buildings[type].cost
    if not Economy.can_afford(stock,cost) or float(stock.get("wood",0))<float(cost.get("wood",0))+7:continue
+   var nav:LocalNavigation=runtime_for.call(ctx).nav
    var hp:float=wall.hp;wall.hp=0
    var economy:=District.build_economy(city,ctx);var passable=func(x,z,_team):var index:=nav.index(x,z);return index>=0 and nav.base[index]!=0
    var result:=Economy.place_building(economy,int(city.team),type,Vector2(wall.x,wall.z),passable,Callable(),true)

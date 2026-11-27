@@ -143,6 +143,9 @@ var simulation_paused := false
 var menu_open := false
 var simulation_pause_button: Button
 var elapsed := 0.0
+const BACKGROUND_CITY_INTERVAL := 0.25
+var background_city_cursor := 0
+var city_marker_clock := 0.0
 var settler: Dictionary = {}
 var game: Dictionary = {}
 var terrain: MeshInstance3D
@@ -2122,6 +2125,31 @@ func update_camera_keys(delta: float) -> void:
 		camera_target.z=clampf(camera_target.z,-Grid.ROWS+1,Grid.ROWS-1)
 	update_camera()
 
+# Background cities take turns. The owed time belongs to the city so saves,
+# founding a city, and switching views all preserve its simulation clock.
+func scheduled_cities(delta: float) -> Array:
+	var cities: Array=game.cities
+	var focused: Dictionary={}
+	var tile: Vector2i=selected if detail_inspection else player
+	for city in cities:
+		city.pendingSimulationSeconds=float(city.get("pendingSimulationSeconds",0.0))+delta
+		if detail_mode and focused.is_empty() and DistrictContexts.existing(city,tile)!=null:
+			focused=city
+	var scheduled: Array=[]
+	if not focused.is_empty():scheduled.append(focused)
+	var count:=cities.size()-scheduled.size()
+	if count==0:return scheduled
+	var quota:=clampi(ceili(count*delta/BACKGROUND_CITY_INTERVAL),1,count)
+	for i in cities.size():
+		background_city_cursor%=cities.size()
+		var city: Dictionary=cities[background_city_cursor]
+		background_city_cursor=(background_city_cursor+1)%cities.size()
+		if is_same(city,focused):continue
+		scheduled.append(city)
+		quota-=1
+		if quota==0:break
+	return scheduled
+
 func _process(delta: float) -> void:
 	DetailView.poll_nature_assets();DetailGroundMaterial.poll()
 	if is_instance_valid(detail_loading_overlay):
@@ -2219,7 +2247,9 @@ func _process(delta: float) -> void:
 		game.lastAIResearchPlan=game.time
 		for team in [1,2,3]:manage_ai_settlers(team)
 	if not game.cities.is_empty():
-		for city in game.cities:
+		for city in scheduled_cities(delta):
+			var city_delta:=minf(float(city.pendingSimulationSeconds),maxf(delta,BACKGROUND_CITY_INTERVAL))
+			city.pendingSimulationSeconds-=city_delta
 			var runtime:=ensure_city_runtime(city)
 			var nav: LocalNavigation=runtime.nav
 			var production: LumberProduction=runtime.production
@@ -2231,8 +2261,8 @@ func _process(delta: float) -> void:
 			AIRoadGates.tick(game,city,ensure_city_runtime,upgrade_rule)
 			if rival and not city.get("reservePendingV168",false):
 				AIStoneDefenses.update_builders(game,city)
-				tick_ai_field(city,runtime,city)
-				for district in city.get("districts",{}).values():tick_ai_field(district,ensure_city_runtime(district),city)
+				tick_ai_field(city,city)
+				for district in city.get("districts",{}).values():tick_ai_field(district,city)
 				var defense_rule=func(type):return CityRules.urban_rule(game,city,city_cell_data(city),type,is_coast(int(city.c),int(city.r)),city_has_river(city),DistrictContexts.all_buildings(city))
 				var defense_context=func(parent,tile):return district_context_at(parent,tile,true)
 				var outer_rule=func(ctx,type):return CityRules.urban_rule(game,ctx,city_cell_data(ctx),type,is_coast(int(ctx.c),int(ctx.r)),city_has_river(ctx),DistrictContexts.all_buildings(city),{"outerRingV184":true})
@@ -2248,11 +2278,11 @@ func _process(delta: float) -> void:
 				if float(game.time)>=float(city.get("aiMilitaryCheck",0)):
 					city.aiMilitaryCheck=float(game.time)+12;AIMilitary.tick(game,city)
 			var difficulty: String=game.get("difficulty","normal")
-			var production_dt:=delta*(0.6 if difficulty=="easy" else 0.95 if difficulty=="hard" else 0.8) if rival else delta
-			var basic_dt:=delta*(0.6 if difficulty=="easy" else 0.75) if rival else delta
-			CityNeeds.consume_luxuries(city,int(game.ages[city.team]),delta)
+			var production_dt:=city_delta*(0.6 if difficulty=="easy" else 0.95 if difficulty=="hard" else 0.8) if rival else city_delta
+			var basic_dt:=city_delta*(0.6 if difficulty=="easy" else 0.75) if rival else city_delta
+			CityNeeds.consume_luxuries(city,int(game.ages[city.team]),city_delta)
 			Production.apply_building_upgrades(game,city)
-			tick_city_demographics(city,delta)
+			tick_city_demographics(city,city_delta)
 			nav.trail_time=elapsed
 			Labor.allocate(game,city)
 			var build_event:Dictionary
@@ -2263,20 +2293,20 @@ func _process(delta: float) -> void:
 				for finished in build_event.get("district_completed",[]):
 					var updated:Dictionary=finished.ctx;ensure_city_runtime(updated).nav.rebuild(updated.economy.buildings,updated.world.resources)
 					if finished.building.get("type","")=="bridge" and finished.building.get("ready",false):activate_city_bridge(updated)
-				tick_city_districts(city,delta,production_dt,basic_dt)
+				tick_city_districts(city,city_delta,production_dt,basic_dt)
 			activate_city_bridge(city)
 			city_cell_data(city)
 			var previous_vision: int=game.get("visionRevision",0)
 			var changed: bool=production.tick(game,city,nav,production_dt,grid,basic_dt)
-			runtime.market.tick(game,city,delta,func(tile):return district_context_at(city,tile,true),district_nav_for,merchant_land_path)
-			TownStreets.tick(city,delta,ensure_city_runtime,elapsed)
+			runtime.market.tick(game,city,city_delta,func(tile):return district_context_at(city,tile,true),district_nav_for,merchant_land_path)
+			TownStreets.tick(city,city_delta,ensure_city_runtime,elapsed)
 			if int(game.get("visionRevision",0))!=previous_vision:refresh_fog()
 			if changed and detail_mode and active:detail_root.sync_removed_resources(city.world.resources,elapsed,city.economy.buildings)
 			var trained: Dictionary=training.tick(game,city,nav,basic_dt,finish_ship_job,func(tile):return district_context_at(city,tile,true),district_nav_for,merchant_land_path)
 			if trained.has("completed") and active:update_status("Väljaõpe valmis: "+str(Economy.DATA.data.troops[trained.completed].name))
 			if trained.has("completedShip") and active:update_status("Laev valmis: "+str(Naval.SHIPS.data[trained.completedShip].name))
 			if detail_mode and active:
-				tree_visual_clock+=delta
+				tree_visual_clock+=city_delta
 				if tree_visual_clock>=1.0:
 					tree_visual_clock=0.0;detail_root.sync_removed_resources(city.world.resources,elapsed,city.economy.buildings)
 				var displayed:Dictionary=city
@@ -2287,7 +2317,7 @@ func _process(delta: float) -> void:
 				detail_root.update_builder(displayed,elapsed,int(game.ages[int(city.team)]))
 				detail_root.update_trainer(city,elapsed,int(game.ages[int(city.team)]))
 				detail_root.update_workers(city,elapsed,int(game.ages[int(city.team)]))
-				detail_root.update_wildlife(city,elapsed,delta,nav)
+				detail_root.update_wildlife(city,elapsed,city_delta,nav)
 				detail_root.update_building_animations(elapsed)
 			if detail_mode and not active:
 				var visible_view: Node=visible_city_detail(city)
@@ -2384,7 +2414,10 @@ func _process(delta: float) -> void:
 	update_raid_markers()
 	update_merchant_markers()
 	update_ship_markers()
-	update_city_markers()
+	city_marker_clock+=delta
+	if city_marker_clock>=BACKGROUND_CITY_INTERVAL:
+		city_marker_clock=fmod(city_marker_clock,BACKGROUND_CITY_INTERVAL)
+		update_city_markers()
 	update_other_settler_markers()
 	update_world_roads()
 	update_territory_visual()
@@ -2423,6 +2456,7 @@ func generate_worker(value: int,restored: Dictionary={},world_type:="tectonic") 
 	call_deferred("finish_generation", data)
 
 func finish_generation(data: Dictionary) -> void:
+	background_city_cursor=0;city_marker_clock=0.0
 	generation_thread.wait_to_finish()
 	generation_thread = null
 	outer_ring_surveys.clear()
@@ -3300,6 +3334,7 @@ func load_partial(destination: String=SAVE_FILE) -> void:
 	generation_thread.start(Callable(self,"generate_worker").bind(int(data.game.seed),data.game))
 
 func apply_loaded_game() -> void:
+	background_city_cursor=0;city_marker_clock=0.0
 	var data := pending_load
 	pending_load = {}
 	autosave_suspended=false
@@ -4102,22 +4137,22 @@ func place_ai_building(city: Dictionary,runtime: Dictionary,type: String,parent:
 	return false
 
 # One 48-by-32 field per finished farm, following the source search cadence.
-func tick_ai_field(city: Dictionary,runtime: Dictionary,parent: Dictionary={}) -> void:
-	if parent.is_empty():parent=city
+func tick_ai_field(city: Dictionary,parent: Dictionary) -> void:
 	if float(game.time)<float(city.get("nextFieldSearchV127",0)):return
 	var farms:=0;var fields:=0;var pending:=0
 	for b in city.economy.buildings:
 		if b.type=="farm" and b.get("ready",false) and float(b.get("hp",0))>0:farms+=1
 		if b.type=="field" and float(b.get("hp",0))>0:fields+=1
+	if farms<=fields:return
 	for b in DistrictContexts.all_buildings(parent):
 		if not b.get("ready",false) and float(b.get("hp",0))>0:pending+=1
-	if farms<=fields or pending>=6:return
+	if pending>=6:return
 	var team:=int(city.team)
 	if not Economy.can_afford(city.economy.realms[team].resources,Economy.DATA.data.buildings.field.cost):return
 	city.nextFieldSearchV127=float(game.time)+60
+	var runtime:=ensure_city_runtime(city)
 	var field: Variant=ai_field_site(city,runtime,null,parent)
 	if field==null:return
-	var heights: Array=runtime.heights
 	var passable=func(x,z,_team):return AIStoneDefenses.terrain_open(runtime.nav,x,z)
 	var economy:=DistrictContexts.build_economy(parent,city)
 	var result:=Economy.place_building(economy,team,"field",Vector2(field.x,field.z),passable,Callable(),true)
@@ -4667,15 +4702,21 @@ func district_nav_for(ctx: Dictionary,worker: Dictionary) -> LocalNavigation:
 	var nav:LocalNavigation=district_agents[key].nav;nav.trail_time=elapsed;return nav
 
 func tick_city_districts(parent: Dictionary,delta: float,production_dt: float,basic_dt: float) -> void:
+	var city_buildings:=DistrictContexts.all_buildings(parent)
 	for district in parent.get("districts",{}).values():
 		DistrictContexts.attach(parent,district);district.economy.time=parent.economy.time
 		district.waterFetchV267=parent.get("waterFetchV267",false);district.waterFetchFarV280=parent.get("waterFetchFarV280",false)
+		var view:Node=visible_city_detail(district) if detail_mode else null
+		var buildings: Array=district.economy.buildings
+		var empty_site: bool=buildings.is_empty() or (buildings.size()==1 and buildings[0].get("type","")=="hall" and buildings[0].get("virtual",false))
+		if empty_site and view==null and district.economy.cargo.is_empty() and district.world.get("workers",{}).is_empty() and district.get("basicAssigned",{}).is_empty():
+			Lumber.tick_resources(game,district.world,buildings,district.economy.time,production_dt)
+			continue
 		var runtime:=ensure_city_runtime(district);var nav:LocalNavigation=runtime.nav;nav.trail_time=elapsed
 		Production.apply_building_upgrades(game,district)
 		city_cell_data(district)
-		runtime.production.city_wide_buildings=DistrictContexts.all_buildings(parent)
+		runtime.production.city_wide_buildings=city_buildings
 		var changed:bool=runtime.production.tick(game,district,nav,production_dt,grid,basic_dt)
-		var view:Node=visible_city_detail(district) if detail_mode else null
 		if view!=null:
 			var visible:Dictionary=district.duplicate();visible.builderAgents=[]
 			for worker in parent.get("builderAgents",[]):

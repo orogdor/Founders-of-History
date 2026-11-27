@@ -36,13 +36,24 @@ static func team_cargo(cargo: Array,team: int) -> Array:
 
 var city_wide_buildings: Array=[]
 
+static func tick_resources(state: Dictionary,world: Dictionary,buildings: Array,economy_time: float,dt: float) -> bool:
+	var changed:=ForestryScript.natural_regrowth(state,world,dt,buildings)>0
+	for resource in world.resources:
+		if resource.has("respawnAt") and float(resource.respawnAt)<=economy_time:
+			resource.removed=false
+			resource.amount=resource.get("capacity",96)
+			resource.erase("respawnAt")
+			world.revision=int(world.get("revision",0))+1
+			changed=true
+	return changed
+
 func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cells: Array,basic_dt: float=-1.0) -> bool:
 	var changed:=false
 	var world: Dictionary=city.world
 	var economy: Dictionary=city.economy
 	var realm: Dictionary=economy.realms[city.team]
 	var terrain_modifiers:=Bonuses.terrain(cells,city)
-	if ForestryScript.natural_regrowth(state,world,dt,economy.buildings)>0:changed=true
+	changed=tick_resources(state,world,economy.buildings,economy.time,dt)
 	# On reload, continue above all persisted cargo IDs so their paths stay separate.
 	for cargo in economy.cargo:
 		if cargo.has("portCargoId"):next_cargo_id=maxi(next_cargo_id,int(cargo.portCargoId)+1)
@@ -50,13 +61,6 @@ func tick(state: Dictionary,city: Dictionary,base: LocalNavigation,dt: float,cel
 		worker.working=false
 		worker.moving=false
 		if worker.get("kind")=="farm":worker.visible=false
-	for resource in world.resources:
-		if resource.has("respawnAt") and float(resource.respawnAt)<=float(economy.time):
-			resource.removed=false
-			resource.amount=resource.get("capacity",96)
-			resource.erase("respawnAt")
-			world.revision=int(world.get("revision",0))+1
-			changed=true
 	if int(world.get("revision",0))!=seen_revision:synchronize(base,world,economy.buildings)
 	for well in economy.buildings:
 		if well.type!="well" or not well.get("ready",false) or well.get("disabled",false) or float(well.get("hp",0))<=0:continue
