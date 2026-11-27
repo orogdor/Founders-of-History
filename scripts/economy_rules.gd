@@ -1,6 +1,7 @@
 class_name EconomyRules
 extends RefCounted
 const DATA := preload("res://data/economy.json")
+const Walls=preload("res://scripts/wall_draw.gd")
 const Availability = preload("res://scripts/era_availability.gd")
 
 static func tempo_factor(state: Dictionary) -> float:
@@ -106,6 +107,7 @@ static func build_rule(state: Dictionary, team: int, type: String, at: Vector2, 
 	if not passable.call(at.x,at.y,team): return {"error":"Ehitada saab ainult kuival maal."}
 	for b in state.buildings:
 		if b.team != team or b.get("virtual",false) or float(b.get("hp",0)) <= 0: continue
+		if Walls.shares_wall({"type":type,"x":at.x,"z":at.y,"team":team},b):continue
 		if type == "market" or b.type == "market":
 			var x_size := (11.0 if type == "market" else 5.0)+(11.0 if b.type == "market" else 5.0)+1.5
 			var z_size := (10.2 if type == "market" else 5.0)+(10.2 if b.type == "market" else 5.0)+1.5

@@ -202,7 +202,7 @@ func create_designed_building(type: String,age: int,design: Dictionary={},tier:=
 	var raw: Node3D
 	if saved_design_id(type, design)==id:
 		raw=HousePlanModel.from_design(design,variation,true)
-	elif Period.age_of(id)>0:
+	elif id=="hunter" or Period.age_of(id)>0:
 		raw=HousePlanModel.from_design(Period.get_plan(id),variation,true)
 	elif ResourceLoader.exists(file):
 		raw=load(file).instantiate()

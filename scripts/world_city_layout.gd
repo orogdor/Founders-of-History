@@ -2,6 +2,7 @@ extends RefCounted
 
 const Navigation=preload("res://scripts/local_navigation.gd")
 const PeriodLod=preload("res://scripts/house_period_city_lod.gd")
+const StoneDwelling=preload("res://scripts/stone_map_dwelling.gd")
 const Styles=preload("res://scripts/house_period_styles.gd")
 const PaintedMaterials=preload("res://scripts/painted_building_materials.gd")
 
@@ -23,8 +24,8 @@ static func stamp(buildings: Array, age := 0) -> String:
 			if not b.get("houseDesignV354",{}).is_empty():
 				parts.append(str(hash(b.houseDesignV354)))
 			if b.type=="field":parts.append(str([b.get("width",16),b.get("depth",16)]))
-			if b.has("shoreAngle") or b.has("palisadeSpanV167") or b.has("extendedPalisadeV166") or b.has("wallAxis"):
-				parts.append(str(hash([b.get("shoreAngle",0),b.get("palisadeSpanV167",0),b.get("cliffEmbedStartV179",0),b.get("cliffEmbedEndV179",0),b.get("extendedPalisadeV166",false),b.get("wallAxis",false)])))
+		if b.has("shoreAngle") or b.has("palisadeSpanV167") or b.has("extendedPalisadeV166") or b.has("wallAxis"):
+			parts.append(str(hash([b.get("shoreAngle",0),b.get("palisadeSpanV167",0),b.get("cliffEmbedStartV179",0),b.get("cliffEmbedEndV179",0),b.get("extendedPalisadeV166",false),b.get("wallAxis",false)])))
 	return "|".join(parts)
 
 static func map_size(kind: String, age: int) -> float:
@@ -70,6 +71,9 @@ static func clearances(buildings: Array,origin: Vector2,age:=0) -> Array:
 
 static func get_mesh(name: String) -> Mesh:
 	if meshes.has(name):return meshes[name]
+	if name in ["house","hunter","peamaja"]:
+		meshes[name]=StoneDwelling.new().dwelling(name,PeriodLod.material(0))
+		return meshes[name]
 	var path: String="res://assets/world/town_models/"+name+".glb"
 	if not ResourceLoader.exists(path):return null
 	var source: Node=load(path).instantiate();var found:=find_mesh(source)
@@ -87,7 +91,7 @@ static func find_mesh(node: Node) -> MeshInstance3D:
 	return null
 
 static func map_rotation(building: Dictionary, age: int, coast_plan: Dictionary, fortification: bool) -> float:
-	var fallback := PI/2 if age in [1,2] and fortification and building.get("wallAxis",false) else 0.0
+	var fallback := PI/2 if fortification and building.get("wallAxis",false) else 0.0
 	var angle := float(building.get("buildingRotationV228",building.get("wallAngleV175",building.get("shoreAngle",fallback))))
 	if age in [1,2] and building.type in ["harbor","fisher"] and building.has("shoreAngle"):
 		var plan := coast_plan if not coast_plan.is_empty() else Styles.get_plan(Styles.designer_id(building.type,age))
@@ -119,7 +123,7 @@ static func build(buildings: Array,origin: Vector3,height: Callable,tile:=Vector
 		var batch:=MultiMesh.new();batch.transform_format=MultiMesh.TRANSFORM_3D;batch.use_custom_data=true
 		# On the Compatibility renderer an explicit white instance color keeps
 		# this mesh's painted plaster, earth and timber vertex colors visible.
-		batch.use_colors = age in [1,2]
+		batch.use_colors = true
 		batch.mesh=mesh;batch.instance_count=groups[name].size()
 		for i in groups[name].size():
 			var item: Dictionary=groups[name][i];var b: Dictionary=item.building
@@ -127,7 +131,7 @@ static func build(buildings: Array,origin: Vector3,height: Callable,tile:=Vector
 			var fortification: bool = b.type in ["palisade","stonewall","reinforced_wall","woodgate","gatehouse"]
 			var angle := map_rotation(b,age,plans.get(name,{}),fortification)
 			var span := 1.0
-			if age in [1,2] and fortification:
+			if fortification:
 				if float(b.get("palisadeSpanV167",0))>0 and b.type in ["palisade","stonewall","reinforced_wall"]:
 					span=(float(b.palisadeSpanV167)+float(b.get("cliffEmbedStartV179",0))+float(b.get("cliffEmbedEndV179",0)))/7.0
 				elif b.type in ["palisade","woodgate","gatehouse"] and b.get("extendedPalisadeV166",false):

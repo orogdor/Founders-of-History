@@ -480,9 +480,10 @@ func choose_building(index: int) -> void:
 	if not host.detail_mode:
 		host.toggle_detail()
 		if not host.can_build_on_detail():return
+	if type in ["palisade","stonewall","reinforced_wall","watchtower","stonetower"]:close_menu()
 	host.build_select.select(index);host.update_field_controls(index)
 	host.clear_building_preview();host.build_angle=null;host.build_placement_mode=true
-	host.update_status("Lohista müür kaardile · C sirge/kumer · T kõrgus · Ctrl + hiireratas pöörab." if type in ["palisade","stonewall","reinforced_wall"] else "Vali detailkaardil ehituskoht · Ctrl + hiireratas pöörab." if type!="field" else "Lohista detailkaardile põllu ala · Ctrl + hiireratas pöörab.")
+	host.update_status("Klõpsa ühe vallilõigu jaoks või lohista pikem vall · C muudab kuju, T taset." if type in ["palisade","stonewall","reinforced_wall"] else "Klõpsa vallile torni kinnitamiseks või vali vaba ehituskoht." if type in ["watchtower","stonetower"] else "Vali detailkaardil ehituskoht · Ctrl + hiireratas pöörab." if type!="field" else "Lohista detailkaardile põllu ala · Ctrl + hiireratas pöörab.")
 
 func populate_villages() -> void:
 	var research: Dictionary=host.game.research[0]

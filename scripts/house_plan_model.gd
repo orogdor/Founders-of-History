@@ -835,16 +835,24 @@ func add_wall_brace(a: Vector3,b: Vector3,radius: float) -> void:
  if a.distance_to(b)<0.001:return
  add_pole(a,b,radius,"wood");get_child(get_child_count()-1).name="HouseWallBrace"
 
-func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float) -> void:
+func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float,end_high:=NAN) -> void:
+ if is_nan(end_high):end_high=high
  var length:=a.distance_to(b)
- if length<0.08 or high-low<0.09:return
+ if length<0.025 or maxf(high,end_high)-low<0.035:return
  var axis:Vector3=(b-a).normalized();var side:=Vector3(-axis.z,0,axis.x)
- var bays:=maxi(1,roundi(length/0.22));var courses:=maxi(1,roundi((high-low)/0.052));var segments:=bays*8;var sides:=7
+ var bays:=maxi(1,roundi(length/0.22));var courses:=maxi(1,roundi((maxf(high,end_high)-low)/0.052));var segments:=bays*5;var sides:=5
  var surface:=SurfaceTool.new();surface.begin(Mesh.PRIMITIVE_TRIANGLES);surface.set_material(material_for("wood"))
  for course in courses:
-  var y:=low+(course+0.5)*(high-low)/courses;var radius:=0.016+fence_noise(course*47+2)*0.008
+  var radius:=0.016+fence_noise(course*47+2)*0.008
+  var y:=lerpf(low,maxf(high,end_high),(course+0.5)/courses)
+  var u0:=0.0;var u1:=1.0
+  if y>minf(high,end_high):
+   var crossing:=clampf((y-high)/(end_high-high),0,1)
+   if end_high>high:u0=crossing
+   else:u1=crossing
+  if (u1-u0)*length<radius:continue
   var sample=func(step: int,ring: int) -> Vector3:
-   var u:=float(step)/segments;var theta:=float(ring)/sides*TAU
+   var u:=lerpf(u0,u1,float(step)/segments);var theta:=float(ring)/sides*TAU
    var weave:=cos(u*bays*PI+course*PI);var bend:=sin(u*12+fence_noise(course*47)*6)*0.009+sin(u*31+course*47)*0.004
    return a.lerp(b,u)+Vector3.UP*(y+bend+cos(theta)*radius)+side*(weave*(width*0.40+0.012)+sin(theta)*radius)
   for step in segments:
@@ -854,7 +862,8 @@ func add_woven_wall(a: Vector3,b: Vector3,low: float,high: float,width: float) -
     for index in [3,2,1,2,0,1]:surface.set_uv(uv[index]);surface.add_vertex(points[index])
  surface.generate_normals();var mesh:=MeshInstance3D.new();mesh.name="HouseWovenBranches";mesh.mesh=surface.commit();add_child(mesh)
  for i in bays+1:
-  var p:=a.lerp(b,float(i)/bays);add_pole(p+Vector3.UP*low,p+Vector3.UP*high,width*0.28,"wood")
+  var u:=float(i)/bays;var p:=a.lerp(b,u)
+  add_pole(p+Vector3.UP*low,p+Vector3.UP*lerpf(high,end_high,u),width*0.28,"wood")
 
 # The roof surface and reed courses follow the source designer's sampling;
 # vents and finer era-specific roof details remain to be ported.
@@ -931,7 +940,10 @@ func add_round_eave_wall(outline: PackedVector2Array,sample: Callable,seat: floa
    elif span.get("type","")=="window":
     var win:=Plan.window_span(era,style)
     bands=[Vector2(base,win.x),Vector2(maxf(base,win.y),INF)]
-   var divisions:=maxi(1,ceili(span.a.distance_to(span.b)/7.0))
+   # A woven span uses the same post spacing and bent rods as the wall below.
+   # Keep each span whole so a post does not restart at every roof sample.
+   var woven:bool=span.finish=="weave"
+   var divisions:=1 if woven else maxi(1,ceili(span.a.distance_to(span.b)/7.0))
    for j in divisions:
     var tops: Array[Vector3]=[]
     for step in [j,j+1]:
@@ -946,6 +958,11 @@ func add_round_eave_wall(outline: PackedVector2Array,sample: Callable,seat: floa
      last.y=clampf(last.y,band.x,maxf(band.x,band.y))
      if maxf(first.y,last.y)<=band.x:continue
      var finish:=str(span.finish)
+     if woven:
+      var mesh_start:=get_child_count()
+      add_woven_wall(local(span.a),local(span.b),band.x,first.y,0.19,last.y)
+      for index in range(mesh_start,get_child_count()):
+       get_child(index).set_meta("period_static","eave_wall")
      if not surfaces.has(finish):
       var batch:=SurfaceTool.new()
       batch.begin(Mesh.PRIMITIVE_TRIANGLES);batch.set_material(material_for(finish))

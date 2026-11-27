@@ -18,6 +18,7 @@ static func successor(graph: Dictionary,id: String,unlocked: Callable) -> Varian
  return found
 
 static func building_successor(state: Dictionary,team: int,id: String) -> Variant:
+ if id in ["watchtower","palisade"]:return null
  var age:=int(state.ages[team]);var known: Array=state.research[team].known
  return successor(BUILDING_SUCCESSORS,id,func(next):
   var tech: String=RESEARCH.data.build_tech.get(next,"")

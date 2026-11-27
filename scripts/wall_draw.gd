@@ -127,6 +127,23 @@ static func wall_point_inside(p: Vector2,wall: Dictionary,pad:=0.0) -> bool:
  var dx:=p.x-float(wall.x);var dz:=p.y-float(wall.z);var c:=cos(angle);var s:=sin(angle)
  return absf(dx*c-dz*s)<=span/2+pad and absf(dx*s+dz*c)<=depth+pad
 
+static func tower_site(type: String,at: Vector2,buildings: Array,team: int) -> Dictionary:
+ if type not in ["watchtower","stonetower"]:return {}
+ var nearest: Dictionary={}
+ var best:=2.8
+ for wall in buildings:
+  if wall.type not in ["palisade","stonewall","reinforced_wall"] or wall.get("team",-1)!=team or wall.get("virtual",false) or float(wall.get("hp",0))<=0:continue
+  var ends:=end_points(wall)
+  var p:=Geometry2D.get_closest_point_to_segment(at,ends[0],ends[1])
+  var distance:=at.distance_to(p)
+  if distance>=best:continue
+  var axis:Vector2=ends[1]-ends[0]
+  nearest={"point":p,"angle":-axis.angle()};best=distance
+ return nearest
+
+static func shares_wall(tower: Dictionary,wall: Dictionary) -> bool:
+ return tower.get("type","") in ["watchtower","stonetower"] and tower.get("team",-1)==wall.get("team",-2) and tower_joins(tower,wall)
+
 static func tower_joins(tower: Dictionary,wall: Dictionary) -> bool:
  if wall.get("type","") not in ["palisade","stonewall","reinforced_wall"]:return false
  var angle:=float(wall.get("wallAngleV175",PI/2 if wall.get("wallAxis",false) else 0));var dx:=float(tower.x)-float(wall.x);var dz:=float(tower.z)-float(wall.z)

@@ -1655,7 +1655,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var field_mode: bool=build_placement_mode and can_build_on_detail() and city_created and not settler_mode and build_select.get_item_metadata(build_select.selected)=="field"
 			var wall_mode: bool=wall_drawing_active()
 			if wall_mode and event.pressed:
-				var start:Variant=detail_point(event.position);wall_stroke=[]
+				var start:Variant=detail_point(event.position);wall_stroke=[];drag_origin=event.position
 				if start!=null:wall_stroke.append({"x":float(start.x),"z":float(start.z)});clear_building_preview()
 			elif wall_mode and not event.pressed and not wall_stroke.is_empty():finish_wall_stroke(event.position)
 			elif field_mode and event.pressed:
@@ -1730,7 +1730,7 @@ func rotate_build_preview(screen: Vector2,direction: int) -> void:
 	var initial:=float(building_preview.get_meta("placement_yaw",building_preview.rotation.y)) if is_instance_valid(building_preview) else 0.0
 	var current: float=initial if build_angle==null else float(build_angle)
 	build_angle=fposmod(current+deg_to_rad(2.0)*direction,TAU)
-	if not wall_stroke.is_empty():show_wall_preview()
+	if not wall_stroke.is_empty():show_wall_preview(wall_points_rotated(wall_stroke))
 	elif field_drag_start!=null:update_field_preview(screen)
 	else:update_building_preview(screen)
 	update_status("Pööre: %d° · Ctrl + hiireratas muudab nurka." % roundi(rad_to_deg(float(build_angle))))
@@ -1741,6 +1741,8 @@ func tint_building_preview(node: Node,material: Material) -> void:
 
 # The same checks and snapped position are used by both the ghost and placement.
 func building_site_check(city: Dictionary,type: String,requested: Vector2) -> Dictionary:
+	var attachment:=WallDraw.tower_site(type,requested,city.economy.buildings,int(city.team))
+	if not attachment.is_empty():requested=attachment.point
 	if city_created and active_city_index>=0 and active_city_index<game.cities.size():
 		var parent:Dictionary=game.cities[active_city_index]
 		var offset:=Vector2((int(city.c)-int(parent.c))*225.0,(int(city.r)-int(parent.r))*195.0)
@@ -1784,6 +1786,7 @@ func building_site_check(city: Dictionary,type: String,requested: Vector2) -> Di
 				if dx!=0 and dz!=0:levels.append(DetailTerrainScript.detail_height(city_heights,x,z))
 		if float(levels.max())-float(levels.min())>1.8:return {"error":"Maapind on hoone jaoks liiga järsk.","point":target}
 	var candidate: Dictionary={"type":type,"x":target.x,"z":target.y,"team":city.team}
+	if not attachment.is_empty():candidate.buildingRotationV228=attachment.angle
 	if coast.has("landEntry"):candidate.landEntry=coast.landEntry
 	if build_angle!=null:candidate.buildingRotationV228=float(build_angle);candidate.freeRotationV243=true
 	elif not coast.is_empty():candidate.shoreAngle=coast.get("shoreAngle",0.0)
@@ -1798,6 +1801,7 @@ func building_site_check(city: Dictionary,type: String,requested: Vector2) -> Di
 	if footprint!=null:
 		for other in city.economy.buildings:
 			if other.get("virtual",false) or float(other.get("hp",0))<=0:continue
+			if WallDraw.shares_wall(candidate,other):continue
 			var existing: Variant=LocalNav.clearance(other)
 			if existing==null:continue
 			var close_houses: bool=type=="house" and other.type=="house"
@@ -1809,7 +1813,7 @@ func building_site_check(city: Dictionary,type: String,requested: Vector2) -> Di
 	var result:=Economy.build_rule(city.economy,city.team,type,target,passable,build_site_clear,true)
 	if not result.has("error") and city_nav!=null and not city_nav.preserves_access(candidate,city.economy.buildings,city.world.get("workers",{}),city.economy.get("cargo",[])):
 		result={"error":"Hoone sulgeks sissepääsu või töötaja tagasitee. Jäta majade vahele läbipääs."}
-	result.point=target;result.coast=coast;result.deposit_id=deposit_id
+	result.point=target;result.coast=coast;result.deposit_id=deposit_id;result.attachment=attachment
 	return result
 
 func update_building_preview(screen: Vector2) -> void:
@@ -1818,6 +1822,10 @@ func update_building_preview(screen: Vector2) -> void:
 	if type=="field":clear_building_preview();return
 	var hit: Variant=detail_point(screen)
 	if hit==null:return
+	if wall_drawing_active():
+		clear_building_preview()
+		show_wall_preview(single_wall_points(Vector2(hit.x,hit.z)))
+		return
 	var city: Dictionary=current_build_context()
 	if not is_instance_valid(building_preview) or building_preview_type!=type:
 		clear_building_preview()
@@ -1833,6 +1841,7 @@ func update_building_preview(screen: Vector2) -> void:
 	if coast.has("baseY"):elevation=elevation+float(coast.baseY)-ground if coast.get("riverBankV276",false) else float(coast.baseY)
 	building_preview.position=Vector3(point.x,elevation+0.12,point.y)
 	var placement_yaw:=float(build_angle) if build_angle!=null else float(coast.get("shoreAngle",0.0))
+	if build_angle==null and not check.get("attachment",{}).is_empty():placement_yaw=check.attachment.angle
 	building_preview.set_meta("placement_yaw",placement_yaw)
 	building_preview.rotation.y=placement_yaw+float(building_preview.get_meta("coast_art_yaw",0.0)) if coast.has("shoreAngle") else placement_yaw
 	var error: String=check.get("error","")
@@ -3785,6 +3794,7 @@ func place_city_building() -> void:
 		build_placement_mode=false;clear_building_preview();update_resources_status();update_status("Silla ehitus on järjekorras.");return
 	var target:=build_position
 	var field: Dictionary={}
+	var attachment: Dictionary={}
 	var coast_placement: Dictionary={}
 	var deposit_id: int=-1
 	if type=="field":
@@ -3795,7 +3805,7 @@ func place_city_building() -> void:
 	else:
 		var check:=building_site_check(city,type,target)
 		if check.has("error"):update_status(check.error);return
-		target=check.point;coast_placement=check.coast;deposit_id=check.deposit_id
+		target=check.point;coast_placement=check.coast;deposit_id=check.deposit_id;attachment=check.attachment
 	var passable: Callable=build_terrain_passable
 	if not coast_placement.is_empty():passable=func(_x,_z,_team):return true
 	var economy:Dictionary=city.economy
@@ -3811,6 +3821,7 @@ func place_city_building() -> void:
 			if coast_placement.has(key):result.building[key]=coast_placement[key]
 	if build_angle!=null:
 		result.building.buildingRotationV228=float(build_angle);result.building.freeRotationV243=true
+	elif not attachment.is_empty():result.building.buildingRotationV228=attachment.angle
 	if type=="field":
 		result.building.width=field.width;result.building.depth=field.depth
 		for resource in city.world.resources:
@@ -4707,7 +4718,8 @@ func wall_terrain_passable(x: float,z: float) -> bool:
 	var cell:Dictionary=grid[tile.y*Grid.COLS+tile.x]
 	if not cell.land or cell.get("mountain",false):return false
 	var owner:Variant=territory_allocation.get("territory",{}).get(DistrictContexts.key(tile))
-	if owner==null or int(owner.id)!=int(game.cities[active_city_index].id):return false
+	var parent: Dictionary=game.cities[active_city_index]
+	if tile!=Vector2i(int(parent.c),int(parent.r)) and (owner==null or int(owner.id)!=int(parent.id)):return false
 	var lx:=x-dc*225.0;var lz:=z-dr*195.0
 	if detail_rendered_height(x,z)<=0.2:return false
 	var heights:Array=detail_root.heights if dc==0 and dr==0 else detail_pick_heights.get(DistrictContexts.key(tile),[])
@@ -4715,22 +4727,27 @@ func wall_terrain_passable(x: float,z: float) -> bool:
 	var river:=river_navigation_for(tile.x,tile.y,heights)
 	return river==null or river.passable(lx,lz)
 
+func single_wall_points(at: Vector2) -> Array:
+	var angle:=float(build_angle) if build_angle!=null else 0.0
+	var half:=Vector2(cos(angle),-sin(angle))*WallDraw.SPACING/2.0
+	return WallDraw.snap_ends([WallDraw.as_point(at-half),WallDraw.as_point(at+half)],current_build_context().economy.buildings)
+
 func update_wall_stroke(screen: Vector2) -> void:
 	var p:Variant=detail_point(screen)
 	if p==null:return
 	var last:Dictionary=wall_stroke.back()
 	if Vector2(last.x,last.z).distance_to(Vector2(p.x,p.z))<1.5:return
-	wall_stroke.append({"x":float(p.x),"z":float(p.z)});show_wall_preview()
+	wall_stroke.append({"x":float(p.x),"z":float(p.z)});show_wall_preview(wall_points_rotated(wall_stroke))
 
-func show_wall_preview() -> void:
+func show_wall_preview(points: Array) -> void:
 	clear_wall_preview()
-	if wall_stroke.size()<2:return
-	var result:=WallDraw.plan(wall_points_rotated(wall_stroke),wall_shape,10,wall_terrain_passable)
+	if points.size()<2:return
+	var result:=WallDraw.plan(points,wall_shape,10,wall_terrain_passable)
 	var mesh:=ImmediateMesh.new();var material:=StandardMaterial3D.new();material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;material.albedo_color=Color("e65555") if result.has("error") else Color("78d48b")
 	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP,material)
 	var curve:Array=result.get("curve",[])
 	if curve.is_empty():
-		for p in wall_stroke:curve.append(Vector2(p.x,p.z))
+		for p in points:curve.append(Vector2(p.x,p.z))
 	for p in curve:mesh.surface_add_vertex(Vector3(p.x,detail_rendered_height(p.x,p.y)+0.2,p.y))
 	mesh.surface_end();wall_preview=MeshInstance3D.new();wall_preview.mesh=mesh;detail_root.add_child(wall_preview)
 	if result.has("error"):update_status(result.error)
@@ -4739,7 +4756,10 @@ func show_wall_preview() -> void:
 func finish_wall_stroke(screen: Vector2) -> void:
 	var p:Variant=detail_point(screen)
 	if p!=null:wall_stroke.append({"x":float(p.x),"z":float(p.z)})
-	var result:=WallDraw.plan(wall_points_rotated(wall_stroke),wall_shape,10,wall_terrain_passable);wall_stroke=[];clear_wall_preview()
+	var points:=wall_points_rotated(wall_stroke)
+	if p!=null and drag_origin.distance_to(screen)<5.0 and WallDraw.clean(wall_stroke).size()<=2:
+		points=single_wall_points(Vector2(p.x,p.z))
+	var result:=WallDraw.plan(points,wall_shape,10,wall_terrain_passable);wall_stroke=[];clear_wall_preview()
 	if result.has("error"):update_status(result.error);return
 	var type:String=build_select.get_item_metadata(build_select.selected)
 	var placement:=place_wall_segments(type,result.segments)

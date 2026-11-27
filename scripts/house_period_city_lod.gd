@@ -7,7 +7,7 @@ const BronzeMap = preload("res://scripts/bronze_age_map_mesh.gd")
 const IronMap = preload("res://scripts/iron_age_map_mesh.gd")
 const PeriodShader=preload("res://scripts/period_world_building.gdshader")
 const FAMILIES:=[
-	[],["aegeanPlaster","romanTile","aegeanRed"],["romanStucco","romanTile","romanRed"],
+	[Painted.STONE,Painted.REED,"period_norseTimber"],["aegeanPlaster","romanTile","aegeanRed"],["romanStucco","romanTile","romanRed"],
 	["norseTimber","norseShingle","medievalMasonry"],["lappedPine","slate","maritimePaint"],
 	["millBrick","corrugation","castIron"],["boardConcrete","membrane","metalTrim"],
 ]
@@ -40,10 +40,11 @@ static func material(age: int) -> ShaderMaterial:
 		shader.shader=PeriodShader
 		var names:=["walls","roofs","accents"]
 		for slot in names.size():
-			var family: String = ["period_aegeanPlaster", Painted.SOIL, "period_norseTimber"][slot] if age == 1 else "period_" + str(FAMILIES[age][slot])
+			var family: String = FAMILIES[age][slot]
+			if age==1:family=["period_aegeanPlaster",Painted.SOIL,"period_norseTimber"][slot]
+			elif age>0:family="period_"+family
 			shader.set_shader_parameter(names[slot],Painted.atlas(family))
-		if age in [1,2]:
-			shader.set_shader_parameter("paint_strength", 0.20 if age == 1 else 0.17)
+		shader.set_shader_parameter("paint_strength", [0.23,0.20,0.17,0.32,0.34,0.36,0.36][age])
 		materials[age]=shader
 	return materials[age]
 
@@ -66,8 +67,8 @@ static func prism(surface: SurfaceTool, center: Vector3,size: Vector3,tint: Colo
 	var d:=Vector3(bottom.x,bottom.y,top.z)
 	var rise:=Vector3.UP*size.y
 	for edge in [[a,b],[b,c],[c,d],[d,a]]:
-		quad(surface,edge[0],edge[1],edge[0]+rise,edge[1]+rise,tint,finish)
-	quad(surface,a+rise,b+rise,d+rise,c+rise,tint,finish)
+		quad(surface,edge[1],edge[0],edge[1]+rise,edge[0]+rise,tint,finish)
+	quad(surface,a+rise,d+rise,b+rise,c+rise,tint,finish)
 
 static func ridged(surface: SurfaceTool,at: Vector3,width: float,depth: float,rise: float,tint: Color,end_tint: Color,hip:=false) -> void:
 	var x:=width/2
@@ -229,6 +230,16 @@ static func mesh(age: int,role: String) -> Mesh:
 		if age==4 and dock:
 			prism(surface,Vector3(0,0.063,length*0.68),Vector3(width*0.72,0.13,length*0.55),wall.darkened(0.12))
 		prism(surface,Vector3(0,h*0.31,length/2+0.009),Vector3(width*0.20,h*0.62,0.025),wall.darkened(0.47))
+	if role=="home" and age>=3:
+		var frame:=wall.darkened(0.56)
+		for side:float in [-1.,1.]:
+			for location:float in [-0.28,0.25]:
+				prism(surface,Vector3(side*(width/2+0.01),h*0.60,length*location),Vector3(0.022,h*0.34,length*0.19),frame,2)
+				prism(surface,Vector3(side*(width/2+0.025),h*0.41,length*location),Vector3(0.045,0.027,length*0.23),accent,2)
+		if age<6:
+			for side:float in [-1.,1.]:
+				prism(surface,Vector3(side*width*0.47,h*0.5,length/2+0.009),Vector3(0.055,h,0.045),accent,2)
+			prism(surface,Vector3(width*0.21,h+0.19,-length*0.24),Vector3(0.12,0.37,0.14),wall.darkened(0.22),0)
 	surface.generate_normals()
 	var result:=surface.commit()
 	cache[key]=result

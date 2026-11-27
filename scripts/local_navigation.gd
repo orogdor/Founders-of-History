@@ -1,5 +1,6 @@
 class_name LocalNavigation
 extends RefCounted
+const Walls=preload("res://scripts/wall_draw.gd")
 const Heap=preload("res://scripts/min_priority_queue.gd")
 const DIRS := [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1),Vector2i(1,1),Vector2i(1,-1),Vector2i(-1,1),Vector2i(-1,-1)]
 var min_x: int
@@ -248,7 +249,7 @@ func preserves_access(candidate: Dictionary,buildings: Array,workers: Dictionary
 	for building in buildings:
 		if building.get("virtual",false) or float(building.get("hp",0))<=0 or clearance(building)==null:continue
 		if building.type=="hall":hall=building
-		anchors.append(door(building))
+		if not Walls.shares_wall(candidate,building):anchors.append(door(building))
 	if hall==null:return true
 	var from: Variant=nearest(door(hall))
 	if from==null:return false
