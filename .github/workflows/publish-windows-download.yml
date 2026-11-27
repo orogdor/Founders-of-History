@@ -13,14 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ef0b189bd698eee0d68d3d9b7379890edbea8b65
+          ref: d7a70f7f85c5fefb5bbdd0f41bef996e718b67f1
           fetch-depth: 1
       - name: Download verified Windows build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run download 46018772505 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
+          gh run watch 46061408109 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
+          gh run download 46061408109 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
           find /tmp/game -maxdepth 3 -type f -printf '%P %s\n'
           cd /tmp/game
           zip -q -r /tmp/Founders-of-History-Windows.zip .
@@ -30,4 +31,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create windows-majad-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target ef0b189bd698eee0d68d3d9b7379890edbea8b65 --title "Founders of History Windows" --notes "Windowsi mänguversioon koos pronksi- ja rauaaja uute ehitistega." --latest=false
+          gh release create windows-jahionn-puud-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target d7a70f7f85c5fefb5bbdd0f41bef996e718b67f1 --title "Founders of History Windows" --notes "Parandatud jahionni seinad ja külavaate puud." --latest=false
