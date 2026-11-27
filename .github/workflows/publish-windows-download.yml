@@ -16,8 +16,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run watch 46064731008 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
-          gh run download 46064731008 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
+          gh run watch 46065192580 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
+          gh run download 46065192580 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
           find /tmp/game -maxdepth 3 -type f -printf '%P %s\n'
           cd /tmp/game
           zip -q -r /tmp/Founders-of-History-Windows.zip .
@@ -27,4 +27,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create windows-puitvallid-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target 94ab759ecbf39cc74daf7f9590b3f360234b8c50 --title "Founders of History Windows" --notes "Jahionni punutis räästani, uued maailmakaardi elamud ning ehitatavad puitvallid ja vahitornid." --latest=false
+          gh release create windows-vallid-tornid-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target a3a7e69ef9c8c42d04caf5312d068bbe439efaeb --title "Founders of History Windows" --notes "Jahionni punutis räästani, uued maailmakaardi elamud ning ehitatavad puitvallid ja vahitornid." --latest=false
