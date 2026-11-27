@@ -147,6 +147,8 @@ func check_transition(host: Node) -> bool:
 			host.tick_ai_build(city,runtime)
 			host.tick_ai_field(city,runtime,city)
 			host.plan_ai_rural(city)
+		# Manual replay steps supply their own clock instead of frame timing.
+		host.previous_frame_usec = 0
 		host._process(6.0)
 		if float(state.time) <= now:
 			printerr("Simulation stopped at ",now," game seconds")
