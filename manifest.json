@@ -1,37 +1,37 @@
 {
   "schema": 1,
   "runtime": "godot-4.7.2-windows-v1",
-  "revision": 31,
-  "source": "94d0025d08eeef5af7acdfa3f6919fc0d93ae9a0",
+  "revision": 34,
+  "source": "521ce4f7cbb1f11a62fd6241b702ed48e714f69c",
   "base": {
     "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-base-v1/windows-base.pck",
     "sha256": "76dc077da861baca0907fc6923412172be96d3a0fbd0e28acd47204adbaacfea",
     "size": 772092496
   },
   "patch": {
-    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-31-1/windows-patch.pck",
-    "sha256": "aeecb36a3df9c42ba4598fb1a50072d2a535c71c526b6bc9467f2e85eaf2fd7a",
-    "size": 1550471924
+    "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-34-1/windows-patch.pck",
+    "sha256": "bcb9c34f0e3cfe9bae16d9b8653cb51754790d4acbae6e7a3c1246ff3816ca9c",
+    "size": 1550472772
   },
   "deltas": [
     {
-      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-31-1/windows-delta-30-1.bin",
-      "sha256": "b51ac30da69d1131aae56752de75181437ef44b4a45c03dce5c009a07b98e02d",
-      "size": 4657847,
+      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-34-1/windows-delta-31-1.bin",
+      "sha256": "2c79616a0274e1e357cc21fe07fb66caf85862275685b4eb48a771fa926c0663",
+      "size": 4280379,
+      "from": {
+        "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-31-1/windows-patch.pck",
+        "sha256": "aeecb36a3df9c42ba4598fb1a50072d2a535c71c526b6bc9467f2e85eaf2fd7a",
+        "size": 1550471924
+      }
+    },
+    {
+      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-34-1/windows-delta-30-1.bin",
+      "sha256": "8402a35b52a4db5657c9d5faefda849cd9070d5dcf17268e2d4eb4811ba175b7",
+      "size": 4537993,
       "from": {
         "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-30-1/windows-patch.pck",
         "sha256": "e88c14d3a2cf78b134a31858b2ee68c7f45ae082c6116f32102afc824afa9455",
         "size": 1550329900
-      }
-    },
-    {
-      "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-31-1/windows-delta-29-1.bin",
-      "sha256": "24e8e574f523b6d709db6bce4bcc3936a28d41b0e88db650022cfafa170f6029",
-      "size": 4772022,
-      "from": {
-        "url": "https://github.com/orogdor/Founders-of-History/releases/download/windows-launcher-update-29-1/windows-patch.pck",
-        "sha256": "6b6053b565c0652bdb23b14271e9b663b5c3cca8c37df1eba60404ea09d23ffa",
-        "size": 1550259540
       }
     }
   ]
