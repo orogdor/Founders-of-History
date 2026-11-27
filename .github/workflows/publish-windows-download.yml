@@ -16,8 +16,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run watch 46068502548 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
-          gh run download 46068502548 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
+          gh run watch 46069637957 --repo "$GITHUB_REPOSITORY" --interval 30 --exit-status
+          gh run download 46069637957 --repo "$GITHUB_REPOSITORY" --name Founders-of-History-Windows --dir /tmp/game
           find /tmp/game -maxdepth 3 -type f -printf '%P %s\n'
           cd /tmp/game
           zip -q -r /tmp/Founders-of-History-Windows.zip .
@@ -27,4 +27,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create windows-linnade-joudlus-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target 644df87f649ae47fccb34d3862def283de8f2174 --title "Founders of History Windows" --notes "Taustalinnade arvutused toimuvad kordamööda. Tühjad linnaosad ja valliväravate kontroll vajavad vähem teeleidmist." --latest=false
+          gh release create windows-maailmakaart-20261127 /tmp/Founders-of-History-Windows.zip --repo "$GITHUB_REPOSITORY" --target 50de7815b73e8ca9fd0ffd2b61122e69a24b5175 --title "Founders of History Windows" --notes "Maailmakaardi jõudlus: linnad töötavad kordamööda, tühjad linnaosad on kergemad ning kaardi avastamine kasutab olemasolevaid linnapiire." --latest=false
